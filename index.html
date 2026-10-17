@@ -726,6 +726,32 @@ html.dark #pdDropdownLayer{background:#15283f;border-color:#385474;color:#d4e2f6
 html.dark #partsDashboard .pd-panel,html.dark #partsDashboard .pd-filter{border-color:#30435f}html.dark #partsDashboard .pd-bar-track{background:repeating-linear-gradient(to right,transparent 0,transparent calc(25% - 1px),#2d435f calc(25% - 1px),#2d435f 25%)}
 html.dark #partsDashboard .pd-brand-mark{background:#203c61;border-color:#37577e;color:#afcffc}html.dark #partsDashboard .pd-open{background:#1a304d;border-color:#37577e;color:#a7c8f4}html.dark #partsDashboard .pd-share-track{background:#2b4261}
 </style>
+
+<style id="partsStatisticsExpandStyle">
+#partsDashboard .pd-chart-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+#partsDashboard .pd-chart-actions .pd-btn{border-color:#cbdcf6;color:#2563eb;background:#f4f8ff;min-height:34px}
+#partsDashboard .pd-chart-actions .pd-btn:hover{background:#eaf2ff}
+#partsDashboard .pd-chart-dialog{position:fixed;inset:0;width:100vw;max-width:none;height:100vh;height:100dvh;max-height:none;margin:0;padding:0;border:0;border-radius:0;background:var(--pd-card,#fff);color:var(--pd-ink,#1c304c);overflow:hidden;box-sizing:border-box}
+#partsDashboard .pd-chart-dialog[open]{display:flex;flex-direction:column}
+#partsDashboard .pd-chart-dialog::backdrop{background:#0f172a99}
+#partsDashboard .pd-chart-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:26px 36px 20px;border-bottom:1px solid var(--pd-border,#dbe5f3);flex:none}
+#partsDashboard .pd-chart-dialog-eyebrow{margin:0 0 7px;color:#3970d4;font-size:10px;font-weight:800;letter-spacing:.12em}
+#partsDashboard .pd-chart-dialog-head .pd-panel-title{font-size:24px;line-height:1.4}
+#partsDashboard .pd-chart-dialog-head .pd-panel-sub{font-size:12px}
+#partsDashboard .pd-chart-dialog-close{flex:none;min-height:42px;padding:10px 16px;font-size:12px!important}
+#partsDashboard .pd-chart-dialog .pd-chart-legend{padding:18px 36px 12px;justify-content:space-between;flex:none;gap:20px;font-size:12px}
+#partsDashboard .pd-chart-dialog-legend-label{display:flex;align-items:center;gap:8px}
+#partsDashboard #pdChartDialogCount{font-weight:700;text-align:right;line-height:1.6}
+#partsDashboard .pd-chart-dialog .pd-chart-dialog-bars{flex:1 1 0;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;justify-content:flex-start;gap:12px;padding:16px 36px 28px}
+#partsDashboard .pd-chart-dialog-bars .pd-bar-row{flex:none;grid-template-columns:minmax(160px,23%) minmax(0,1fr) 90px;gap:20px;min-height:32px;padding:3px 0}
+#partsDashboard .pd-chart-dialog-bars .pd-bar-name{font-size:14px;line-height:1.6;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+#partsDashboard .pd-chart-dialog-bars .pd-bar-track{height:22px}
+#partsDashboard .pd-chart-dialog-bars .pd-bar-value{font-size:14px}
+#partsDashboard .pd-chart-dialog .pd-chart-foot{flex:none;padding:16px 36px;font-size:11px;gap:16px;background:var(--pd-card,#fff);padding-bottom:max(16px,env(safe-area-inset-bottom))}
+html.dark #partsDashboard .pd-chart-actions .pd-btn{border-color:#3a5274;background:#1c304d;color:#bdd7ff}
+html.dark #partsDashboard .pd-chart-dialog-close{background:#1c304d;border-color:#3a5274;color:#bdd7ff}
+@media(max-width:760px){#partsDashboard .pd-panel-head:has(.pd-chart-actions){flex-wrap:wrap}#partsDashboard .pd-chart-actions{margin-left:auto}#partsDashboard .pd-chart-dialog-head{padding:20px 16px 16px;gap:12px;align-items:flex-start}#partsDashboard .pd-chart-dialog-head .pd-panel-title{font-size:20px}#partsDashboard .pd-chart-dialog-eyebrow{font-size:9px}#partsDashboard .pd-chart-dialog-close{padding:9px 11px}#partsDashboard .pd-chart-dialog .pd-chart-legend{padding:14px 16px 8px;align-items:flex-start;font-size:10px;gap:12px}#partsDashboard .pd-chart-dialog .pd-chart-dialog-bars{padding:12px 16px 20px;gap:12px}#partsDashboard .pd-chart-dialog-bars .pd-bar-row{grid-template-columns:minmax(95px,34%) minmax(0,1fr) 57px;gap:9px;min-height:34px}#partsDashboard .pd-chart-dialog-bars .pd-bar-name,#partsDashboard .pd-chart-dialog-bars .pd-bar-value{font-size:11px}#partsDashboard .pd-chart-dialog-bars .pd-bar-track{height:20px}#partsDashboard .pd-chart-dialog .pd-chart-foot{padding:13px 16px;flex-wrap:wrap;font-size:10px}#partsDashboard .pd-chart-dialog-foot-key{display:none}}
+</style>
 </head>
 <style id="premiumEmptyAlignmentFix">
 #dataSection .premium-empty-visual{position:relative!important;display:block!important}
@@ -3746,7 +3772,7 @@ html.dark #quotePriceSection #quoteResultBody .premium-empty-orbit::before,html.
     <div><div class="pd-eyebrow"><i></i> TRUNG TÂM DỮ LIỆU <span style="color:#c6d0df;margin:0 3px">/</span> TỔNG QUAN</div><h1 id="pdTitle">Thống kê phụ tùng</h1><p>Mọi dữ liệu trong một góc nhìn. Nắm bắt số lượng theo hãng và hiệu xe.</p></div>
     <div class="pd-actions"><button type="button" class="pd-btn" id="pdRefresh"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 6.1a8 8 0 0 1 13.2 3M4.7 14.9a8 8 0 0 0 13.2 3"/></svg>Làm mới</button><button type="button" class="pd-btn pd-primary" id="pdExport"><svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>Xuất báo cáo</button></div>
   </div>
-  <div class="pd-source"><div class="pd-source-left"><span class="pd-source-badge" id="pdSourceBadge">Dữ liệu hệ thống</span><span id="pdUpdated">Chưa cập nhật</span></div><small>Tổng quan danh mục phụ tùng</small></div>
+  <div class="pd-source"><div class="pd-source-left"><span class="pd-source-badge" id="pdSourceBadge">Dữ liệu hệ thống</span><span id="pdUpdated">Chưa cập nhật</span><span id="pdCacheNote" role="status" style="font-size:10px;line-height:1.6"></span></div><small>Tổng quan danh mục phụ tùng</small></div>
   <div class="pd-status" id="pdStatus" role="status" aria-live="polite" hidden></div>
   <section class="pd-progress" id="pdProgress" data-state="loading" aria-label="Tiến trình thống kê" hidden>
     <span class="pd-progress-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 6.1a8 8 0 0 1 13.2 3M4.7 14.9a8 8 0 0 0 13.2 3"/></svg></span>
@@ -3767,7 +3793,7 @@ html.dark #quotePriceSection #quoteResultBody .premium-empty-orbit::before,html.
     <button type="button" id="pdReset" class="pd-btn pd-plain pd-reset"><svg viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/></svg>Đặt lại</button>
   </div>
   <div class="pd-chart-grid">
-    <article class="pd-panel"><div class="pd-panel-head"><div><h2 class="pd-panel-title" id="pdChartTitle">Phân bổ theo hãng xe</h2><p class="pd-panel-sub" id="pdChartSubtitle">Các hãng có số lượng phụ tùng nhiều nhất</p></div><span class="pd-panel-kicker">TOP 8</span></div><div class="pd-chart-legend"><span class="pd-dot"></span>Số bản ghi phụ tùng</div><div class="pd-bars" id="pdBars" aria-label="Biểu đồ số lượng theo hãng"></div><div class="pd-chart-foot"><span><svg viewBox="0 0 24 24"><path d="m9 3 3 18 3-7 7-3L9 3Z"/></svg>Chọn thanh để xem chi tiết</span><b id="pdChartTotal">— hãng xe</b></div></article>
+    <article class="pd-panel"><div class="pd-panel-head"><div><h2 class="pd-panel-title" id="pdChartTitle">Phân bổ theo hãng xe</h2><p class="pd-panel-sub" id="pdChartSubtitle">Các hãng có số lượng phụ tùng nhiều nhất</p></div><div class="pd-chart-actions"><span class="pd-panel-kicker" id="pdChartKicker">TOP 8</span><button type="button" class="pd-btn pd-small" id="pdChartExpand" aria-haspopup="dialog" aria-expanded="false" aria-controls="pdChartDialog" hidden>Xem tất cả</button></div></div><div class="pd-chart-legend"><span class="pd-dot"></span>Số bản ghi phụ tùng</div><div class="pd-bars" id="pdBars" aria-label="Biểu đồ số lượng theo hãng"></div><div class="pd-chart-foot"><span><svg viewBox="0 0 24 24"><path d="m9 3 3 18 3-7 7-3L9 3Z"/></svg>Chọn thanh để xem chi tiết</span><b id="pdChartTotal">— hãng xe</b></div></article>
     <article class="pd-panel"><div class="pd-panel-head"><div><h2 class="pd-panel-title">Cơ cấu phụ tùng</h2><p class="pd-panel-sub">Tỷ trọng theo loại phụ tùng</p></div><svg viewBox="0 0 24 24" style="color:#a6b4ca;width:17px"><path d="M12 3v9h9M9 3.5A9 9 0 1 0 20.5 15"/></svg></div><div class="pd-donut-area"><div class="pd-donut" id="pdDonut" role="img" aria-label="Cơ cấu phụ tùng"></div><div class="pd-donut-center"><strong id="pdDonutTotal">—</strong><span>Bản ghi phụ tùng</span></div></div><div id="pdTypes" class="pd-types"></div><div class="pd-chart-foot"><span>Tỷ trọng trên dữ liệu đã lọc</span><b>100%</b></div></article>
   </div>
   <article class="pd-panel"><div class="pd-panel-head pd-table-head"><div><h2 class="pd-panel-title">Chi tiết danh mục phụ tùng</h2><p class="pd-panel-sub">Số lượng và cơ cấu theo từng nhóm xe</p></div><div class="pd-table-actions"><div class="pd-segment" aria-label="Nhóm dữ liệu"><button type="button" id="pdGroupBrand" aria-pressed="false">Theo hãng</button><button type="button" id="pdGroupModel" aria-pressed="true">Theo hiệu xe</button></div><div class="pd-search"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" id="pdSearch" placeholder="Tìm hãng, hiệu, phụ tùng..." aria-label="Tìm hãng, hiệu hoặc tên phụ tùng"/></div></div></div>
@@ -3776,6 +3802,13 @@ html.dark #quotePriceSection #quoteResultBody .premium-empty-orbit::before,html.
   </article>
   <div class="pd-bottom-note"><p>Số lượng là số bản ghi trong lịch sử báo giá, không phải tồn kho vật lý. Cùng một tên phụ tùng có thể xuất hiện nhiều lần theo hiệu xe, năm sản xuất và báo giá.</p><span><svg viewBox="0 0 24 24"><path d="m12 3 8 4v6c0 4-8 8-8 8s-8-4-8-8V7l8-4Z"/><path d="m8 12 3 3 5-6"/></svg>KHO GIÁ PHỤ TÙNG</span></div>
   <div id="pdToast" class="pd-toast" role="status" hidden></div>
+  <dialog id="pdChartDialog" class="pd-chart-dialog" aria-modal="true" aria-labelledby="pdChartDialogTitle" aria-describedby="pdChartDialogSubtitle">
+    <div class="pd-chart-dialog-head"><div><p class="pd-chart-dialog-eyebrow">THỐNG KÊ PHỤ TÙNG · TOÀN BỘ BIỂU ĐỒ</p><h2 id="pdChartDialogTitle" class="pd-panel-title">Phân bổ theo hãng xe</h2><p id="pdChartDialogSubtitle" class="pd-panel-sub"></p></div><button type="button" id="pdChartClose" class="pd-btn pd-chart-dialog-close" aria-label="Đóng biểu đồ toàn màn hình" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>Đóng</button></div>
+    <div class="pd-chart-legend"><span class="pd-chart-dialog-legend-label"><span class="pd-dot"></span>Số bản ghi phụ tùng</span><span id="pdChartDialogCount"></span></div>
+    <div id="pdChartDialogBars" class="pd-bars pd-chart-dialog-bars" role="group" aria-label="Biểu đồ đầy đủ theo hãng xe"></div>
+    <div class="pd-chart-foot"><span>Chọn thanh để lọc báo cáo và quay lại trang thống kê</span><span class="pd-chart-dialog-foot-key">Nhấn Esc để đóng</span></div>
+  </dialog>
+
 </section>
 
 <div id="sysMgrSection" style="display: none;">
@@ -6715,6 +6748,7 @@ html.dark #modalFeedback .feedback-error-context{border-color:#7f1d1d;background
         // Dashboard reads only the same RLS-protected parts data as the lookup page.
         window.kgptStats.configure({
             user: () => auth.currentUser?.uid || null,
+            cacheScope: () => JSON.stringify([SUPABASE_PROJECT_URL,currentUserProfile?.role,currentUserProfile?.permissions?.parts]),
             canRead: () => canCurrentUserAccessPage('stats', 'view'),
             async load(onProgress, signal, onBatch = null) {
                 if (!canCurrentUserAccessPage('stats', 'view')) throw new Error('Không có quyền xem thống kê.');
@@ -17730,6 +17764,42 @@ ${text}` });
 })();
 
 </script>
+<script id="partsStatisticsCache">(function(root){
+  'use strict';
+  // IndexedDB stores typed arrays without converting a large dataset to JSON.
+  root.KGPTCreateStatsCache=function(databaseName='kgpt-parts-statistics'){
+    function transact(mode,key,value,signal){
+      return new Promise((resolve,reject)=>{
+        let db,tx,done=false,result;
+        const finish=(error)=>{if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);db?.close();error?reject(error):resolve(result);};
+        const abort=()=>{try{tx?.abort();}catch(_){}finish(new Error('STATS_CANCELLED'));};
+        const timer=setTimeout(()=>{try{tx?.abort();}catch(_){}finish(new Error('Bộ nhớ trình duyệt không phản hồi.'));},8000);
+        if(signal?.aborted){abort();return;}
+        signal?.addEventListener('abort',abort,{once:true});
+        try{
+          if(!root.indexedDB)throw new Error('Trình duyệt không hỗ trợ lưu dữ liệu.');
+          const opening=root.indexedDB.open(databaseName,1);
+          opening.onupgradeneeded=()=>{if(!opening.result.objectStoreNames.contains('reports'))opening.result.createObjectStore('reports');};
+          opening.onerror=()=>finish(opening.error||new Error('Không mở được bộ nhớ trình duyệt.'));
+          opening.onblocked=()=>finish(new Error('Bộ nhớ trình duyệt đang bận.'));
+          opening.onsuccess=()=>{
+            db=opening.result;if(done){db.close();return;}
+            db.onversionchange=()=>db.close();
+            try{
+              tx=db.transaction('reports',mode);
+              tx.oncomplete=()=>finish();
+              tx.onabort=tx.onerror=()=>finish(tx.error||new Error('Không lưu/đọc được dữ liệu.'));
+              const request=mode==='readonly'?tx.objectStore('reports').get(key):tx.objectStore('reports').put(value,key);
+              request.onsuccess=()=>{result=mode==='readonly'?request.result:true;};
+            }catch(error){finish(error);}
+          };
+        }catch(error){finish(error);}
+      });
+    }
+    return {read:(key,signal)=>transact('readonly',key,undefined,signal),write:(key,value,signal)=>transact('readwrite',key,value,signal)};
+  };
+})(typeof window==='undefined'?globalThis:window);
+</script>
 <script id="partsStatisticsController">(function(root){
   'use strict';
   function createPartsStatsEngine(){
@@ -17795,9 +17865,28 @@ ${text}` });
         cache={key:filterKey,result,brands:[...brandGroups.values()].map(serialize),models:[...modelGroups.values()].map(serialize)};
       }
       const chartSource=b?cache.models:cache.brands;
-      return {...cache.result,chartGroups:sortGroups(chartSource).slice(0,8),chartCount:chartSource.length,groups:sortGroups(filters.group==='brand'?cache.brands:cache.models,filters.descending!==false)};
+      return {...cache.result,chartGroups:sortGroups(chartSource),chartCount:chartSource.length,groups:sortGroups(filters.group==='brand'?cache.brands:cache.models,filters.descending!==false)};
     }
-    reset();return {reset,append,query,count:()=>length};
+    function snapshot(){
+      return {version:1,length,columns:columns.map(c=>c.slice(0,length)),brands:brands.map(b=>b.text),models:models.map(m=>({text:m.text,brand:m.brand})),years:years.slice(),names:names.slice()};
+    }
+    function restore(saved){
+      const invalid=()=>{throw new Error('Bản lưu thống kê không hợp lệ.');};
+      if(!saved||saved.version!==1||!Number.isSafeInteger(saved.length)||saved.length<0||!Array.isArray(saved.columns)||saved.columns.length!==5)invalid();
+      const {columns:cols,brands:bs,models:ms,years:ys,names:ns}=saved;
+      if(![bs,ms,ys,ns].every(Array.isArray)||![bs,ys,ns].every(a=>a.every(v=>typeof v==='string')))invalid();
+      if(!cols.every(c=>c instanceof Uint32Array&&c.length===saved.length)||!ms.every(m=>m&&typeof m.text==='string'&&Number.isInteger(m.brand)&&m.brand>=0&&m.brand<bs.length))invalid();
+      for(let i=0;i<saved.length;i++)if(cols[0][i]>=bs.length||cols[1][i]>=ms.length||cols[2][i]>=ys.length||cols[3][i]>=ns.length||cols[4][i]>2||ms[cols[1][i]].brand!==cols[0][i])invalid();
+      reset();length=saved.length;capacity=Math.max(2048,length);columns=cols.map(c=>{const result=new Uint32Array(capacity);result.set(c);return result;});
+      brands=bs.map(text=>({text,search:key(text),models:new Set()}));
+      models=ms.map(m=>({text:m.text,brand:m.brand,search:key(`${bs[m.brand]} ${m.text}`),years:new Set()}));
+      years=ys.slice();names=ns.slice();
+      brands.forEach((b,i)=>brandIds.set(b.text,i));models.forEach((m,i)=>{modelIds.set(JSON.stringify([m.brand,m.text]),i);brands[m.brand].models.add(i);});
+      years.forEach((y,i)=>yearIds.set(y,i));names.forEach((n,i)=>nameIds.set(n,i));
+      for(let i=0;i<length;i++)models[columns[1][i]].years.add(columns[2][i]);
+      return {sourceTotal:length};
+    }
+    reset();return {reset,append,query,snapshot,restore,count:()=>length};
   }
   root.KGPTCreateStatsEngine=createPartsStatsEngine;
 })(typeof window==='undefined'?globalThis:window);
@@ -17895,7 +17984,7 @@ ${text}` });
   const pct = (n,d) => percentFormat.format(d ? n / d * 100 : 0) + '%';
   const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const types = [{id:'genuine',label:'Chính hãng',color:'#059669'},{id:'aftermarket',label:'Không chính hãng',color:'#ea580c'},{id:'unknown',label:'Chưa phân loại',color:'#94a3b8'}];
-  const state = {sourceTotal:0,total:0,summary:null,queryRevision:0,groups:[],page:1,pageSize:7,group:'model',descending:true,loading:false,loaded:false,owner:null,revision:0,config:null};
+  const state = {sourceTotal:0,total:0,summary:null,chartExpanded:false,queryRevision:0,groups:[],page:1,pageSize:7,group:'model',descending:true,loading:false,loaded:false,owner:null,scope:null,revision:0,config:null};
   let toastTimer;
   const baseTitle = document.title;
   const idleJob = () => ({phase:'idle',loaded:0,total:null,startedAt:0,finishedAt:0,minimized:false,dismissed:false,unread:false,message:''});
@@ -17954,6 +18043,7 @@ ${text}` });
     document.addEventListener('visibilitychange',syncJob);
   }
   let statsBridge=null,loadingBridge=null;
+  const statsCache=window.KGPTCreateStatsCache();
   const optionsCache=new WeakMap();
   const yieldMain=()=>new Promise(resolve=>setTimeout(resolve,0));
   function emptySummary(){return {total:0,sourceTotal:0,brandCount:0,modelCount:0,nameCount:0,missingBrands:0,kinds:{genuine:0,aftermarket:0,unknown:0},brandOptions:[],modelOptions:[],yearOptions:[],groups:[],chartGroups:[],chartCount:0};}
@@ -17964,7 +18054,7 @@ ${text}` });
       let worker,url;
       const pending=new Map();let serial=0;
       try{
-        const source='const engine=('+factory.toString()+')();self.onmessage=async function(event){const {id,type,payload}=event.data;try{let value;if(type==="reset")engine.reset();else if(type==="append")value=engine.append(payload);else if(type==="query")value=await engine.query(payload);self.postMessage({id,ok:true,value});}catch(error){self.postMessage({id,ok:false,error:error.message});}};';
+        const source='const engine=('+factory.toString()+')();self.onmessage=async function(event){const {id,type,payload}=event.data;try{let value;if(type==="reset")engine.reset();else if(type==="append")value=engine.append(payload);else if(type==="query")value=await engine.query(payload);else if(type==="snapshot")value=engine.snapshot();else if(type==="restore")value=engine.restore(payload);self.postMessage({id,ok:true,value});}catch(error){self.postMessage({id,ok:false,error:error.message});}};';
         url=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));worker=new Worker(url);
         const fail=error=>{for(const entry of pending.values()){clearTimeout(entry.timeout);entry.reject(error);}pending.clear();};
         worker.onmessage=event=>{const entry=pending.get(event.data.id);if(!entry)return;pending.delete(event.data.id);clearTimeout(entry.timeout);event.data.ok?entry.resolve(event.data.value):entry.reject(new Error(event.data.error));};
@@ -17976,7 +18066,7 @@ ${text}` });
       }catch(error){worker?.terminate();if(url)URL.revokeObjectURL(url);for(const entry of pending.values()){clearTimeout(entry.timeout);entry.reject(error);}pending.clear();}
     }
     const engine=factory();let disposed=false;
-    return {mode:'cooperative',async call(type,payload){if(disposed)throw new Error('STATS_CANCELLED');if(type==='reset'){engine.reset();return;}if(type==='append'){for(let i=0;i<payload.length;i+=256){if(disposed)throw new Error('STATS_CANCELLED');engine.append(payload.slice(i,i+256));await yieldMain();}return {sourceTotal:engine.count()};}if(type==='query')return engine.query(payload,async()=>{await yieldMain();if(disposed)throw new Error('STATS_CANCELLED');});},dispose(){disposed=true;engine.reset();}};
+    return {mode:'cooperative',async call(type,payload){if(disposed)throw new Error('STATS_CANCELLED');if(type==='reset'){engine.reset();return;}if(type==='append'){for(let i=0;i<payload.length;i+=256){if(disposed)throw new Error('STATS_CANCELLED');engine.append(payload.slice(i,i+256));await yieldMain();}return {sourceTotal:engine.count()};}if(type==='snapshot')return engine.snapshot();if(type==='restore')return engine.restore(payload);if(type==='query')return engine.query(payload,async()=>{await yieldMain();if(disposed)throw new Error('STATS_CANCELLED');});},dispose(){disposed=true;engine.reset();}};
   }
   function toast(message){$('pdToast').textContent=message;$('pdToast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('pdToast').hidden=true,4500);}
   function status(message,tone='info'){const el=$('pdStatus');el.textContent=message;el.dataset.tone=tone;el.hidden=!message;}
@@ -18011,13 +18101,60 @@ ${text}` });
     $('pdGroupBrand').setAttribute('aria-pressed',String(state.group==='brand'));$('pdGroupModel').setAttribute('aria-pressed',String(state.group==='model'));
     $('pdSort').closest('th').setAttribute('aria-sort',state.descending?'descending':'ascending');$('pdExport').disabled=!summary.total||state.loading;
   }
+  let chartScrollLock=null;
+  function renderChartBars(id,groups,byModel,max,fullscreen=false){
+    const container=$(id);
+    container.innerHTML=groups.length?groups.map((g,i)=>`<button type="button" class="pd-bar-row" data-chart="${i}" title="Lọc ${esc(byModel?g.model:g.brand)||'Chưa xác định'}: ${fmt(g.total)} bản ghi"><span class="pd-bar-name">${esc(byModel?g.model:g.brand)||'Chưa xác định'}</span><span class="pd-bar-track"><span class="pd-bar-fill" style="width:${g.total/max*100}%"></span></span><span class="pd-bar-value">${fmt(g.total)}</span></button>`).join(''):'<div class="pd-empty"><strong>Chưa có dữ liệu phù hợp</strong>Thử thay đổi hoặc đặt lại bộ lọc.</div>';
+    container.querySelectorAll('[data-chart]').forEach(button=>button.addEventListener('click',()=>{
+      if(fullscreen)closeChartDialog();
+      focusGroup(groups[Number(button.dataset.chart)],byModel);
+    }));
+  }
   function renderChart(summary){
-    const byModel=!!$('pdBrand').value,chartGroups=summary.chartGroups,max=Math.max(1,...chartGroups.map(g=>g.total));
+    const byModel=!!$('pdBrand').value,allGroups=summary.chartGroups,chartGroups=allGroups.slice(0,8);
+    const max=allGroups.reduce((value,g)=>Math.max(value,g.total),1);
+    $('pdChartKicker').textContent='TOP '+Math.min(8,allGroups.length);
+    const expandButton=$('pdChartExpand');
+    expandButton.hidden=allGroups.length<=8;expandButton.disabled=state.loading;
+    expandButton.textContent='Xem tất cả ('+fmt(allGroups.length)+')';
+    expandButton.setAttribute('aria-expanded',String(state.chartExpanded));
     $('pdChartTitle').textContent=byModel?'Phân bổ theo hiệu xe':'Phân bổ theo hãng xe';
     $('pdChartSubtitle').textContent=byModel?`Hiệu xe thuộc ${$('pdBrand').value==='__missing__'?'nhóm chưa xác định':$('pdBrand').value}`:'Các hãng có số lượng phụ tùng nhiều nhất';
-    $('pdChartTotal').textContent=fmt(summary.chartCount)+(byModel?' hiệu xe':' hãng xe');$('pdBars').setAttribute('aria-label',byModel?'Biểu đồ theo hiệu xe':'Biểu đồ theo hãng xe');
-    $('pdBars').innerHTML=chartGroups.length?chartGroups.map((g,i)=>`<button type="button" class="pd-bar-row" data-chart="${i}" title="Lọc ${esc(byModel?g.model:g.brand)||'Chưa xác định'}: ${fmt(g.total)} bản ghi"><span class="pd-bar-name">${esc(byModel?g.model:g.brand)||'Chưa xác định'}</span><span class="pd-bar-track"><span class="pd-bar-fill" style="width:${g.total/max*100}%"></span></span><span class="pd-bar-value">${fmt(g.total)}</span></button>`).join(''):'<div class="pd-empty"><strong>Chưa có dữ liệu phù hợp</strong>Thử thay đổi hoặc đặt lại bộ lọc.</div>';
-    $('pdBars').querySelectorAll('[data-chart]').forEach(button=>button.addEventListener('click',()=>focusGroup(chartGroups[Number(button.dataset.chart)],byModel)));
+    $('pdChartTotal').textContent=fmt(chartGroups.length)+' / '+fmt(summary.chartCount)+(byModel?' hiệu xe':' hãng xe');
+    $('pdBars').setAttribute('aria-label',byModel?'Biểu đồ theo hiệu xe':'Biểu đồ theo hãng xe');
+    renderChartBars('pdBars',chartGroups,byModel,max);
+    if(state.chartExpanded)renderChartDialog(summary);
+  }
+  function renderChartDialog(summary){
+    const byModel=!!$('pdBrand').value,groups=summary.chartGroups;
+    $('pdChartDialogTitle').textContent=byModel?'Phân bổ theo hiệu xe':'Phân bổ theo hãng xe';
+    $('pdChartDialogSubtitle').textContent=byModel?`Hiệu xe thuộc ${$('pdBrand').value==='__missing__'?'nhóm chưa xác định':$('pdBrand').value}`:'Toàn bộ hãng xe theo bộ lọc hiện tại';
+    $('pdChartDialogCount').textContent=fmt(groups.length)+(byModel?' hiệu xe':' hãng xe')+' · '+fmt(summary.total)+' bản ghi';
+    $('pdChartDialogBars').setAttribute('aria-label',byModel?'Biểu đồ đầy đủ theo hiệu xe':'Biểu đồ đầy đủ theo hãng xe');
+    renderChartBars('pdChartDialogBars',groups,byModel,groups.reduce((value,g)=>Math.max(value,g.total),1),true);
+  }
+  function openChartDialog(){
+    if(state.loading||!state.summary||$('pdChartDialog').open)return;
+    if(!state.config?.user()||!state.config.canRead()){clear();return;}
+    window.KGPTDashboardSelects?.close();
+    const dialog=$('pdChartDialog');
+    renderChartDialog(state.summary);
+    dialog.showModal();state.chartExpanded=true;
+    chartScrollLock={html:document.documentElement.style.overflow,body:document.body.style.overflow};
+    document.documentElement.style.overflow='hidden';document.body.style.overflow='hidden';
+    $('pdChartExpand').setAttribute('aria-expanded','true');
+    $('pdChartDialogBars').scrollTop=0;
+    $('pdChartClose').focus({preventScroll:true});
+  }
+  function closeChartDialog(focus=true){
+    const dialog=$('pdChartDialog'),wasOpen=dialog.open;
+    state.chartExpanded=false;
+    if(wasOpen)dialog.close();
+    if(chartScrollLock){document.documentElement.style.overflow=chartScrollLock.html;document.body.style.overflow=chartScrollLock.body;chartScrollLock=null;}
+    $('pdChartExpand').setAttribute('aria-expanded','false');
+    $('pdChartDialogBars').replaceChildren();
+    const trigger=$('pdChartExpand');
+    if(focus&&wasOpen&&!trigger.hidden&&!trigger.disabled)trigger.focus({preventScroll:true});
   }
   function renderDonut(summary){
     const counts=summary.kinds;let current=0;
@@ -18048,46 +18185,89 @@ ${text}` });
     const blob=new Blob(['\uFEFF'+lines.map(row=>row.map(safe).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`thong-ke-phu-tung${state.config?.demo?'-minh-hoa':''}-${new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'})}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);toast(`Đã xuất ${fmt(state.groups.length)} nhóm xe theo bộ lọc hiện tại.`);
   }
   function clear(){
+    closeChartDialog(false);
     state.revision++;state.queryRevision++;state.controller?.abort();statsBridge?.dispose();loadingBridge?.dispose();statsBridge=null;loadingBridge=null;
-    state.loading=false;state.sourceTotal=0;state.total=0;state.summary=null;state.groups=[];state.owner=null;state.loaded=false;state.page=1;state.group='model';state.descending=true;
-    ['pdBrand','pdModel','pdYear','pdType','pdSearch'].forEach(id=>$(id).value='');$('pdUpdated').textContent='Chưa cập nhật';$('partsDashboard').classList.remove('pd-loading');$('pdRefresh').disabled=false;render(emptySummary());status('');resetJob();
+    state.loading=false;state.sourceTotal=0;state.total=0;state.summary=null;state.chartExpanded=false;state.groups=[];state.owner=null;state.scope=null;state.loaded=false;state.page=1;state.group='model';state.descending=true;
+    ['pdBrand','pdModel','pdYear','pdType','pdSearch'].forEach(id=>$(id).value='');$('pdUpdated').textContent='Chưa cập nhật';$('pdCacheNote').textContent='';$('pdSourceBadge').textContent=state.config?.demo?'Dữ liệu minh họa':'Dữ liệu hệ thống';$('partsDashboard').classList.remove('pd-loading');$('pdRefresh').disabled=false;render(emptySummary());status('');resetJob();
   }
   async function refresh(force=false){
     if(!state.config)return;
-    const owner=state.config.user();
+    const owner=state.config.user(),scope=String(state.config.cacheScope?.()||(state.config.demo?'demo':'system'));
     if(!owner||!state.config.canRead()){clear();status('Đăng nhập bằng tài khoản có quyền tra cứu phụ tùng để xem thống kê.','error');return;}
-    if(owner!==state.owner){clear();state.owner=owner;}
+    if(owner!==state.owner||scope!==state.scope){clear();state.owner=owner;state.scope=scope;}
     if(state.loading||state.loaded&&!force)return;
-    const revision=++state.revision;state.queryRevision++;state.controller=new AbortController();state.loading=true;$('partsDashboard').classList.add('pd-loading');$('pdRefresh').disabled=true;$('pdExport').disabled=true;status('');startJob();
+    const cacheKey=JSON.stringify([scope,owner]),revision=++state.revision;
+    state.queryRevision++;state.controller=new AbortController();const signal=state.controller.signal;
+    state.loading=true;$('partsDashboard').classList.add('pd-loading');$('pdRefresh').disabled=true;$('pdExport').disabled=true;$('pdChartExpand').disabled=true;status('');startJob();
     let nextBridge;
-    const valid=()=>revision===state.revision&&owner===state.config.user()&&state.config.canRead();
+    const valid=()=>revision===state.revision&&owner===state.config.user()&&state.config.canRead()&&scope===String(state.config.cacheScope?.()||(state.config.demo?'demo':'system'));
     try{
       nextBridge=await createBridge();if(!valid()){nextBridge.dispose();return;}loadingBridge=nextBridge;
-      let streamed=false;
-      const append=async batch=>{if(!valid()||state.controller.signal.aborted)throw new Error('STATS_CANCELLED');streamed=true;await nextBridge.call('append',batch);};
-      const loaded=await state.config.load((count,total)=>{if(valid()){job.loaded=Math.max(0,Number(count)||0);job.total=Number.isFinite(total)&&total>=0?total:null;syncJob();}},state.controller.signal,append);
+      let restored=false,savedAt=null,stored=false;
+      if(!force){
+        job.stage='restoring';job.message='Đang mở dữ liệu đã lưu trong trình duyệt…';syncJob();
+        try{
+          const saved=await statsCache.read(cacheKey,signal);
+          if(!valid()){nextBridge.dispose();return;}
+          if(saved&&saved.version===1&&saved.owner===owner&&saved.scope===scope&&Number.isFinite(saved.savedAt)&&saved.savedAt>0){
+            await nextBridge.call('restore',saved.snapshot);
+            restored=true;stored=true;savedAt=saved.savedAt;
+          }
+        }catch(error){
+          if(!valid()||signal.aborted){nextBridge.dispose();return;}
+          await nextBridge.call('reset');
+          console.warn('Chưa dùng được bản thống kê đã lưu:',error);
+        }
+      }
       if(!valid()){nextBridge.dispose();return;}
-      if(!streamed&&Array.isArray(loaded)){for(let from=0;from<loaded.length;from+=1000)await append(loaded.slice(from,from+1000));}
-      job.stage='analyzing';job.message='Đã đọc xong dữ liệu. Đang tính toán thống kê; bạn vẫn có thể chuyển mục để làm việc.';syncJob();
+      if(!restored){
+        job.stage='reading';job.message=force?'Đang tải dữ liệu mới nhất…':'Chưa có bản lưu phù hợp. Đang tải dữ liệu thống kê…';syncJob();
+        let streamed=false;
+        const append=async batch=>{if(!valid()||signal.aborted)throw new Error('STATS_CANCELLED');streamed=true;await nextBridge.call('append',batch);};
+        const loaded=await state.config.load((count,total)=>{if(valid()){job.loaded=Math.max(0,Number(count)||0);job.total=Number.isFinite(total)&&total>=0?total:null;syncJob();}},signal,append);
+        if(!valid()){nextBridge.dispose();return;}
+        if(!streamed&&Array.isArray(loaded)){for(let from=0;from<loaded.length;from+=1000)await append(loaded.slice(from,from+1000));}
+        savedAt=Date.now();
+      }
+      job.stage='analyzing';job.message=restored?'Đang khôi phục báo cáo từ dữ liệu đã lưu.':'Đã đọc xong dữ liệu. Đang tính toán thống kê…';syncJob();
       let summary,filters;
       do{filters=readFilters();summary=await nextBridge.call('query',filters);if(!valid()){nextBridge.dispose();return;}}while(JSON.stringify(filters)!==JSON.stringify(readFilters()));
       if(!valid()){nextBridge.dispose();return;}
+      if(!restored){
+        try{
+          const snapshot=await nextBridge.call('snapshot');
+          if(!valid()){nextBridge.dispose();return;}
+          await statsCache.write(cacheKey,{version:1,owner,scope,savedAt,snapshot},signal);
+          stored=true;
+        }catch(error){if(!valid()||signal.aborted){nextBridge.dispose();return;}console.warn('Không lưu được thống kê trong trình duyệt:',error);}
+      }
+      if(!valid()){nextBridge.dispose();return;}
+      // Filters can change while the browser commits the cache transaction.
+      while(JSON.stringify(filters)!==JSON.stringify(readFilters())){filters=readFilters();summary=await nextBridge.call('query',filters);if(!valid()){nextBridge.dispose();return;}}
       statsBridge?.dispose();statsBridge=nextBridge;loadingBridge=null;state.loaded=true;
-      render(summary);status('');$('pdUpdated').textContent='Cập nhật '+new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date());
-      job.loaded=summary.sourceTotal;job.total=summary.sourceTotal;finishJob('success');
+      render(summary);status('');
+      $('pdUpdated').textContent='Cập nhật '+new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(savedAt));
+      $('pdSourceBadge').textContent=state.config.demo?'Dữ liệu minh họa':restored?'Dữ liệu đã lưu':'Dữ liệu hệ thống';
+      $('pdCacheNote').textContent=stored?'Đã lưu trên trình duyệt · Bấm “Làm mới” để cập nhật':'Chưa lưu được trên trình duyệt. Dữ liệu hiện vẫn dùng được; lần mở sau sẽ tải lại.';
+      job.loaded=summary.sourceTotal;job.total=summary.sourceTotal;
+      finishJob('success',restored?'Đã mở bản dữ liệu lưu trong trình duyệt. Bấm “Làm mới” khi cần dữ liệu mới nhất.':'Đã cập nhật báo cáo.'+(stored?' Dữ liệu đã được lưu cho lần mở sau.':''));
     }catch(error){
       nextBridge?.dispose();if(loadingBridge===nextBridge)loadingBridge=null;
       if(revision!==state.revision)return;if(owner!==state.config.user()||!state.config.canRead()){clear();return;}
       console.error('Không tải được thống kê phụ tùng:',error);
       finishJob('error',(state.loaded?'Không thể làm mới. Đang giữ dữ liệu của lần cập nhật trước. ':'Chưa thể tải thống kê. ')+'Vui lòng kiểm tra kết nối, quyền xem dữ liệu và thử “Làm mới”.');
     }finally{
-      if(revision===state.revision){state.loading=false;$('partsDashboard').classList.remove('pd-loading');$('pdRefresh').disabled=false;$('pdExport').disabled=!state.total;}
+      if(revision===state.revision){state.loading=false;$('partsDashboard').classList.remove('pd-loading');$('pdRefresh').disabled=false;$('pdExport').disabled=!state.total;$('pdChartExpand').disabled=false;}
     }
   }
   function init(){
     if(!$('partsDashboard'))return;
     window.KGPTDashboardSelects?.init($('partsDashboard'));
     initJobNotifications();
+    $('pdChartExpand').addEventListener('click',openChartDialog);
+    $('pdChartClose').addEventListener('click',()=>closeChartDialog());
+    $('pdChartDialog').addEventListener('cancel',event=>{event.preventDefault();closeChartDialog();});
+    $('pdChartDialog').addEventListener('close',()=>{if(!$('pdChartDialog').open)closeChartDialog(false);});
     ['pdBrand','pdModel','pdYear','pdType'].forEach(id=>$(id).addEventListener('change',()=>{if(id==='pdBrand'){$('pdModel').value='';$('pdYear').value='';}if(id==='pdModel')$('pdYear').value='';state.page=1;requestRender();}));
     let searchTimer;$('pdSearch').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{state.page=1;requestRender();},200);});
     $('pdReset').addEventListener('click',()=>{['pdBrand','pdModel','pdYear','pdType','pdSearch'].forEach(id=>$(id).value='');state.page=1;requestRender();});
