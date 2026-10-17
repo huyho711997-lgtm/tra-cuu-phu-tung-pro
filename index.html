@@ -8,7 +8,18 @@
 <style id="partsAiSearchStyle">
 .parts-ai-tools{position:relative;z-index:2;display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:18px;padding-top:15px;border-top:1px solid #e5edf7}.parts-ai-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:39px;padding:9px 15px;border:1px solid #a9c7f6;border-radius:10px;background:linear-gradient(135deg,#eff6ff,#e9f1ff);color:#1d4ed8;font:800 12px 'Plus Jakarta Sans',sans-serif;cursor:pointer}.parts-ai-button svg{width:17px;height:17px}.parts-ai-button:disabled{opacity:.55;cursor:wait}.parts-ai-settings{min-height:36px;padding:7px 10px;border:1px solid #dce5f0;border-radius:9px;background:#fff;color:#526581;font:700 11px 'Plus Jakarta Sans',sans-serif;cursor:pointer}.parts-ai-hint{color:#64748b;font-size:11px;line-height:1.6}.parts-ai-status{width:100%;color:#526581;font-size:12px;line-height:1.65}.parts-ai-status[data-tone="error"]{color:#b45309}.parts-ai-results{position:relative;z-index:2;margin-top:12px;padding:16px;border:1px solid #cddff8;border-radius:13px;background:#f7faff}.parts-ai-results[hidden]{display:none}.parts-ai-heading{margin:0 0 5px;font-size:13px;font-weight:800;color:#1e3a5f}.parts-ai-description{margin:0 0 12px;font-size:11px;line-height:1.65;color:#64748b}.parts-ai-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px}.parts-ai-option{display:flex;flex-direction:column;gap:5px;padding:12px 13px;border:1px solid #d9e4f3;border-radius:10px;background:#fff;text-align:left;cursor:pointer}.parts-ai-option:hover,.parts-ai-option:focus-visible{border-color:#60a5fa;outline:2px solid #dbeafe}.parts-ai-option strong{font:800 12px 'Plus Jakarta Sans',sans-serif;color:#243d63;line-height:1.6}.parts-ai-option small{font-size:10px;color:#64748b;line-height:1.6}.parts-ai-option small[data-review="true"]{color:#a16207}html.dark .parts-ai-tools{border-color:#334155}html.dark .parts-ai-button{border-color:#315a8c;background:#173052;color:#bfdbfe}html.dark .parts-ai-settings,html.dark .parts-ai-option{border-color:#334155;background:#152238;color:#cbd5e1}html.dark .parts-ai-results{border-color:#334b6b;background:#111e32}html.dark .parts-ai-heading,html.dark .parts-ai-option strong{color:#dbeafe}html.dark .parts-ai-hint,html.dark .parts-ai-status,html.dark .parts-ai-description,html.dark .parts-ai-option small{color:#a0b4cf}@media(max-width:600px){.parts-ai-options{grid-template-columns:1fr}.parts-ai-tools{gap:8px}.parts-ai-hint{width:100%}}
 </style>
-<style id="partsAiSettingsStyle">.parts-ai-settings-note{display:none}.parts-ai-mode .quote-ocr-only{display:none}.parts-ai-mode .parts-ai-settings-note{display:block}.parts-ai-mode .quote-provider-grid{grid-template-columns:1fr}</style>
+<style id="partsAiSettingsStyle">
+.parts-ai-settings-note{display:none}.parts-ai-mode .quote-ocr-only{display:none}.parts-ai-mode .parts-ai-settings-note{display:block}.parts-ai-mode .quote-provider-grid{grid-template-columns:1fr}
+#searchPanel .search-panel-head>div.parts-search-header-copy:first-child{max-width:min(900px,calc(100% - 185px))}
+#searchPanel .search-panel-head>.parts-ai-header-settings{position:absolute;top:20px;right:22px;z-index:4;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:8px 12px;border:1px solid #cbdcf6;border-radius:9px;background:#fff;color:#44658f;box-shadow:0 3px 10px rgba(35,67,110,.04);font-size:11px;font-weight:700;line-height:1.5;cursor:pointer;transition:background .15s,border-color .15s}
+#searchPanel .search-panel-head>.parts-ai-header-settings:hover{background:#f0f6ff;border-color:#8fafe4}
+#searchPanel .search-panel-head>.parts-ai-header-settings:focus-visible{outline:3px solid #abc9ff;outline-offset:3px}
+#searchPanel .parts-ai-header-settings svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+html.dark #searchPanel .search-panel-head>.parts-ai-header-settings{background:#1f314c;border-color:#3e5572;color:#c6d8f2}
+html.dark #searchPanel .search-panel-head>.parts-ai-header-settings:hover{background:#294260;border-color:#5d7fa9}
+@media(max-width:640px){#searchPanel .search-panel-head>div.parts-search-header-copy:first-child{max-width:calc(100% - 54px)}#searchPanel .search-panel-head>.parts-ai-header-settings{width:38px;padding:0}#searchPanel .parts-ai-header-settings span{display:none}}
+@media(prefers-reduced-motion:reduce){#searchPanel .search-panel-head>.parts-ai-header-settings{transition:none}}
+</style>
 <style id="partsFilterLayerStyle">
 /* Menus stay above AI suggestions; the open field also covers adjacent filters on narrow screens. */
 #searchPanel.control-panel > .grid{z-index:20}
@@ -3958,7 +3969,7 @@ html.dark #quotePriceSection #quoteResultBody .premium-empty-orbit::before,html.
 <div class="absolute -bottom-32 -left-32 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
 <div class="search-panel-head relative z-10 border-slate-200/60 pb-5 mb-6">
-<div>
+<div class="parts-search-header-copy">
 <div class="flex items-center gap-3 mb-2">
 <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/40 dark:to-indigo-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-[0_2px_10px_-2px_rgba(37,99,235,0.2)] border border-blue-100 dark:border-blue-800/50">
 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
@@ -3967,6 +3978,7 @@ html.dark #quotePriceSection #quoteResultBody .premium-empty-orbit::before,html.
 </div>
 <div class="text-[12.5px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-4xl pl-12">Thiết lập nhanh tiêu chí tra cứu theo hãng xe, dòng xe, năm sản xuất, loại hàng và tên phụ tùng. Khi cần đối chiếu chuyên sâu, bạn có thể bật khớp chính xác để so sánh đúng một phụ tùng qua nhiều hồ sơ.</div>
 </div>
+<button class="parts-ai-settings parts-ai-header-settings" type="button" onclick="openQuoteGeminiSettings('parts')" aria-label="Cài đặt Gemini" title="Cài đặt Gemini"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 3.4h4.8l.7 2.2 2 .9 2.1-1.1 2.4 4.2-1.8 1.5v2.2l1.8 1.5-2.4 4.2-2.1-1.1-2 .9-.7 2.2H9.6l-.7-2.2-2-.9L4.8 19l-2.4-4.2 1.8-1.5v-2.2L2.4 9.6l2.4-4.2 2.1 1.1 2-.9z"/><circle cx="12" cy="12" r="3.2"/></svg><span>Cài đặt Gemini</span></button>
 <div aria-hidden="true" class="parts-hero-watermark">
 <svg class="parts-watermark-path" fill="none" viewbox="0 0 480 120">
 <path d="M22 78C92 18 151 104 218 50S344 16 458 62"></path>
@@ -4098,7 +4110,6 @@ html.dark #quotePriceSection #quoteResultBody .premium-empty-orbit::before,html.
 </div>
 <div class="parts-ai-tools">
 <button class="parts-ai-button" id="btnPartsAiSearch" type="button" onclick="runPartsAiSearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z" stroke-linejoin="round"/></svg><span>Tìm bằng AI</span></button>
-<button class="parts-ai-settings" type="button" onclick="openQuoteGeminiSettings('parts')">Cài đặt Gemini</button>
 <button class="parts-batch-toggle" id="btnPartsBatchToggle" type="button" aria-expanded="false" aria-controls="partsBatchComposer" onclick="setPartsBatchMode(this.getAttribute('aria-expanded') !== 'true')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5m-18 5 9 5 9-5"/></svg>Tìm nhiều phụ tùng</button>
 <span class="parts-ai-hint">Hiểu cách gọi khác nhau, gợi ý tên có trong kho của xe đã chọn.</span>
 <div class="parts-ai-status" id="partsAiStatus" role="status" aria-live="polite"></div>
@@ -4767,7 +4778,7 @@ html.dark #partsPriceReview .price-review-caution{color:#d7b580}
 <section id="partsPriceReview" hidden aria-labelledby="partsPriceReviewTitle">
 <div class="price-review-header">
  <div class="price-review-identity"><span class="price-review-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z"/></svg></span><div><span class="price-review-eyebrow">ĐÁNH GIÁ KHO GIÁ · AI</span><h3 id="partsPriceReviewTitle">Bảng đánh giá giá bằng AI</h3><p id="partsPriceReviewStatus" role="status" aria-live="polite"></p></div></div>
- <div class="price-review-actions"><button id="btnPartsPriceReviewRetry" type="button" onclick="retryPartsPriceReview()">Đánh giá lại</button><button type="button" onclick="openQuoteGeminiSettings('parts')">Cài đặt Gemini</button><button id="btnPartsPriceReviewToggle" type="button" aria-controls="partsPriceReviewBody" aria-expanded="true" onclick="togglePartsPriceReview(this.getAttribute('aria-expanded') !== 'true')">Ẩn đánh giá</button></div>
+ <div class="price-review-actions"><button id="btnPartsPriceReviewRetry" type="button" onclick="retryPartsPriceReview()">Đánh giá lại</button><button id="btnPartsPriceReviewToggle" type="button" aria-controls="partsPriceReviewBody" aria-expanded="true" onclick="togglePartsPriceReview(this.getAttribute('aria-expanded') !== 'true')">Ẩn đánh giá</button></div>
 </div>
 <div id="partsPriceReviewBody">
  <p id="partsPriceReviewMeta"></p>
@@ -8929,6 +8940,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         window.resetPartsAiSearch = function() {
             ++PARTS_AI_REVISION;
             PARTS_AI_STATE?.controller?.abort();
+            window.resetPartsPriceReview?.();
             PARTS_AI_STATE = null;
             PARTS_AI_SELECTED = null;
             const panel = document.getElementById('partsAiResults');
@@ -10176,8 +10188,11 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 CURRENT_PAGE = 1;
                 renderTable();
                 const reviewScope = partsPriceReviewScope();
-                const reviewNames = aiWarehouseNames.length ? aiWarehouseNames : exactPartName && search ? [...new Set(MASTER_DATA.map(item => String(item.ten_phu_tung || '')).filter(Boolean))] : [];
-                window.startPartsPriceReview?.({ criteria: { uid: auth.currentUser?.uid || '', brand: hang, models: hieus, years: nams, kind: type }, groups: reviewNames.length ? [{ term: document.getElementById('searchInput')?.value?.trim() || searchDescription, names: reviewNames }] : [], isCurrent: () => searchRevision === PARTS_DATA_SEARCH_REVISION && reviewScope === partsPriceReviewScope() });
+                // Exact-name matching is an ordinary search. Only applied AI suggestions enable an AI review.
+                if (aiWarehouseNames.length) {
+                    const reviewNameKey = JSON.stringify(aiWarehouseNames);
+                    window.startPartsPriceReview?.({ criteria: { uid: auth.currentUser?.uid || '', brand: hang, models: hieus, years: nams, kind: type }, groups: [{ term: document.getElementById('searchInput')?.value?.trim() || searchDescription, names: aiWarehouseNames }], isCurrent: () => searchRevision === PARTS_DATA_SEARCH_REVISION && reviewScope === partsPriceReviewScope() && document.getElementById('exactPartName')?.value === '1' && reviewNameKey === JSON.stringify(getSelectedPartsAiNames()) });
+                }
                 await recordPartsSearchUsage({ searchDescription, aiWarehouseNames, hang, hieus, nams, exactPartName, skipLog, resultsCount: MASTER_DATA.length });
                 return true;
             } catch (e) {
