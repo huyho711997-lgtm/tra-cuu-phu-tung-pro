@@ -10210,3 +10210,89 @@ ${text}` });
                 window.initHomeActivityFeed?.();
             }
         });
+
+// Filter part names on the server before the existing result limit.
+const applySupabaseConstraintBeforePartNameFix = applySupabaseConstraint;
+applySupabaseConstraint = function(builder, source, constraint) {
+    if (constraint.type === 'where' && constraint.operator === 'imatch') {
+        return builder.filter(mapFieldToDb(source.collectionName, constraint.field), 'imatch', constraint.value);
+    }
+    return applySupabaseConstraintBeforePartNameFix(builder, source, constraint);
+};
+window.searchData = async function(options = {}) {
+    if (PARTS_BATCH_MODE && !options.forceSingle) {
+        const state = PARTS_BATCH_STATE;
+        if (isCurrentPartsBatchState(state)) {
+            if (state.aiBusy || state.priceBusy) return false;
+            if (state.phase === 'review' || state.phase === 'results') return applyPartsBatchAiSelection(options);
+        }
+        return runPartsBatchSearch(options);
+    }
+    clearPartsBatchResults();
+    const searchRevision = ++PARTS_DATA_SEARCH_REVISION;
+    const hang = document.getElementById('filterHang').value;
+    const hieus = Array.from(document.querySelectorAll('input[name="hieu_xe"]:checked')).map(cb => cb.value);
+    const nams = Array.from(document.querySelectorAll('input[name="nam_sx"]:checked')).map(cb => cb.value);
+    const type = document.getElementById('filterType').value;
+    const search = document.getElementById('searchInput').value.toLowerCase().trim();
+    const exactPartName = document.getElementById('exactPartName')?.value === '1';
+    const aiWarehouseNames = exactPartName ? getSelectedPartsAiNames() : [];
+    const aiNameSet = new Set(aiWarehouseNames);
+    const aiSearchScope = aiWarehouseNames.length ? partsAiScopeKey() : '';
+    const searchDescription = aiWarehouseNames.length ? aiWarehouseNames.join(' | ') : search;
+    const loading = document.getElementById('loadingIndicator');
+    const silent = !!options?.silent;
+    const skipLog = !!options?.skipLog;
+    if (loading) loading.classList.remove('hidden');
+    let constraints = [];
+    if (hang) constraints.push(where('hang_xe', '==', hang));
+    if (hieus.length > 0) constraints.push(where('hieu_xe', 'in', hieus.slice(0, 30)));
+    if (nams.length === 1) constraints.push(where('nam_sx', '==', parseInt(nams[0])));
+    else if (nams.length > 1) constraints.push(where('nam_sx', 'in', nams.map(n => parseInt(n)).slice(0, 30)));
+    if (type === 'genuine') constraints.push(where('chinh_hang', '==', 'Chính hãng'));
+    if (aiWarehouseNames.length) constraints.push(where('ten_phu_tung', 'in', aiWarehouseNames));
+    if (aiWarehouseNames.length && type === 'aftermarket') constraints.push(where('chinh_hang', 'in', ['Thay thế', 'Hàng ngoài']));
+    // Match the literal name in PostgreSQL before LIMIT.
+    if (search && !aiWarehouseNames.length) {
+        const literalName = search.replace(/[.*+?^{}$()|[\]\\]/g, '\\$&');
+        const namePattern = exactPartName ? '^[[:space:]]*' + literalName + '[[:space:]]*$' : literalName;
+        constraints.push(where('ten_phu_tung', 'imatch', namePattern));
+    }
+    const queryLimit = exactPartName && search ? 1500 : 500;
+    constraints.push(limit(queryLimit));
+    try {
+        const snap = await getDocs(query(collection(db, 'LichSuBaoGia'), ...constraints));
+        if (searchRevision !== PARTS_DATA_SEARCH_REVISION) return false;
+        if (aiWarehouseNames.length && (aiSearchScope !== partsAiScopeKey() || document.getElementById('exactPartName')?.value !== '1' || JSON.stringify(aiWarehouseNames) !== JSON.stringify(getSelectedPartsAiNames()))) return false;
+        MASTER_DATA = [];
+        snap.forEach(docSnap => {
+            const item = docSnap.data(); item.id = docSnap.id;
+            if (nams.length > 0 && !nams.includes(String(item.nam_sx))) return;
+            item.chinh_hang = normalizePartTypeValue(item.chinh_hang);
+            const tenPhuTung = (item.ten_phu_tung || '').toLowerCase().trim();
+            if (type === 'genuine' && !isGenuinePartType(item.chinh_hang)) return;
+            if (type === 'aftermarket' && !isAftermarketPartType(item.chinh_hang)) return;
+            if (aiNameSet.size) {
+                if (aiNameSet.has(String(item.ten_phu_tung || ''))) MASTER_DATA.push(item);
+                return;
+            }
+            if (!search) { MASTER_DATA.push(item); return; }
+            if (exactPartName) {
+                if (tenPhuTung !== search) return;
+                MASTER_DATA.push(item);
+            } else if (tenPhuTung.includes(search)) MASTER_DATA.push(item);
+        });
+        MASTER_DATA.sort((a, b) => parseDateForSort(b.ngay_bao_gia) - parseDateForSort(a.ngay_bao_gia));
+        document.getElementById('statCount').innerText = MASTER_DATA.length + ' kết quả';
+        CURRENT_PAGE = 1;
+        renderTable();
+        await recordPartsSearchUsage({ searchDescription, aiWarehouseNames, hang, hieus, nams, exactPartName, skipLog, resultsCount: MASTER_DATA.length });
+        return true;
+    } catch (e) {
+        console.error(e);
+        if (!silent) customAlert('Lỗi máy chủ khi tải dữ liệu phụ tùng: ' + e.message);
+        return false;
+    } finally {
+        if (loading && searchRevision === PARTS_DATA_SEARCH_REVISION) loading.classList.add('hidden');
+    }
+};
