@@ -1,5 +1,13 @@
 # Chuyển giữa Gemini và Groq
 
+## Theo dõi hạn mức Groq
+
+Mở **Cài đặt AI**, chọn Groq để xem bảng **Đã sử dụng · GPT-OSS 120B** gồm yêu cầu/phút, yêu cầu/ngày, token/phút và token/ngày. Bảng tự cập nhật khi dùng AI và khi thời gian phục hồi thay đổi; không gọi thêm API để làm mới số liệu.
+
+Yêu cầu/ngày và token/phút ưu tiên các header hạn mức từ phản hồi Groq, nếu trình duyệt được phép đọc chúng. Các số liệu còn lại được ghi nhận trên trình duyệt này, riêng theo tài khoản và key; không bao gồm những lần gọi trước khi có tính năng hoặc từ thiết bị khác. Số liệu nội bộ theo ngày UTC, còn số liệu máy chủ theo thời gian phục hồi do Groq trả về. Khi header không đọc được, giao diện gắn nhãn số liệu ghi nhận trên máy này.
+
+Token được tính từ `usage` của phản hồi, có loại phần input đã cache khi được cung cấp. Lượt gọi thất bại hoặc chưa trả usage sẽ hiển thị thông báo rằng tổng token có thể chưa đầy đủ. Việc ghi nhận vẫn thực hiện nếu AI đã tiêu thụ token nhưng trả JSON lỗi hoặc kết quả bị cắt. Số liệu có thể mất nếu xóa dữ liệu trang; không lưu API key hoặc nội dung báo giá trong bảng ghi sử dụng.
+
 Bản sửa dựa trên commit `ef60cab` của repository `huyho711997-lgtm/tra-cuu-phu-tung-pro`.
 
 ## Cách dùng
@@ -32,6 +40,7 @@ Nếu chỉ cập nhật các file thay đổi, thay:
 - `assets/css/app.css`
 - `assets/js/app-core.mjs`
 - Thêm `assets/js/ai-provider.mjs`
+- Thêm `assets/js/groq-usage.mjs`
 
 `tests/ai-provider.test.mjs` và tài liệu này dành cho kiểm tra/hướng dẫn. Không cần cài thêm thư viện hay chạy build.
 
@@ -43,6 +52,7 @@ Chạy bằng Node.js 22 trở lên:
 
 ```sh
 node --test tests/ai-provider.test.mjs
+node --test tests/groq-usage.test.mjs
 node --check assets/js/app-core.mjs
 node --check assets/js/ai-provider.mjs
 ```

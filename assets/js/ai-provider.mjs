@@ -3,6 +3,7 @@ export const GROQ_MODEL = 'openai/gpt-oss-120b';
 // One request per action: do not spend a free account's quota on automatic retries.
 export async function generateGroqContent(parts, config = {}, options = {}) {
     const { apiKey, signal, timeoutMs = 60000, fetchImpl = globalThis.fetch } = options;
+    const notify = (name, value) => { try { options[name]?.(value); } catch (_) {} };
     if (signal?.aborted) throw new DOMException('Đã hủy xử lý AI.', 'AbortError');
     if (!apiKey?.trim()) throw new Error('Chưa có Groq API key. Mở Cài đặt AI để nhập key.');
     if (!Array.isArray(parts) || parts.some(part => typeof part.text !== 'string')) {
@@ -13,6 +14,7 @@ export async function generateGroqContent(parts, config = {}, options = {}) {
     signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(abort, timeoutMs);
     try {
+        notify('onRequest');
         const response = await fetchImpl('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey.trim()}` },
@@ -30,6 +32,7 @@ export async function generateGroqContent(parts, config = {}, options = {}) {
             })
         });
         const payload = await response.json().catch(() => ({}));
+        notify('onUsage', { usage: payload.usage, headers: response.headers, status: response.status });
         if (!response.ok) {
             const messages = {
                 400: 'Groq không nhận được yêu cầu hợp lệ hoặc dữ liệu quá dài. Hãy chia nhỏ nội dung.',

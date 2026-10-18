@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { generateGroqContent, GROQ_MODEL } from '../assets/js/ai-provider.mjs';
+import { createGroqUsageTracker } from '../assets/js/groq-usage.mjs';
 
 const success = (content = '{"items":[]}', finish_reason = 'stop') => new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason }] }), { status: 200 });
 const parts = [{ text: 'Trả JSON cho phụ tùng cản trước.' }];
@@ -87,6 +88,7 @@ function settingsHarness() {
         localStorage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) },
         document: { getElementById: id => controls.get(id) || null, querySelectorAll: () => [] },
         generateGroqContent: async () => ({ provider: 'groq' }),
+        getActiveGroqUsageTracker: async () => null,
         callGeminiGenerateContentWithRetry: async () => ({ provider: 'gemini' }), getQuoteGeminiKeys: () => ['gemini-key']
     });
     context.window = context;
@@ -128,6 +130,23 @@ test('Groq key and provider are isolated between accounts and clearing a key per
     controls.get('quoteGroqKeyInput').value = ''; context.saveGroqKey();
     assert.equal(api.getGroqKey(), '');
     assert.equal(api.getQuoteAiProvider(), 'gemini'); // OCR choice is independent.
+});
+
+test('the application dispatcher records usage on every Groq request and leaves Gemini uncounted', async () => {
+    const { context, controls, api } = settingsHarness();
+    const tracker = await createGroqUsageTracker({ ownerId: 'test', apiKey: 'test', storage: null });
+    context.getActiveGroqUsageTracker = async () => tracker;
+    context.generateGroqContent = (parts, config, options) => generateGroqContent(parts, config, {
+        ...options, fetchImpl: async () => new Response(JSON.stringify({ usage: { total_tokens: 500 }, choices: [{ message: { content: '{}' } }] }))
+    });
+    controls.get('quoteGroqKeyInput').value = 'test'; context.saveGroqKey();
+    controls.get('quoteLlmProviderSelect').value = 'groq'; context.saveLlmProvider();
+    await api.callSelectedAiGenerateContent(parts);
+    assert.equal(tracker.snapshot().requestDay.used, 1);
+    assert.equal(tracker.snapshot().tokenDay.used, 500);
+    controls.get('quoteLlmProviderSelect').value = 'gemini'; context.saveLlmProvider();
+    await api.callSelectedAiGenerateContent(parts);
+    assert.equal(tracker.snapshot().requestDay.used, 1);
 });
 
 function searchHarness({ provider = 'groq', pages, terms = ['cản trước'] } = {}) {
