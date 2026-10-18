@@ -2093,3 +2093,12 @@ html.dark #pdLoadOverlay{background:radial-gradient(ellipse at 50% 35%,#183358 0
 @keyframes pd-load-turn{to{transform:rotate(360deg)}}@keyframes pd-load-breathe{50%{transform:scale(.94);box-shadow:0 8px 22px #2563eb12}}
 @media(max-width:480px){#pdLoadOverlay{padding:18px}.pd-load-card{padding:24px 4px}.pd-load-card h2{font-size:21px}.pd-load-info{font-size:10px}}
 @media(prefers-reduced-motion:reduce){#pdLoadOverlay *,#pdLoadOverlay *:after{animation:none!important;transition:none!important}}
+
+
+/* STATS_MANUAL_LOAD */
+#pdInitialView{min-height:calc(100dvh - 130px);display:flex;flex-direction:column}
+#pdInitialView[hidden],#pdReportContent[hidden]{display:none!important}
+.pd-initial-header{padding:18px 22px}.pd-initial-header h1{font-size:26px;font-weight:800;letter-spacing:-.035em;margin:9px 0;color:var(--pd-ink)}.pd-initial-header p{font-size:12px;color:var(--pd-muted);margin:0;line-height:1.8}
+.pd-initial-card{flex:1;min-height:350px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:34px 20px 64px;background:radial-gradient(ellipse at 50% 45%,#eaf2ff99,transparent 65%);border:1px solid var(--pd-border);border-radius:20px;margin-top:8px}.pd-initial-icon{width:80px;height:80px;display:grid;place-items:center;border:1px solid #cfe0fb;border-radius:24px;background:linear-gradient(145deg,#fff,#eaf2ff);color:#437ee0;box-shadow:0 14px 35px #2563eb12;margin-bottom:25px}#partsDashboard .pd-initial-icon svg{width:34px;height:34px}.pd-initial-card h2{font-size:21px;letter-spacing:-.025em;font-weight:800;margin:0 0 12px}.pd-initial-card p{font-size:12px;line-height:1.85;color:var(--pd-muted);max-width:420px;margin:0 0 24px}.pd-initial-card .pd-initial-load{height:43px;padding:0 22px;font-size:12px;font-weight:800;gap:9px}.pd-initial-note{font-size:10px;color:var(--pd-muted);margin-top:18px}.pd-initial-error{font-size:11px;line-height:1.8;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;max-width:480px;padding:11px 15px;margin-bottom:20px}
+html.dark .pd-initial-card{background:radial-gradient(ellipse at 50% 45%,#1c375955,transparent 65%)}html.dark .pd-initial-icon{background:linear-gradient(145deg,#1c3558,#14243c);border-color:#345176;color:#9bc1ff}html.dark .pd-initial-error{color:#f8cf8d;background:#3b3020;border-color:#67502b}
+@media(max-width:600px){.pd-initial-header{padding:12px 4px}.pd-initial-header h1{font-size:23px}.pd-initial-card{min-height:390px;padding:32px 18px}.pd-initial-card h2{font-size:19px}}
