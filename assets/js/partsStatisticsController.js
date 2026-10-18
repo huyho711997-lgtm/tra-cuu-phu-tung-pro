@@ -391,7 +391,7 @@
   async function refresh(force=false){
     if(!state.config)return;
     const owner=state.config.user(),scope=String(state.config.cacheScope?.()||(state.config.demo?'demo':'system'));
-    if(!owner||!state.config.canRead()){clear();status('Đăng nhập bằng tài khoản có quyền tra cứu phụ tùng để xem thống kê.','error');return;}
+    if(!owner||!state.config.canRead()){clear();status('Tài khoản chưa được cấp quyền Xem Thống kê phụ tùng.','error');return;}
     if(owner!==state.owner||scope!==state.scope){clear();state.owner=owner;state.scope=scope;}
     if(state.loading||state.loaded&&!force)return;
     const cacheKey=JSON.stringify([scope,owner]),revision=++state.revision;

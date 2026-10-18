@@ -649,13 +649,13 @@
         let ADMIN_USER_REFRESH_VERSION = 0;
         let ADMIN_USER_STATUS_FILTER = 'all';
         let ADMIN_USAGE_LOGS = [];
-        const APP_PERMISSION_KEYS = ['parts', 'quote', 'paint', 'teacher', 'student', 'users', 'feedbacks'];
+        const APP_PERMISSION_KEYS = ['parts', 'quote', 'paint', 'stats', 'teacher', 'student', 'users', 'feedbacks'];
         function getDefaultUserPermissions(role = 'user') {
             const allow = (view = false, edit = false, remove = false) => ({ view, edit, delete: remove });
-            if (role === 'admin') return Object.fromEntries(APP_PERMISSION_KEYS.map(key => [key, key === 'paint' ? allow(true) : allow(true, true, true)]));
-            if (role === 'teacher') return { parts: allow(true), quote: allow(true), paint: allow(), teacher: allow(true, true, true), student: allow(true), users: allow(), feedbacks: allow() };
-            if (role === 'user_no_quote') return { parts: allow(true), quote: allow(), paint: allow(), teacher: allow(), student: allow(true), users: allow(), feedbacks: allow() };
-            return { parts: allow(true), quote: allow(true), paint: allow(), teacher: allow(), student: allow(true), users: allow(), feedbacks: allow() };
+            if (role === 'admin') return Object.fromEntries(APP_PERMISSION_KEYS.map(key => [key, ['paint', 'stats'].includes(key) ? allow(true) : allow(true, true, true)]));
+            if (role === 'teacher') return { parts: allow(true), quote: allow(true), paint: allow(), stats: allow(), teacher: allow(true, true, true), student: allow(true), users: allow(), feedbacks: allow() };
+            if (role === 'user_no_quote') return { parts: allow(true), quote: allow(), paint: allow(), stats: allow(), teacher: allow(), student: allow(true), users: allow(), feedbacks: allow() };
+            return { parts: allow(true), quote: allow(true), paint: allow(), stats: allow(), teacher: allow(), student: allow(true), users: allow(), feedbacks: allow() };
         }
         function normalizeUserPermissions(value, role = 'user') {
             if (role === 'admin') return getDefaultUserPermissions('admin');
@@ -666,6 +666,8 @@
                 const item = value[key] || {};
                 normalized[key] = { view: item.view === true, edit: item.edit === true, delete: item.delete === true };
             });
+            normalized.stats.edit = false;
+            normalized.stats.delete = false;
             normalized.paint.edit = false;
             normalized.paint.delete = false;
             normalized.users = { view: false, edit: false, delete: false };
@@ -675,18 +677,19 @@
         function canCurrentUserAccessPage(page, action = 'view') {
             // Fail closed: tuyệt đối không cấp quyền trong lúc hồ sơ/quyền chưa tải xong.
             if (!currentUserProfile || currentUserProfile.status !== 'active') return false;
-            if (page === 'paint' && action !== 'view') return false;
+            if (['paint', 'stats'].includes(page) && action !== 'view') return false;
             if (currentUserProfile.role === 'admin') return true;
-            if (page === 'stats') return action === 'view' && currentUserProfile.permissions?.parts?.view === true;
+            if (page === 'stats') return currentUserProfile.permissions?.stats?.view === true;
             if (page === 'users') return false;
             if (page === 'ranking') return action === 'view' && (currentUserProfile.permissions?.student?.view === true || currentUserProfile.permissions?.teacher?.view === true);
             return currentUserProfile.permissions?.[page]?.[action] === true;
         }
         function firstAllowedMainPage() {
-            return ['parts', 'quote', 'paint', 'teacher', 'student', 'ranking'].find(page => canCurrentUserAccessPage(page, 'view')) || null;
+            return ['parts', 'quote', 'paint', 'stats', 'teacher', 'student', 'ranking'].find(page => canCurrentUserAccessPage(page, 'view')) || null;
         }
         function applyCurrentUserPermissions() {
             if (!currentUserProfile) return;
+            if (!canCurrentUserAccessPage('stats', 'view')) window.kgptStats?.clear();
             document.querySelectorAll('.ti-nav-btn[data-ti-view]').forEach(button => {
                 const page = button.dataset.tiView;
                 button.style.display = canCurrentUserAccessPage(page, 'view') ? 'flex' : 'none';
@@ -1196,7 +1199,7 @@
         // Dashboard reads only the same RLS-protected parts data as the lookup page.
         window.kgptStats.configure({
             user: () => auth.currentUser?.uid || null,
-            cacheScope: () => JSON.stringify([SUPABASE_PROJECT_URL,currentUserProfile?.role,currentUserProfile?.permissions?.parts]),
+            cacheScope: () => JSON.stringify([SUPABASE_PROJECT_URL,currentUserProfile?.role,currentUserProfile?.permissions?.parts,currentUserProfile?.permissions?.stats]),
             canRead: () => canCurrentUserAccessPage('stats', 'view'),
             async load(onProgress, signal, onBatch = null) {
                 if (!canCurrentUserAccessPage('stats', 'view')) throw new Error('Không có quyền xem thống kê.');
