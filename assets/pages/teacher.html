@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kho Giá Phụ Tùng · Quản lý bài tập</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--nav:#091120;--nav2:#101b30;--blue:#2563eb;--blue2:#1746cc;--ink:#101828;--muted:#667085;--line:#e5eaf2;--canvas:#f3f6fb;--card:#fff;--green:#12b76a;--amber:#f79009;--red:#f04438;--shadow:0 22px 55px -35px rgba(15,23,42,.38)}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:'Plus Jakarta Sans',sans-serif;color:var(--ink);background:var(--canvas)}
+button,input,select,textarea{font:inherit}
+.app{min-height:100vh}
+.sidebar{position:fixed;inset:0 auto 0 0;width:270px;background:linear-gradient(180deg,var(--nav2),var(--nav));color:#fff;padding:22px 14px;display:flex;flex-direction:column;z-index:20;border-right:1px solid rgba(255,255,255,.07)}
+.brand{display:flex;align-items:center;gap:12px;padding:0 8px 22px;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,#3b82f6,#1d4ed8);box-shadow:0 12px 25px -12px #3b82f6}
+.brand-icon svg{width:23px}
+.brand-name{font-size:14px;font-weight:800;letter-spacing:.02em}
+.brand-sub{font-size:8px;color:#7890b0;font-weight:800;letter-spacing:.13em;margin-top:4px}
+.nav-label{margin:24px 12px 10px;color:#60728e;font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.nav-btn{width:100%;height:46px;border:0;border-radius:12px;background:transparent;color:#94a3b8;display:flex;align-items:center;gap:12px;padding:0 13px;font-size:12px;font-weight:700;cursor:pointer;text-align:left;transition:.2s}
+.nav-btn svg{width:18px}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,.05)}
+.nav-btn.active{color:#fff;background:linear-gradient(90deg,rgba(37,99,235,.28),rgba(37,99,235,.12));box-shadow:inset 3px 0 #60a5fa}
+.sidebar-foot{margin-top:auto;padding:13px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:rgba(255,255,255,.035)}
+.sidebar-foot strong{font-size:10px;display:block}
+.sidebar-foot span{font-size:8px;color:#718198}
+.main{margin-left:270px;min-height:100vh}
+.topbar{height:72px;background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:15;backdrop-filter:blur(14px)}
+.top-left,.user{display:flex;align-items:center;gap:12px}
+.mobile-menu{display:none;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#64748b}
+.role-pill{padding:7px 10px;border-radius:9px;background:#eef4ff;color:#315ad3;font-size:10px;font-weight:800;letter-spacing:.06em}
+.page-name{font-size:14px;font-weight:800}
+.user-copy{text-align:right}
+.user-copy strong{font-size:12px;display:block}
+.user-copy span{font-size:9px;color:#8491a5}
+.avatar{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#4f75e9,#244dcc);color:white;font-size:13px;font-weight:800;box-shadow:0 10px 22px -12px #2563eb}
+.content{padding:24px 28px 40px;max-width:1700px;margin:auto}
+.hero{border:1px solid #d9e5f5;border-radius:22px;background:radial-gradient(circle at 90% 0,rgba(37,99,235,.13),transparent 30%),linear-gradient(135deg,#fff,#f6f9ff);padding:24px;box-shadow:var(--shadow)}
+.hero-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.eyebrow{color:#4f72d7;font-size:9px;font-weight:800;letter-spacing:.15em;text-transform:uppercase}
+.hero h1{font-size:25px;letter-spacing:-.04em;margin:8px 0 7px}
+.hero p{font-size:11px;color:var(--muted);margin:0;line-height:1.7}
+.primary{height:44px;padding:0 18px;border:0;border-radius:12px;background:linear-gradient(135deg,#2f67ec,#1d4ed8);color:#fff;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 14px 25px -14px #1d4ed8;display:inline-flex;align-items:center;gap:8px;transition:.2s}
+.primary:hover{transform:translateY(-1px);box-shadow:0 18px 30px -14px #1d4ed8}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
+.stat{padding:15px;border-radius:15px;background:rgba(255,255,255,.85);border:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.stat-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#eef4ff;color:var(--blue)}
+.stat-icon svg{width:18px}
+.stat b{font-size:19px;display:block}
+.stat span{font-size:9px;color:var(--muted);font-weight:700}
+.workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:18px}
+.panel{background:#fff;border:1px solid #dfe6f0;border-radius:19px;box-shadow:var(--shadow);overflow:hidden}
+.panel-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.panel-title{font-size:14px;font-weight:800}
+.panel-sub{font-size:9px;color:#8a96a8;margin-top:4px}
+.filters{display:flex;gap:8px}
+.search{height:36px;width:220px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font-size:10.5px;outline:none}
+.search:focus{border-color:#93b4ff;box-shadow:0 0 0 3px #eef4ff}
+.filter{height:36px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:0 10px;font-size:10.5px;color:#475467}
+.table-wrap{overflow:auto}
+.table{width:100%;border-collapse:collapse;min-width:760px}
+.table th{height:44px;padding:0 17px;text-align:left;background:#f8fafc;color:#7c8ba1;font-size:9px;letter-spacing:.08em;text-transform:uppercase}
+.table td{padding:14px 17px;border-top:1px solid #eef1f6;font-size:10.5px;vertical-align:middle}
+.task-name{font-size:12px;font-weight:800;margin-bottom:5px;color:#1e293b}
+.task-meta{color:#8793a5;font-size:9.5px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border-radius:999px;font-size:8.5px;font-weight:800}
+.badge.green{background:#eafaf2;color:#087a46}
+.badge.blue{background:#edf4ff;color:#2456c8}
+.badge.gray{background:#f2f4f7;color:#667085}
+.badge.amber{background:#fff6e6;color:#b54708}
+.progress{width:92px;height:5px;border-radius:99px;background:#edf1f6;overflow:hidden;margin-top:6px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,#2563eb,#60a5fa);border-radius:99px}
+.icon-btn{width:32px;height:32px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#667085;display:inline-grid;place-items:center;cursor:pointer;transition:.2s}
+.icon-btn:hover{color:var(--blue);border-color:#b8cdfa;background:#f5f8ff}
+.icon-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn.danger{color:#e0525f;border-color:#f5d5d9;background:#fffafb}
+.icon-btn.danger:hover{color:#fff;border-color:#e11d48;background:#e11d48;box-shadow:0 9px 18px -12px rgba(225,29,72,.75);transform:translateY(-1px)}
+.action-group{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.modal-backdrop{position:fixed;inset:0;background:rgba(5,12,26,.6);z-index:50;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)}
+.modal-backdrop.open{display:flex}
+.modal{width:min(900px,calc(100vw - 36px));max-height:92vh;display:flex;flex-direction:column;border-radius:24px;background:#fff;box-shadow:0 36px 90px -25px rgba(3,12,29,.7);overflow:hidden}
+.modal-head{padding:22px 26px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#fff,#f8fbff)}
+.modal-head h2{font-size:19px;margin:4px 0 0;color:#0f172a}
+.close{width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:20px;color:#667085;cursor:pointer;transition:.2s}
+.close:hover{background:#fff1f2;color:#e11d48;border-color:#fecaca}
+.form{flex:1;overflow-y:auto;padding:22px 26px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:9.5px;font-weight:800;color:#526076;margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em}
+.field input,.field select,.field textarea{width:100%;border:1px solid #dfe5ee;border-radius:11px;background:#fbfcfe;padding:11px 13px;font-size:11.5px;outline:none;transition:.2s}
+.field input:focus,.field select:focus,.field textarea:focus{background:#fff;border-color:#8eb0fb;box-shadow:0 0 0 3px #edf3ff}
+.modal-foot{padding:16px 26px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;background:#fff}
+.secondary{height:42px;padding:0 16px;border:1px solid var(--line);border-radius:11px;background:#fff;color:#475467;font-size:11px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.2s}
+.secondary:hover{background:#f8fafc;border-color:#cbd5e1}
+.toast{position:fixed;right:24px;bottom:24px;padding:13px 18px;border-radius:12px;background:#101828;color:#fff;font-size:11px;font-weight:700;box-shadow:0 18px 40px -18px #000;transform:translateY(90px);opacity:0;transition:.3s;z-index:80}
+.toast.show{transform:none;opacity:1}
+.question-builder{margin-top:12px;border:1px solid #dae5f3;border-radius:18px;background:linear-gradient(180deg,#f8faff,#f4f7fc);overflow:hidden}
+.question-builder-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px;border-bottom:1px solid #dfe8f4;background:#fff}
+.question-builder-actions{display:flex;align-items:center;gap:8px}
+.template-excel-btn,.import-excel-btn{height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;border:1px solid #cfe0f8;border-radius:11px;background:#fff;color:#315fc5;cursor:pointer;transition:.18s}
+.template-excel-btn{border-color:#cdebdc;color:#178653}
+.template-excel-btn:hover{background:#f0fdf4;border-color:#86efac}
+.import-excel-btn:hover{background:#eff6ff;border-color:#93c5fd}
+.question-count-pill{height:40px;padding:0 12px;display:flex;align-items:center;gap:6px;border:1px solid #d5e2f5;border-radius:11px;background:#fff;color:#50617c;font-weight:800}
+.question-count-pill b{color:#2563eb;font-size:16px}
+.question-list{padding:14px;display:flex;flex-direction:column;gap:12px}
+.question-card{position:relative;padding:16px;border:1px solid #dce5f1;border-radius:15px;background:#fff}
+.question-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.question-number{width:32px;height:32px;display:grid;place-items:center;border-radius:9px;background:#2563eb;color:#fff;font-size:10px;font-weight:800}
+.points-control{height:32px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid #e1e7f0;border-radius:8px;background:#f8fafc;font-size:9.5px;font-weight:700;color:#64748b}
+.points-control input{width:42px;height:24px;border:0;background:#fff;text-align:center;font-weight:800;color:#2563eb;border-radius:5px}
+.question-prompt{width:100%;height:68px;padding:10px 12px;border:1px solid #dbe4ef;border-radius:10px;font-size:11.5px;resize:vertical;outline:none}
+.premium-answers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.premium-answer-option{display:flex;align-items:center;gap:8px;padding:0 9px;height:42px;border:1px solid #dfe6f0;border-radius:10px;background:#fbfcfe;cursor:pointer}
+.premium-answer-option.selected{border-color:#74a0ef;background:#eff6ff}
+.answer-key{width:24px;height:24px;display:grid;place-items:center;border-radius:7px;background:#edf2f8;color:#60708a;font-size:9.5px;font-weight:800;flex:none}
+.premium-answer-option.selected .answer-key{background:#2563eb;color:#fff}
+.answer-text{flex:1;border:0;background:transparent;font-size:11px;outline:none}
+.add-question-btn{width:calc(100% - 28px);margin:0 14px 14px;height:48px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px dashed #9db9ed;border-radius:12px;background:#f4f8ff;color:#2563eb;cursor:pointer;font-weight:800;font-size:11.5px;transition:.18s}
+.add-question-btn:hover{background:#eaf2ff;border-color:#3b82f6}
+.results-table{width:100%;border-collapse:collapse}
+.results-table th{background:#f8fafc;padding:10px 14px;font-size:9.5px;text-align:left;color:#64748b;border-bottom:1px solid #e2e8f0}
+.results-table td{padding:12px 14px;font-size:11px;border-bottom:1px solid #f1f5f9}
+@media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}.workspace{grid-template-columns:1fr}.sidebar{transform:translateX(-100%);transition:.25s}.sidebar.open{transform:none}.main{margin-left:0}.mobile-menu{display:grid;place-items:center}}
+@media(max-width:650px){.content{padding:16px}.topbar{padding:0 16px}.hero-head{flex-direction:column}.stats{grid-template-columns:1fr}.filters{display:none}.grid2{grid-template-columns:1fr}.user-copy{display:none}}
+.embedded .sidebar,.embedded .topbar{display:none!important}
+.embedded .main{margin-left:0;min-height:auto}
+.embedded .content{max-width:none;padding:20px}
+.embedded{background:#f3f6fb}
+.embedded .hero{box-shadow:none}
+</style>
+</head>
+<body>
+<script>document.body.classList.add('embedded')</script>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 2l2 2.2 3-.3.8 2.9 2.7 1.4-1.2 2.8 1.2 2.8-2.7 1.4-.8 2.9-3-.3L12 20l-2-2.2-3 .3-.8-2.9-2.7-1.4L4.7 11 3.5 8.2l2.7-1.4L7 3.9l3 .3L12 2Z"/><circle cx="12" cy="11" r="3"/></svg></div><div><div class="brand-name">KHO GIÁ PHỤ TÙNG</div><div class="brand-sub">HỌC VIỆN NGHIỆP VỤ</div></div></div>
+    <div class="nav-label">Quản lý đào tạo</div>
+    <button class="nav-btn active"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 3v4M16 3v4M4 9h16"/></svg>Quản lý bài tập</button>
+    <button class="nav-btn"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 19V5h16v14H4Zm4-3v-4m4 4V8m4 8v-6"/></svg>Kết quả học tập</button>
+    <button class="nav-btn"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2M17 7h4m-2-2v4"/></svg>Danh sách học viên</button>
+    <div class="sidebar-foot"><strong>KHO GIÁ ACADEMY</strong><span>Hệ thống đào tạo nội bộ</span></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="top-left"><button class="mobile-menu" onclick="sidebar.classList.toggle('open')">☰</button><span class="role-pill" id="teacherRolePill">GIẢNG VIÊN</span><span class="page-name">Quản lý bài tập</span></div>
+      <div class="user"><div class="user-copy"><strong id="teacherFullName">Người quản lý</strong><span id="teacherRoleText">Quản lý đào tạo</span></div><div class="avatar" id="teacherAvatar">Q</div></div>
+    </header>
+    <div class="content">
+      <section class="hero">
+        <div class="hero-head">
+          <div>
+            <div class="eyebrow">Training Management Center</div>
+            <h1>Quản lý bài tập & kết quả</h1>
+            <p>Tạo nội dung đánh giá nghiệp vụ, phân công học viên và theo dõi tiến độ hoàn thành theo thời gian thực.</p>
+          </div>
+          <button class="primary" onclick="openModal()"><span style="font-size:17px">＋</span>Tạo bài tập mới</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="stat-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></div><div><b id="statTaskCount">0</b><span>Tổng bài tập</span></div></div>
+          <div class="stat"><div class="stat-icon" style="color:#087a46;background:#eafaf2"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></div><div><b id="statActiveCount">0</b><span>Đang triển khai</span></div></div>
+          <div class="stat"><div class="stat-icon" style="color:#b54708;background:#fff6e6"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div><b id="statSubmissions">0</b><span>Lượt đã nộp</span></div></div>
+          <div class="stat"><div class="stat-icon" style="color:#6941c6;background:#f3efff"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/></svg></div><div><b id="statAvgScore">—</b><span>Điểm trung bình</span></div></div>
+        </div>
+      </section>
+      <div class="workspace">
+        <section class="panel">
+          <div class="panel-head">
+            <div><div class="panel-title">Danh sách bài tập</div><div class="panel-sub">Quản lý nội dung, thời hạn và tiến độ hoàn thành</div></div>
+            <div class="filters">
+              <input class="search" id="search" placeholder="Tìm kiếm bài tập..." oninput="filterRows()">
+              <select class="filter" id="statusFilter" onchange="filterRows()">
+                <option value="">Tất cả trạng thái</option>
+                <option value="open">Đang mở</option>
+                <option value="draft">Bản nháp</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Bài tập</th><th>Thời hạn</th><th>Lượt nộp</th><th>Điểm TB</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+              <tbody id="taskRows">
+                <tr><td colspan="6" style="text-align:center; padding: 48px 16px; color:#8792a3;">Đang tải danh sách bài tập...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal Tạo bài tập -->
+<div class="modal-backdrop" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="eyebrow">TRAINING WORKSPACE</div><h2>Tạo bài tập mới</h2></div>
+      <button class="close" onclick="closeModal()">×</button>
+    </div>
+    <form class="form" id="createForm" onsubmit="event.preventDefault(); saveAssignmentForm('publish');">
+      <div class="field">
+        <label>Tên bài tập</label>
+        <input id="newTitle" required placeholder="Ví dụ: Kiểm tra báo giá phụ tùng xe...">
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Chuyên đề</label>
+          <select id="newTopic">
+            <option>Định giá phụ tùng</option>
+            <option>Nhận diện phụ tùng</option>
+            <option>Kiểm soát báo giá</option>
+            <option>Quy trình giám định</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Đối tượng</label>
+          <select id="newAudience">
+            <option>Tất cả học viên</option>
+            <option>Giám định viên mới</option>
+            <option>Nhóm nghiệp vụ</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Thời hạn nộp</label>
+          <input type="datetime-local" id="newDeadline">
+        </div>
+        <div class="field">
+          <label>Thời gian làm bài</label>
+          <select id="newDuration">
+            <option value="15 phút">15 phút</option>
+            <option value="20 phút">20 phút</option>
+            <option value="30 phút" selected>30 phút</option>
+            <option value="45 phút">45 phút</option>
+            <option value="60 phút">60 phút</option>
+          </select>
+        </div>
+      </div>
+      <section class="question-builder">
+        <div class="question-builder-head">
+          <div>
+            <div class="eyebrow" style="font-size:9.5px; color:#2563eb;">NGÂN HÀNG CÂU HỎI</div>
+            <h3 style="margin:4px 0 0; font-size:15px; color:#0f172a;">Bộ câu hỏi đánh giá</h3>
+          </div>
+          <div class="question-builder-actions">
+            <input id="questionExcelInput" type="file" accept=".xlsx,.xls,.csv" hidden onchange="handleExcelImport(event)">
+            <button class="template-excel-btn" type="button" onclick="downloadExcelTemplate()" title="Tải file Excel mẫu">
+              <svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4"></path><path d="M5 17v3h14v-3"></path></svg>
+              <span><b>Tải file mẫu</b></span>
+            </button>
+            <button class="import-excel-btn" type="button" onclick="document.getElementById('questionExcelInput').click()" title="Nhập danh sách câu hỏi từ Excel">
+              <svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4"></path><path d="M5 17v3h14v-3"></path></svg>
+              <span><b>Nhập Excel</b></span>
+            </button>
+            <div class="question-count-pill"><b id="questionCountBadge">1</b><span>câu</span></div>
+          </div>
+        </div>
+        <div class="question-list" id="questionListContainer"></div>
+        <button class="add-question-btn" type="button" onclick="addQuestionCard()">
+          <span style="font-size:18px;">＋</span>
+          <span><b>Thêm câu hỏi mới</b></span>
+        </button>
+      </section>
+    </form>
+    <div class="modal-foot">
+      <button class="secondary" type="button" onclick="closeModal()">Hủy</button>
+      <button class="secondary" type="button" onclick="saveAssignmentForm('draft')">Lưu bản nháp</button>
+      <button class="primary" type="button" onclick="saveAssignmentForm('publish')">Tạo & giao bài →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Xem kết quả bài làm -->
+<div class="modal-backdrop" id="resultsModal" onclick="if(event.target===this)closeResultsModal()">
+  <div class="modal" style="max-width: 680px;">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow">KẾT QUẢ ĐÀO TẠO</div>
+        <h2 id="resultModalTitle">Bảng kết quả làm bài</h2>
+      </div>
+      <button class="close" onclick="closeResultsModal()">×</button>
+    </div>
+    <div style="padding: 20px; overflow-y: auto; max-height: 60vh;">
+      <table class="results-table">
+        <thead><tr><th>Học viên</th><th>Thời gian nộp</th><th>Điểm số</th><th>Đánh giá</th></tr></thead>
+        <tbody id="resultSubmissionsBody">
+          <tr><td colspan="4" style="text-align:center; padding:30px; color:#8792a3;">Chưa có học viên nào nộp bài này.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-foot">
+      <button class="secondary" type="button" onclick="closeResultsModal()">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY_ASSIGNMENTS = 'kgpt_shared_assignments_v1';
+const STORAGE_KEY_RESULTS = 'kgpt_student_quiz_results';
+
+let assignments = [];
+
+function escapeHtml(text) {
+    return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function showToast(message) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = message;
+    t.classList.add('show');
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(() => t.classList.remove('show'), 2300);
+}
+
+// 1. Đồng bộ thông tin người dùng từ parent app
+function syncUserProfile(profile) {
+    if (!profile) return;
+    const name = (profile.fullName || profile.displayName || profile.email || 'Người quản lý').trim();
+    const role = profile.role === 'admin' ? 'Quản trị viên' : (profile.role === 'teacher' ? 'Giảng viên' : 'Quản lý đào tạo');
+    const avatar = (name.charAt(0) || 'Q').toUpperCase();
+
+    const fullNameEl = document.getElementById('teacherFullName');
+    const roleTextEl = document.getElementById('teacherRoleText');
+    const rolePillEl = document.getElementById('teacherRolePill');
+    const avatarEl = document.getElementById('teacherAvatar');
+
+    if (fullNameEl) fullNameEl.textContent = name;
+    if (roleTextEl) roleTextEl.textContent = role;
+    if (rolePillEl) rolePillEl.textContent = role.toUpperCase();
+    if (avatarEl) avatarEl.textContent = avatar;
+}
+
+function tryDetectParentUser() {
+    try {
+        if (window.parent && window.parent !== window) {
+            const p = window.parent;
+            const profile = p.currentUserProfile || (p.auth && p.auth.currentUser ? {
+                fullName: p.auth.currentUser.displayName || p.auth.currentUser.email,
+                role: 'Giảng viên'
+            } : null);
+            if (profile) {
+                syncUserProfile(profile);
+                return;
+            }
+            const domName = p.document.getElementById('userDisplayName')?.textContent;
+            const domRole = p.document.getElementById('heroUserRoleBadge')?.textContent;
+            if (domName && domName.trim()) {
+                syncUserProfile({ fullName: domName.trim(), role: domRole ? domRole.trim() : 'Giảng viên' });
+            }
+        }
+    } catch (e) {}
+}
+
+// 2. Tải và render bài tập thực tế
+function getResults() {
+    try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY_RESULTS) || '{}');
+    } catch (e) {
+        return {};
+    }
+}
+
+function loadAssignments() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_ASSIGNMENTS);
+        assignments = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+    } catch (e) {
+        assignments = [];
+    }
+    renderTable();
+    updateStats();
+}
+
+function updateStats() {
+    const results = getResults();
+    const resultList = Object.values(results);
+
+    const total = assignments.length;
+    const active = assignments.filter(a => a.status === 'open').length;
+    const submissions = resultList.length;
+
+    let avg = '—';
+    if (submissions > 0) {
+        const sum = resultList.reduce((acc, r) => acc + (Number(r.score) || 0), 0);
+        avg = (sum / submissions).toFixed(1);
+    }
+
+    document.getElementById('statTaskCount').textContent = total;
+    document.getElementById('statActiveCount').textContent = active;
+    document.getElementById('statSubmissions').textContent = submissions;
+    document.getElementById('statAvgScore').textContent = avg;
+}
+
+function renderTable() {
+    const tbody = document.getElementById('taskRows');
+    if (!tbody) return;
+
+    if (assignments.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align:center; padding: 54px 16px; color:#8792a3;">
+              <svg style="width:44px;height:44px;margin:0 auto 12px;color:#94a3b8;display:block;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10" stroke-width="1.8" stroke-linecap="round"/></svg>
+              <b style="display:block; font-size:13.5px; color:#1e293b; margin-bottom:5px;">Chưa có bài tập nào được tạo</b>
+              <span style="font-size:11px; color:#64748b;">Nhấn <b>“＋ Tạo bài tập mới”</b> hoặc <b>“Nhập Excel”</b> để bắt đầu soạn bài tập thực tế cho học viên.</span>
+            </td>
+          </tr>
+        `;
+        return;
+    }
+
+    const results = getResults();
+    let html = '';
+    assignments.forEach(task => {
+        const res = results[task.id];
+        const statusBadge = task.status === 'draft'
+            ? '<span class="badge gray">● Bản nháp</span>'
+            : '<span class="badge green">● Đang mở</span>';
+
+        const deadlineText = task.deadlineLabel ? escapeHtml(task.deadlineLabel) : 'Chưa thiết lập';
+        const subCount = res ? '1 lượt' : '0 lượt';
+        const scoreText = res ? `<b>${res.score}</b>/10` : '—';
+
+        html += `
+          <tr data-task-id="${task.id}">
+            <td>
+              <div class="task-name">${escapeHtml(task.title)}</div>
+              <div class="task-meta">${(task.questions || []).length} câu · ${escapeHtml(task.duration || '30 phút')} · ${escapeHtml(task.topic || 'Nghiệp vụ')}</div>
+            </td>
+            <td>${deadlineText}</td>
+            <td><b>${subCount}</b></td>
+            <td>${scoreText}</td>
+            <td>${statusBadge}</td>
+            <td>
+              <div class="action-group">
+                <button class="icon-btn" title="Xem kết quả" onclick="viewTaskResults('${task.id}')">
+                  <svg viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/></svg>
+                </button>
+                <button class="icon-btn danger" title="Xóa bài tập" onclick="deleteAssignment('${task.id}')">
+                  <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5"/></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function filterRows() {
+    const q = (document.getElementById('search').value || '').toLowerCase().trim();
+    const st = document.getElementById('statusFilter').value;
+    document.querySelectorAll('#taskRows tr[data-task-id]').forEach(r => {
+        const id = r.dataset.taskId;
+        const task = assignments.find(t => t.id === id);
+        if (!task) return;
+        const matchText = (task.title + ' ' + (task.topic || '')).toLowerCase().includes(q);
+        const matchStatus = !st || task.status === st;
+        r.style.display = (matchText && matchStatus) ? '' : 'none';
+    });
+}
+
+function deleteAssignment(id) {
+    const task = assignments.find(t => t.id === id);
+    if (!task) return;
+    if (!confirm(`Bạn có chắc muốn xoá bài tập "${task.title}"?\nHọc viên sẽ không thể làm bài này nữa.`)) return;
+
+    assignments = assignments.filter(t => t.id !== id);
+    try {
+        localStorage.setItem(STORAGE_KEY_ASSIGNMENTS, JSON.stringify(assignments));
+    } catch (e) {}
+
+    loadAssignments();
+    showToast(`Đã xoá bài tập "${task.title}"`);
+
+    // Bắn thông báo sang parent / student
+    try {
+        window.parent.postMessage({ type: 'kgpt:refresh-assignments' }, '*');
+    } catch (e) {}
+}
+
+function viewTaskResults(id) {
+    const task = assignments.find(t => t.id === id);
+    if (!task) return;
+
+    const results = getResults();
+    const res = results[id];
+    const tbody = document.getElementById('resultSubmissionsBody');
+    document.getElementById('resultModalTitle').textContent = `Kết quả: ${task.title}`;
+
+    if (!res) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:32px; color:#8792a3;">Chưa có học viên nào nộp bài tập này.</td></tr>';
+    } else {
+        const dateStr = res.completedAt ? new Date(res.completedAt).toLocaleString('vi-VN') : '—';
+        const pass = (Number(res.score) >= 7.0);
+        tbody.innerHTML = `
+          <tr>
+            <td><b>${escapeHtml(res.studentName || 'Học viên')}</b></td>
+            <td>${dateStr}</td>
+            <td><b style="color:#2563eb; font-size:13px;">${res.score}</b> / 10</td>
+            <td><span class="badge ${pass ? 'green' : 'amber'}">${pass ? '● Đạt' : '● Chưa đạt'}</span></td>
+          </tr>
+        `;
+    }
+
+    document.getElementById('resultsModal').classList.add('open');
+}
+
+function closeResultsModal() {
+    document.getElementById('resultsModal').classList.remove('open');
+}
+
+// 3. Question Builder & Modal Logic
+let questions = [];
+
+function openModal() {
+    document.getElementById('createForm').reset();
+    questions = [];
+    document.getElementById('questionListContainer').innerHTML = '';
+    addQuestionCard();
+    document.getElementById('modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function addQuestionCard(seed) {
+    const data = seed || { prompt: '', answers: ['', '', '', ''], correct: 0, points: 1 };
+    const card = document.createElement('div');
+    card.className = 'question-card';
+    const idx = document.querySelectorAll('.question-card').length;
+
+    card.innerHTML = `
+      <div class="question-card-head">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="question-number">${String(idx + 1).padStart(2, '0')}</span>
+          <b style="font-size:12px; color:#1e293b;">Câu hỏi ${idx + 1}</b>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label class="points-control"><span>Điểm:</span><input class="q-points" type="number" value="${data.points || 1}" min="0.5" max="10" step="0.5"></label>
+          <button class="icon-btn danger" type="button" onclick="this.closest('.question-card').remove(); refreshQuestionNumbers();" title="Xóa câu hỏi">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5"/></svg>
+          </button>
+        </div>
+      </div>
+      <textarea class="question-prompt" placeholder="Nhập nội dung câu hỏi..." required>${escapeHtml(data.prompt)}</textarea>
+      <div class="premium-answers">
+        ${['A', 'B', 'C', 'D'].map((letter, optIdx) => {
+            const isChecked = data.correct === optIdx;
+            const val = data.answers && data.answers[optIdx] ? data.answers[optIdx] : '';
+            return `
+              <label class="premium-answer-option ${isChecked ? 'selected' : ''}">
+                <input type="radio" name="correct_${idx}" value="${optIdx}" ${isChecked ? 'checked' : ''} onchange="selectCorrectAnswer(this)" style="display:none;">
+                <span class="answer-key">${letter}</span>
+                <input class="answer-text" placeholder="Đáp án ${letter}..." value="${escapeHtml(val)}" required>
+              </label>
+            `;
+        }).join('')}
+      </div>
+    `;
+
+    document.getElementById('questionListContainer').appendChild(card);
+    refreshQuestionNumbers();
+}
+
+function selectCorrectAnswer(radio) {
+    const parentAnswers = radio.closest('.premium-answers');
+    parentAnswers.querySelectorAll('.premium-answer-option').forEach(el => el.classList.remove('selected'));
+    radio.closest('.premium-answer-option').classList.add('selected');
+}
+
+function refreshQuestionNumbers() {
+    const cards = document.querySelectorAll('.question-card');
+    cards.forEach((card, i) => {
+        card.querySelector('.question-number').textContent = String(i + 1).padStart(2, '0');
+        card.querySelector('b').textContent = `Câu hỏi ${i + 1}`;
+        card.querySelectorAll('input[type="radio"]').forEach(r => r.name = `correct_${i}`);
+    });
+    document.getElementById('questionCountBadge').textContent = cards.length;
+}
+
+function saveAssignmentForm(status = 'publish') {
+    const title = (document.getElementById('newTitle').value || '').trim();
+    if (!title) {
+        alert('Vui lòng nhập tên bài tập');
+        document.getElementById('newTitle').focus();
+        return;
+    }
+
+    const cards = document.querySelectorAll('.question-card');
+    if (cards.length === 0 && status !== 'draft') {
+        alert('Vui lòng tạo ít nhất một câu hỏi');
+        return;
+    }
+
+    const questionsData = [];
+    cards.forEach(card => {
+        const prompt = card.querySelector('.question-prompt').value.trim();
+        const answers = Array.from(card.querySelectorAll('.answer-text')).map(input => input.value.trim());
+        const checkedRadio = card.querySelector('input[type="radio"]:checked');
+        const correct = checkedRadio ? Number(checkedRadio.value) : 0;
+        const points = Number(card.querySelector('.q-points').value) || 1;
+        if (prompt) {
+            questionsData.push({ q: prompt, a: answers, c: correct, points: points });
+        }
+    });
+
+    const topic = document.getElementById('newTopic').value;
+    const duration = document.getElementById('newDuration').value;
+    const deadlineVal = document.getElementById('newDeadline').value;
+    let deadlineLabel = 'Chưa thiết lập';
+    if (deadlineVal) {
+        const d = new Date(deadlineVal);
+        deadlineLabel = d.toLocaleDateString('vi-VN') + ' · ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    const newAssignment = {
+        id: 'task-' + Date.now(),
+        title: title,
+        topic: topic,
+        duration: duration,
+        deadline: deadlineVal,
+        deadlineLabel: deadlineLabel,
+        description: `${questionsData.length} câu hỏi đánh giá thuộc chuyên đề ${topic}.`,
+        questions: questionsData,
+        createdAt: new Date().toISOString(),
+        status: status === 'draft' ? 'draft' : 'open'
+    };
+
+    assignments.unshift(newAssignment);
+    try {
+        localStorage.setItem(STORAGE_KEY_ASSIGNMENTS, JSON.stringify(assignments));
+    } catch (e) {}
+
+    loadAssignments();
+    closeModal();
+    showToast(status === 'draft' ? 'Đã lưu bản nháp thành công' : 'Đã tạo và giao bài tập thành công!');
+
+    // Báo parent và student
+    try {
+        window.parent.postMessage({ type: 'kgpt:refresh-assignments' }, '*');
+    } catch (e) {}
+}
+
+// 4. Excel Template & Import
+function downloadExcelTemplate() {
+    if (!window.XLSX) {
+        showToast('Đang tải thư viện Excel...');
+        return;
+    }
+    const sampleRows = [
+        {
+            'Câu hỏi': 'Bộ phận nào có nhiệm vụ lọc bụi bẩn trong dầu động cơ?',
+            'Đáp án A': 'Lọc dầu',
+            'Đáp án B': 'Bugi',
+            'Đáp án C': 'Két nước',
+            'Đáp án D': 'Máy phát điện',
+            'Đáp án đúng': 'A',
+            'Điểm': 1
+        },
+        {
+            'Câu hỏi': 'Ký hiệu OEM thường dùng để chỉ loại phụ tùng nào?',
+            'Đáp án A': 'Phụ tùng đã qua sử dụng',
+            'Đáp án B': 'Phụ tùng của nhà sản xuất thiết bị gốc',
+            'Đáp án C': 'Phụ tùng không rõ nguồn gốc',
+            'Đáp án D': 'Phụ tùng tự chế',
+            'Đáp án đúng': 'B',
+            'Điểm': 1
+        }
+    ];
+    const ws = XLSX.utils.json_to_sheet(sampleRows);
+    ws['!cols'] = [{ wch: 60 }, { wch: 25 }, { wch: 35 }, { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'CauHoi');
+    XLSX.writeFile(wb, 'Mau_nhap_cau_hoi_bai_tap.xlsx');
+    showToast('Đã tải file Excel mẫu thành công');
+}
+
+async function handleExcelImport(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file || !window.XLSX) return;
+
+    try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        if (!rows.length) {
+            showToast('File Excel không có dữ liệu');
+            return;
+        }
+
+        const container = document.getElementById('questionListContainer');
+        container.innerHTML = '';
+
+        rows.forEach(r => {
+            const prompt = r['Câu hỏi'] || r['Cau hoi'] || r['Question'] || '';
+            if (!prompt) return;
+            const answers = [
+                r['Đáp án A'] || r['A'] || '',
+                r['Đáp án B'] || r['B'] || '',
+                r['Đáp án C'] || r['C'] || '',
+                r['Đáp án D'] || r['D'] || ''
+            ];
+            let correct = 0;
+            const correctStr = String(r['Đáp án đúng'] || r['Correct'] || 'A').toUpperCase().trim();
+            if (correctStr === 'B' || correctStr === '2') correct = 1;
+            else if (correctStr === 'C' || correctStr === '3') correct = 2;
+            else if (correctStr === 'D' || correctStr === '4') correct = 3;
+
+            const points = Number(r['Điểm'] || r['Score'] || 1) || 1;
+
+            addQuestionCard({
+                prompt: prompt,
+                answers: answers,
+                correct: correct,
+                points: points
+            });
+        });
+
+        const titleEl = document.getElementById('newTitle');
+        if (titleEl && !titleEl.value.trim()) {
+            titleEl.value = file.name.replace(/\.(xlsx|xls|csv)$/i, '');
+        }
+
+        showToast(`Đã nhập thành công ${document.querySelectorAll('.question-card').length} câu hỏi`);
+    } catch (e) {
+        console.error(e);
+        showToast('Lỗi khi đọc file Excel: ' + e.message);
+    } finally {
+        event.target.value = '';
+    }
+}
+
+// 5. Lắng nghe thông điệp
+window.addEventListener('message', (event) => {
+    const msg = event.data || {};
+    if (msg.type === 'kgpt:sync-user' && msg.user) {
+        syncUserProfile(msg.user);
+    }
+    if (msg.type === 'kgpt:refresh-assignments' || msg.type === 'kgpt:quiz-completed') {
+        loadAssignments();
+    }
+});
+
+window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY_ASSIGNMENTS || e.key === STORAGE_KEY_RESULTS) {
+        loadAssignments();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    tryDetectParentUser();
+    loadAssignments();
+});
+</script>
+</body>
+</html>

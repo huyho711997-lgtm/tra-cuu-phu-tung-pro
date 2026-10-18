@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kho Giá Phụ Tùng · Bài tập của tôi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--nav:#091120;--nav2:#101b30;--blue:#2563eb;--blue2:#194acb;--ink:#101828;--muted:#667085;--line:#e2e8f0;--canvas:#f3f6fb;--green:#12b76a;--amber:#f79009;--red:#ef4444;--shadow:0 22px 55px -35px rgba(15,23,42,.4)}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:'Plus Jakarta Sans',sans-serif;color:var(--ink);background:var(--canvas)}
+button,input{font:inherit}
+.sidebar{position:fixed;inset:0 auto 0 0;width:270px;background:linear-gradient(180deg,var(--nav2),var(--nav));color:#fff;padding:22px 14px;display:flex;flex-direction:column;z-index:20;border-right:1px solid rgba(255,255,255,.07)}
+.brand{display:flex;align-items:center;gap:12px;padding:0 8px 22px;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,#3b82f6,#1d4ed8);box-shadow:0 12px 25px -12px #3b82f6}
+.brand-icon svg{width:23px}
+.brand-name{font-size:14px;font-weight:800}
+.brand-sub{font-size:8px;color:#7890b0;font-weight:800;letter-spacing:.13em;margin-top:4px}
+.nav-label{margin:24px 12px 10px;color:#60728e;font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.nav-btn{width:100%;height:46px;border:0;border-radius:12px;background:transparent;color:#94a3b8;display:flex;align-items:center;gap:12px;padding:0 13px;font-size:12px;font-weight:700;cursor:pointer;text-align:left;transition:.2s}
+.nav-btn svg{width:18px}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,.05)}
+.nav-btn.active{color:#fff;background:linear-gradient(90deg,rgba(37,99,235,.28),rgba(37,99,235,.12));box-shadow:inset 3px 0 #60a5fa}
+.side-progress{margin-top:auto;padding:15px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.035)}
+.side-progress b{font-size:10px}
+.side-progress p{font-size:8px;color:#8090a8;margin:5px 0 10px}
+.mini-progress{height:5px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+.mini-progress i{display:block;width:0%;height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);transition:width .3s ease}
+.main{margin-left:270px;min-height:100vh}
+.topbar{height:72px;background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:15;backdrop-filter:blur(14px)}
+.top-left,.user{display:flex;align-items:center;gap:12px}
+.mobile-menu{display:none;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.role-pill{padding:7px 10px;border-radius:9px;background:#eef4ff;color:#315ad3;font-size:10px;font-weight:800;letter-spacing:.06em}
+.page-name{font-size:14px;font-weight:800}
+.user-copy{text-align:right}
+.user-copy strong{font-size:12px;display:block}
+.user-copy span{font-size:9px;color:#8491a5}
+.avatar{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#4f75e9,#244dcc);color:#fff;font-size:13px;font-weight:800;box-shadow:0 10px 22px -12px #2563eb}
+.content{padding:24px 28px 40px;max-width:1650px;margin:auto}
+.hero{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:24px;border-radius:22px;border:1px solid #d9e5f5;background:radial-gradient(circle at 92% 0,rgba(37,99,235,.15),transparent 29%),linear-gradient(135deg,#fff,#f6f9ff);box-shadow:var(--shadow)}
+.eyebrow{font-size:9px;color:#4c6fcf;font-weight:800;letter-spacing:.15em;text-transform:uppercase}
+.hero h1{font-size:25px;letter-spacing:-.04em;margin:8px 0 7px}
+.hero p{font-size:11px;line-height:1.7;color:var(--muted);margin:0}
+.hero-score{min-width:235px;padding:15px 17px;border:1px solid rgba(255,255,255,.9);border-radius:15px;background:rgba(255,255,255,.78);box-shadow:0 16px 34px -26px #1e3a8a}
+.hero-score-top{display:flex;justify-content:space-between;font-size:9px;color:#667085;font-weight:700}
+.hero-score strong{color:#194acb}
+.bar{height:7px;border-radius:99px;background:#e7edf7;margin:10px 0 7px;overflow:hidden}
+.bar i{display:block;height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#2563eb,#60a5fa);transition:width .3s ease}
+.hero-score small{font-size:8px;color:#8b96a7}
+.layout{display:grid;grid-template-columns:360px minmax(0,1fr);gap:18px;margin-top:18px}
+.panel{background:#fff;border:1px solid #dfe6f0;border-radius:19px;box-shadow:var(--shadow);overflow:hidden}
+.panel-head{padding:18px 19px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-size:14px;font-weight:800}
+.panel-sub{font-size:9px;color:#8a96a8;margin-top:4px}
+.count{padding:6px 9px;border-radius:99px;background:#eff5ff;color:#315dcc;font-size:8px;font-weight:800}
+.task-list{padding:10px;min-height:300px}
+.task{width:100%;padding:14px;border:1px solid #eef2f7;border-radius:14px;background:#fff;display:block;text-align:left;cursor:pointer;transition:.2s;margin-bottom:8px}
+.task:hover{background:#f8faff;border-color:#dbe6fb;transform:translateY(-1px)}
+.task.active{background:linear-gradient(135deg,#f2f6ff,#f8fbff);border-color:#a9c2f6;box-shadow:0 11px 24px -20px #2563eb}
+.task-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.task h3{font-size:12px;line-height:1.45;margin:0 0 5px;color:#1e293b;font-weight:800}
+.task p{font-size:9px;color:#64748b;margin:0;line-height:1.4}
+.status{display:inline-flex;flex:none;padding:5px 8px;border-radius:99px;font-size:8px;font-weight:800}
+.status.open{background:#eafaf2;color:#087a46}
+.status.new{background:#edf4ff;color:#2858c7}
+.status.done{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}
+.task-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid #edf1f6}
+.task-foot span{font-size:9px;color:#64748b}
+.task-foot b{font-size:9px;color:#b54708}
+.detail{min-height:550px}
+.detail-top{padding:22px;border-bottom:1px solid var(--line);background:radial-gradient(circle at 95% 0,rgba(37,99,235,.07),transparent 30%)}
+.detail-topline{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.detail-icon{width:50px;height:50px;border-radius:15px;background:linear-gradient(145deg,#edf4ff,#dbeafe);color:#2563eb;display:grid;place-items:center;margin-bottom:16px}
+.detail-icon svg{width:25px}
+.detail h2{font-size:19px;letter-spacing:-.03em;margin:0 0 8px;color:#0f172a}
+.detail-desc{font-size:11px;color:#667085;line-height:1.65;max-width:700px}
+.deadline{padding:9px 12px;border-radius:10px;background:#fff7ed;color:#b54708;border:1px solid #fed7aa;font-size:9px;font-weight:800;white-space:nowrap}
+.info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:18px 22px}
+.info{padding:12px;border:1px solid #e7ebf2;border-radius:12px;background:#fbfcfe}
+.info span{font-size:8.5px;color:#8a96a8;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;font-weight:800}
+.info b{font-size:12px;color:#0f172a}
+.instructions{margin:0 22px;padding:17px;border-radius:14px;background:#f8faff;border:1px solid #e0e8f6}
+.instructions h3{font-size:11.5px;margin:0 0 9px;color:#1e293b}
+.instructions ul{margin:0;padding-left:17px;color:#64748b;font-size:9.5px;line-height:1.9}
+.detail-actions{padding:20px 22px;display:flex;align-items:center;justify-content:space-between}
+.detail-actions p{font-size:9.5px;color:#8792a3;margin:0;max-width:420px}
+.primary{height:44px;padding:0 20px;border:0;border-radius:12px;background:linear-gradient(135deg,#2f67ec,#1d4ed8);color:#fff;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 14px 25px -14px #1d4ed8;transition:.2s;display:inline-flex;align-items:center;gap:7px}
+.primary:hover{transform:translateY(-1px);box-shadow:0 18px 30px -14px #1d4ed8}
+.primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.quiz{display:none}
+.quiz.active{display:block}
+.quiz-shell{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px}
+.quiz-main,.quiz-nav{background:#fff;border:1px solid #dfe6f0;border-radius:19px;box-shadow:var(--shadow)}
+.quiz-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.quiz-progress span{font-size:10px;color:#667085}
+.quiz-progress b{font-size:12px;color:#0f172a}
+.timer{display:flex;align-items:center;gap:7px;padding:8px 12px;border-radius:10px;background:#fff5e6;color:#b54708;font-size:12px;font-weight:800}
+.question{padding:28px 26px 16px}
+.question-num{font-size:10px;color:#3d67d3;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.question h2{font-size:18px;line-height:1.55;margin:12px 0 20px;color:#0f172a}
+.options{display:grid;gap:10px}
+.option{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #e1e7ef;border-radius:13px;cursor:pointer;transition:.18s;font-size:11px;font-weight:600;color:#1e293b}
+.option:hover{background:#f8faff;border-color:#b6caf4}
+.option.selected{background:#eef4ff;border-color:#7099ef;color:#194acb}
+.option input{display:none}
+.letter{width:29px;height:29px;border-radius:9px;background:#f2f4f7;display:grid;place-items:center;font-size:10px;font-weight:800;color:#475569;flex:none}
+.option.selected .letter{background:#2563eb;color:#fff}
+.quiz-actions{display:flex;justify-content:space-between;padding:20px 26px;border-top:1px solid var(--line);margin-top:20px}
+.secondary{height:40px;padding:0 15px;border:1px solid var(--line);border-radius:11px;background:#fff;color:#475467;font-size:10.5px;font-weight:800;cursor:pointer;transition:.18s}
+.secondary:hover{background:#f8fafc;border-color:#cbd5e1}
+.quiz-nav{padding:18px}
+.quiz-nav h3{font-size:13px;margin:0 0 5px;color:#0f172a}
+.quiz-nav p{font-size:9px;color:#8a96a8;margin:0 0 16px}
+.question-map{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.qbtn{aspect-ratio:1;border:1px solid #dfe5ee;border-radius:9px;background:#fff;color:#667085;font-size:10px;font-weight:800;cursor:pointer;transition:.15s}
+.qbtn.active{background:#2563eb;border-color:#2563eb;color:#fff}
+.qbtn.answered{background:#edf4ff;border-color:#a9c2f6;color:#2456c8}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:17px;padding-top:15px;border-top:1px solid var(--line)}
+.legend span{font-size:9px;color:#667085}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:4px}
+.submit{width:100%;margin-top:18px;background:#101828;box-shadow:none}
+.result-modal{position:fixed;inset:0;background:rgba(5,12,26,.56);z-index:50;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(5px)}
+.result-modal.open{display:flex}
+.result-card{width:min(430px,100%);background:#fff;border-radius:22px;padding:29px;text-align:center;box-shadow:0 30px 80px -24px rgba(0,0,0,.55)}
+.result-icon{width:70px;height:70px;border-radius:50%;display:grid;place-items:center;margin:0 auto 16px;background:#eafaf2;color:#087a46;font-size:30px}
+.result-card h2{font-size:20px;margin:0 0 7px;color:#0f172a}
+.result-card p{font-size:11px;color:#667085;line-height:1.65}
+.result-score{font-size:38px;font-weight:800;color:#194acb;margin:16px 0}
+.result-card .primary{width:100%;justify-content:center}
+.toast{position:fixed;right:24px;bottom:24px;padding:13px 18px;border-radius:12px;background:#101828;color:#fff;font-size:11px;font-weight:700;transform:translateY(90px);opacity:0;transition:.3s;z-index:80}
+.toast.show{transform:none;opacity:1}
+.empty-box{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 20px;color:#64748b}
+.empty-box svg{width:46px;height:46px;color:#94a3b8;margin-bottom:12px}
+.empty-box h4{font-size:13px;font-weight:800;color:#1e293b;margin:0 0 5px}
+.empty-box p{font-size:10.5px;color:#64748b;margin:0;line-height:1.6;max-width:320px}
+@media(max-width:1050px){.sidebar{transform:translateX(-100%);transition:.25s}.sidebar.open{transform:none}.main{margin-left:0}.mobile-menu{display:grid;place-items:center}.layout{grid-template-columns:1fr}.quiz-shell{grid-template-columns:1fr}.quiz-nav{order:-1}.question-map{grid-template-columns:repeat(10,1fr)}}
+@media(max-width:650px){.content{padding:16px}.topbar{padding:0 16px}.hero{align-items:flex-start;flex-direction:column}.hero-score{width:100%}.info-grid{grid-template-columns:repeat(2,1fr)}.detail-topline{flex-direction:column}.question-map{grid-template-columns:repeat(5,1fr)}.user-copy{display:none}}
+.embedded .sidebar,.embedded .topbar{display:none!important}
+.embedded .main{margin-left:0;min-height:auto}
+.embedded .content{max-width:none;padding:20px}
+.embedded{background:#f3f6fb}
+.embedded .hero{box-shadow:none}
+.embedded .layout{margin-bottom:20px}
+</style>
+</head>
+<body>
+<script>document.body.classList.add('embedded')</script>
+<aside class="sidebar" id="sidebar">
+  <div class="brand"><div class="brand-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 2l2 2.2 3-.3.8 2.9 2.7 1.4-1.2 2.8 1.2 2.8-2.7 1.4-.8 2.9-3-.3L12 20l-2-2.2-3 .3-.8-2.9-2.7-1.4L4.7 11 3.5 8.2l2.7-1.4L7 3.9l3 .3L12 2Z"/><circle cx="12" cy="11" r="3"/></svg></div><div><div class="brand-name">KHO GIÁ PHỤ TÙNG</div><div class="brand-sub">HỌC VIỆN NGHIỆP VỤ</div></div></div>
+  <div class="nav-label">Không gian học tập</div>
+  <button class="nav-btn active"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>Bài tập của tôi</button>
+  <button class="nav-btn"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 19V5h16v14H4Zm4-3v-4m4 4V8m4 8v-6"/></svg>Kết quả học tập</button>
+  <button class="nav-btn"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg>Kho tài liệu</button>
+  <div class="side-progress"><b>TIẾN ĐỘ HỌC TẬP</b><p id="sideProgressText">0/0 bài tập đã hoàn thành</p><div class="mini-progress"><i id="sideProgressBar"></i></div></div>
+</aside>
+<main class="main">
+  <header class="topbar">
+    <div class="top-left"><button class="mobile-menu" onclick="sidebar.classList.toggle('open')">☰</button><span class="role-pill" id="studentRolePill">HỌC VIÊN</span><span class="page-name">Bài tập của tôi</span></div>
+    <div class="user"><div class="user-copy"><strong id="studentFullName">Người dùng</strong><span id="studentRoleText">Giám định viên</span></div><div class="avatar" id="studentAvatar">U</div></div>
+  </header>
+  <div class="content" id="dashboard">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Learning Workspace</div>
+        <h1>Chào <span id="studentGreetingName">bạn</span>, tiếp tục học nhé!</h1>
+        <p id="studentHeroDesc">Hoàn thành các bài tập và đánh giá nghiệp vụ được giao để duy trì tiến độ đào tạo.</p>
+      </div>
+      <div class="hero-score">
+        <div class="hero-score-top"><span>Tiến độ tổng thể</span><strong id="overallProgress">0%</strong></div>
+        <div class="bar"><i id="overallProgressBar"></i></div>
+        <small id="overallProgressSub">Chưa có bài tập hoàn thành</small>
+      </div>
+    </section>
+    <div class="layout">
+      <section class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">Bài tập được giao</div><div class="panel-sub">Ưu tiên theo thời hạn gần nhất</div></div>
+          <span class="count" id="taskCountBadge">0 bài</span>
+        </div>
+        <div class="task-list" id="taskListContainer">
+          <div class="empty-box" id="emptyTaskList">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l5 5v11a2 2 0 0 1-2 2Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <h4>Chưa có bài tập nào</h4>
+            <p>Hiện chưa có bài tập nào được phân công. Bài tập thực tế sẽ xuất hiện tại đây khi giảng viên giao bài.</p>
+          </div>
+        </div>
+      </section>
+      <section class="panel detail" id="detailPanel">
+        <div id="noTaskSelectedView" class="empty-box" style="padding: 90px 24px;">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <h4>Chọn bài tập để xem chi tiết</h4>
+          <p>Nhấp vào một bài tập ở danh sách bên trái để xem nội dung, thời gian làm bài và bắt đầu làm bài trắc nghiệm.</p>
+        </div>
+        <div id="taskSelectedView" style="display:none;">
+          <div class="detail-top">
+            <div class="detail-topline">
+              <div>
+                <div class="detail-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></div>
+                <div class="eyebrow">Bài tập được chọn</div>
+                <h2 id="detailTitle">Tên bài tập</h2>
+                <div class="detail-desc" id="detailDesc">Mô tả bài tập.</div>
+              </div>
+              <div class="deadline" id="deadline">Hạn nộp: Chưa thiết lập</div>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info"><span>Số câu hỏi</span><b id="questionCount">0 câu</b></div>
+            <div class="info"><span>Thời gian</span><b id="duration">30 phút</b></div>
+            <div class="info"><span>Số lần làm</span><b id="attemptInfo">Không giới hạn</b></div>
+            <div class="info"><span>Điểm đạt</span><b id="passScore">7.0 / 10</b></div>
+          </div>
+          <div class="instructions">
+            <h3>Hướng dẫn trước khi làm bài</h3>
+            <ul>
+              <li>Đảm bảo kết nối mạng ổn định trong suốt thời gian làm bài.</li>
+              <li>Thời gian được tính ngay sau khi nhấn “Bắt đầu làm bài”.</li>
+              <li>Hệ thống sẽ tự động nộp bài khi hết thời gian quy định.</li>
+              <li>Kiểm tra kỹ các câu trả lời trước khi nhấn nút Hoàn tất.</li>
+            </ul>
+          </div>
+          <div class="detail-actions">
+            <p>Bằng việc bắt đầu, bạn xác nhận đã sẵn sàng thực hiện bài đánh giá nghiệp vụ này.</p>
+            <button class="primary" id="btnStartQuiz" onclick="startQuiz()">Bắt đầu làm bài →</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <div class="content quiz" id="quiz">
+    <div class="quiz-shell">
+      <section class="quiz-main">
+        <div class="quiz-head">
+          <div class="quiz-progress"><span id="quizAssignmentTitle">Bài tập</span><br><b id="progressText">Câu 1 / 1</b></div>
+          <div class="timer">◷ <span id="timer">30:00</span></div>
+        </div>
+        <div class="question">
+          <div class="question-num" id="qNum">Câu hỏi 01</div>
+          <h2 id="qText">Nội dung câu hỏi</h2>
+          <div class="options" id="options"></div>
+        </div>
+        <div class="quiz-actions">
+          <button class="secondary" onclick="moveQuestion(-1)">← Câu trước</button>
+          <button class="primary" onclick="moveQuestion(1)">Câu tiếp theo →</button>
+        </div>
+      </section>
+      <aside class="quiz-nav">
+        <h3>Danh sách câu hỏi</h3>
+        <p>Chọn số câu để di chuyển nhanh</p>
+        <div class="question-map" id="questionMap"></div>
+        <div class="legend">
+          <span><i style="background:#2563eb"></i>Đang chọn</span>
+          <span><i style="background:#dbeafe"></i>Đã trả lời</span>
+          <span><i style="background:#fff;border:1px solid #ddd"></i>Chưa làm</span>
+        </div>
+        <button class="primary submit" onclick="submitQuiz()">Nộp bài</button>
+      </aside>
+    </div>
+  </div>
+</main>
+<div class="result-modal" id="resultModal">
+  <div class="result-card">
+    <div class="result-icon">✓</div>
+    <h2>Nộp bài thành công!</h2>
+    <p>Kết quả của bạn đã được ghi nhận vào hệ thống đào tạo.</p>
+    <div class="result-score" id="resultScore">0.0</div>
+    <p id="resultDetails">Điểm số đạt được: 0/0 điểm</p>
+    <button class="primary" onclick="backDashboard()">Quay về danh sách bài tập</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY_ASSIGNMENTS = 'kgpt_shared_assignments_v1';
+const STORAGE_KEY_RESULTS = 'kgpt_student_quiz_results';
+
+let currentAssignments = [];
+let selectedAssignment = null;
+let current = 0;
+let timeLeft = 1800;
+let timerHandle = null;
+const answers = {};
+
+function escapeHtml(text) {
+    return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function showToast(message) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = message;
+    t.classList.add('show');
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// 1. Đồng bộ thông tin người dùng từ parent app
+function syncUserProfile(profile) {
+    if (!profile) return;
+    const name = (profile.fullName || profile.displayName || profile.email || 'Người dùng').trim();
+    const role = profile.role === 'admin' ? 'Quản trị viên' : (profile.role === 'teacher' ? 'Giảng viên' : 'Giám định viên');
+    const avatar = (name.charAt(0) || 'U').toUpperCase();
+
+    const fullNameEl = document.getElementById('studentFullName');
+    const roleTextEl = document.getElementById('studentRoleText');
+    const rolePillEl = document.getElementById('studentRolePill');
+    const avatarEl = document.getElementById('studentAvatar');
+    const greetingEl = document.getElementById('studentGreetingName');
+
+    if (fullNameEl) fullNameEl.textContent = name;
+    if (roleTextEl) roleTextEl.textContent = role;
+    if (rolePillEl) rolePillEl.textContent = role.toUpperCase();
+    if (avatarEl) avatarEl.textContent = avatar;
+    if (greetingEl) greetingEl.textContent = name;
+}
+
+// Lấy thông tin user hiện tại từ parent nếu có
+function tryDetectParentUser() {
+    try {
+        if (window.parent && window.parent !== window) {
+            const p = window.parent;
+            const profile = p.currentUserProfile || (p.auth && p.auth.currentUser ? {
+                fullName: p.auth.currentUser.displayName || p.auth.currentUser.email,
+                role: 'Giám định viên'
+            } : null);
+            if (profile) {
+                syncUserProfile(profile);
+                return;
+            }
+            const domName = p.document.getElementById('userDisplayName')?.textContent;
+            const domRole = p.document.getElementById('heroUserRoleBadge')?.textContent;
+            if (domName && domName.trim()) {
+                syncUserProfile({ fullName: domName.trim(), role: domRole ? domRole.trim() : 'Giám định viên' });
+            }
+        }
+    } catch (e) {}
+}
+
+// 2. Tải và quản lý bài tập thực tế
+function getQuizResults() {
+    try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY_RESULTS) || '{}');
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveQuizResult(taskId, result) {
+    const all = getQuizResults();
+    all[taskId] = result;
+    try {
+        localStorage.setItem(STORAGE_KEY_RESULTS, JSON.stringify(all));
+    } catch (e) {}
+}
+
+function loadAssignments() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_ASSIGNMENTS);
+        currentAssignments = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+    } catch (e) {
+        currentAssignments = [];
+    }
+    renderTaskList();
+    updateProgressStats();
+}
+
+function renderTaskList() {
+    const container = document.getElementById('taskListContainer');
+    const badge = document.getElementById('taskCountBadge');
+    if (!container) return;
+
+    const openTasks = currentAssignments.filter(a => a.status !== 'draft');
+    if (badge) badge.textContent = openTasks.length + ' bài';
+
+    if (openTasks.length === 0) {
+        container.innerHTML = `
+          <div class="empty-box" style="padding: 40px 16px;">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l5 5v11a2 2 0 0 1-2 2Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <h4>Chưa có bài tập nào</h4>
+            <p>Hiện chưa có bài tập nào được phân công. Bài tập thực tế sẽ xuất hiện tại đây khi giảng viên giao bài.</p>
+          </div>
+        `;
+        document.getElementById('noTaskSelectedView').style.display = 'flex';
+        document.getElementById('taskSelectedView').style.display = 'none';
+        selectedAssignment = null;
+        return;
+    }
+
+    const results = getQuizResults();
+    let html = '';
+    openTasks.forEach((task, idx) => {
+        const res = results[task.id];
+        const isDone = !!res;
+        const statusBadge = isDone 
+            ? `<span class="status done">✓ ${res.score} điểm</span>` 
+            : `<span class="status ${idx === 0 ? 'new' : 'open'}">${idx === 0 ? 'Mới' : 'Đang mở'}</span>`;
+        const footNote = isDone
+            ? `<span>✓ Đã hoàn thành</span><span>${new Date(res.completedAt).toLocaleDateString('vi-VN')}</span>`
+            : `<span>⏱ ${escapeHtml(task.duration || '30 phút')}</span><b>${task.deadlineLabel ? 'Hạn: ' + escapeHtml(task.deadlineLabel) : 'Đang mở'}</b>`;
+
+        const isActive = selectedAssignment && selectedAssignment.id === task.id;
+        html += `
+          <button class="task ${isActive ? 'active' : ''}" type="button" onclick="selectTaskById('${task.id}')">
+            <div class="task-row">
+              <div>
+                <h3>${escapeHtml(task.title)}</h3>
+                <p>${escapeHtml(task.topic || 'Nghiệp vụ')} · ${(task.questions || []).length} câu</p>
+              </div>
+              ${statusBadge}
+            </div>
+            <div class="task-foot">
+              ${footNote}
+            </div>
+          </button>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // Tự động chọn bài đầu tiên nếu chưa chọn bài nào
+    if (!selectedAssignment && openTasks.length > 0) {
+        selectTaskById(openTasks[0].id);
+    } else if (selectedAssignment) {
+        const stillExists = openTasks.find(t => t.id === selectedAssignment.id);
+        if (stillExists) selectTaskById(stillExists.id);
+        else if (openTasks.length > 0) selectTaskById(openTasks[0].id);
+    }
+}
+
+function selectTaskById(id) {
+    const task = currentAssignments.find(t => t.id === id);
+    if (!task) return;
+    selectedAssignment = task;
+
+    document.querySelectorAll('.task').forEach(el => el.classList.remove('active'));
+    const btn = Array.from(document.querySelectorAll('.task')).find(el => el.innerHTML.includes(escapeHtml(task.title)));
+    if (btn) btn.classList.add('active');
+
+    document.getElementById('noTaskSelectedView').style.display = 'none';
+    document.getElementById('taskSelectedView').style.display = 'block';
+
+    const results = getQuizResults();
+    const res = results[task.id];
+
+    document.getElementById('detailTitle').textContent = task.title;
+    document.getElementById('detailDesc').textContent = task.description || `${(task.questions || []).length} câu hỏi đánh giá kiến thức nghiệp vụ.`;
+    document.getElementById('deadline').textContent = 'Hạn nộp: ' + (task.deadlineLabel || 'Chưa thiết lập');
+    document.getElementById('questionCount').textContent = (task.questions || []).length + ' câu';
+    document.getElementById('duration').textContent = task.duration || '30 phút';
+
+    const startBtn = document.getElementById('btnStartQuiz');
+    if (res) {
+        startBtn.textContent = `Làm lại bài (Điểm lần trước: ${res.score}) →`;
+    } else {
+        startBtn.textContent = 'Bắt đầu làm bài →';
+    }
+}
+
+function updateProgressStats() {
+    const openTasks = currentAssignments.filter(a => a.status !== 'draft');
+    const results = getQuizResults();
+    const completedCount = openTasks.filter(t => !!results[t.id]).length;
+    const total = openTasks.length;
+
+    const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+
+    const overallPctEl = document.getElementById('overallProgress');
+    const overallBarEl = document.getElementById('overallProgressBar');
+    const overallNoteEl = document.getElementById('overallProgressSub');
+    const sideTextEl = document.getElementById('sideProgressText');
+    const sideBarEl = document.getElementById('sideProgressBar');
+
+    if (overallPctEl) overallPctEl.textContent = pct + '%';
+    if (overallBarEl) overallBarEl.style.width = pct + '%';
+    if (overallNoteEl) {
+        if (total === 0) overallNoteEl.textContent = 'Chưa có bài tập nào được giao';
+        else if (completedCount >= total) overallNoteEl.textContent = 'Xuất sắc! Bạn đã hoàn thành tất cả bài tập';
+        else overallNoteEl.textContent = `Đã hoàn thành ${completedCount}/${total} bài tập được giao`;
+    }
+
+    if (sideTextEl) sideTextEl.textContent = `${completedCount}/${total} bài tập đã hoàn thành`;
+    if (sideBarEl) sideBarEl.style.width = pct + '%';
+}
+
+// 3. Quiz Runner Engine
+function startQuiz() {
+    if (!selectedAssignment || !(selectedAssignment.questions || []).length) {
+        showToast('Bài tập này chưa có câu hỏi');
+        return;
+    }
+    const questions = selectedAssignment.questions;
+    current = 0;
+    for (let k in answers) delete answers[k];
+
+    const durationMin = parseInt(selectedAssignment.duration, 10) || 30;
+    timeLeft = durationMin * 60;
+
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('quiz').classList.add('active');
+    document.getElementById('quizAssignmentTitle').textContent = selectedAssignment.title;
+
+    renderMap();
+    renderQuestion();
+
+    clearInterval(timerHandle);
+    timerHandle = setInterval(() => {
+        timeLeft--;
+        const m = Math.floor(timeLeft / 60);
+        const s = timeLeft % 60;
+        document.getElementById('timer').textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        if (timeLeft <= 0) {
+            clearInterval(timerHandle);
+            submitQuiz(true);
+        }
+    }, 1000);
+
+    window.scrollTo(0, 0);
+}
+
+function renderQuestion() {
+    const questions = selectedAssignment.questions;
+    const item = questions[current];
+    if (!item) return;
+
+    document.getElementById('qNum').textContent = 'Câu hỏi ' + String(current + 1).padStart(2, '0');
+    document.getElementById('progressText').textContent = `Câu ${current + 1} / ${questions.length}`;
+    document.getElementById('qText').textContent = item.q;
+
+    const optsContainer = document.getElementById('options');
+    optsContainer.innerHTML = (item.a || []).map((text, i) => {
+        const isSelected = answers[current] === i;
+        return `
+          <label class="option ${isSelected ? 'selected' : ''}" onclick="choose(${i})">
+            <input type="radio" name="opt" ${isSelected ? 'checked' : ''}>
+            <span class="letter">${String.fromCharCode(65 + i)}</span>
+            <span>${escapeHtml(text)}</span>
+          </label>
+        `;
+    }).join('');
+
+    renderMap();
+}
+
+function choose(idx) {
+    answers[current] = idx;
+    renderQuestion();
+}
+
+function moveQuestion(step) {
+    const questions = selectedAssignment.questions;
+    current = Math.max(0, Math.min(questions.length - 1, current + step));
+    renderQuestion();
+}
+
+function jump(idx) {
+    current = idx;
+    renderQuestion();
+}
+
+function renderMap() {
+    const questions = selectedAssignment.questions;
+    const map = document.getElementById('questionMap');
+    map.innerHTML = questions.map((_, i) => {
+        const isActive = i === current;
+        const isAns = answers[i] !== undefined;
+        return `<button class="qbtn ${isActive ? 'active' : isAns ? 'answered' : ''}" onclick="jump(${i})">${i + 1}</button>`;
+    }).join('');
+}
+
+function submitQuiz(auto = false) {
+    const questions = selectedAssignment.questions;
+    const answeredCount = Object.keys(answers).length;
+    if (!auto && answeredCount < questions.length) {
+        if (!confirm(`Bạn mới trả lời ${answeredCount}/${questions.length} câu. Vẫn muốn nộp bài?`)) return;
+    }
+
+    clearInterval(timerHandle);
+
+    let totalPoints = questions.reduce((sum, q) => sum + (Number(q.points) || 1), 0);
+    let earnedPoints = questions.reduce((sum, q, i) => {
+        return sum + (answers[i] === q.c ? (Number(q.points) || 1) : 0);
+    }, 0);
+
+    const score = Number((earnedPoints * 10 / (totalPoints || 1)).toFixed(1));
+
+    // Lưu kết quả bài làm thực tế
+    const studentName = document.getElementById('studentFullName')?.textContent || 'Học viên';
+    saveQuizResult(selectedAssignment.id, {
+        score: score,
+        earnedPoints: earnedPoints,
+        totalPoints: totalPoints,
+        completedAt: new Date().toISOString(),
+        studentName: studentName
+    });
+
+    document.getElementById('resultScore').textContent = score.toFixed(1);
+    document.getElementById('resultDetails').textContent = `Điểm số đạt được: ${earnedPoints}/${totalPoints} điểm (${score >= 7.0 ? 'Đạt' : 'Chưa đạt'})`;
+    document.getElementById('resultModal').classList.add('open');
+
+    // Bắn thông báo cập nhật sang parent
+    try {
+        window.parent.postMessage({
+            type: 'kgpt:quiz-completed',
+            taskId: selectedAssignment.id,
+            score: score,
+            studentName: studentName
+        }, '*');
+    } catch (e) {}
+}
+
+function backDashboard() {
+    document.getElementById('resultModal').classList.remove('open');
+    document.getElementById('quiz').classList.remove('active');
+    document.getElementById('dashboard').style.display = 'block';
+    loadAssignments();
+    window.scrollTo(0, 0);
+}
+
+// 4. Lắng nghe thông điệp từ parent hoặc tab khác
+window.addEventListener('message', (event) => {
+    const msg = event.data || {};
+    if (msg.type === 'kgpt:sync-user' && msg.user) {
+        syncUserProfile(msg.user);
+    }
+    if (msg.type === 'kgpt:refresh-assignments') {
+        loadAssignments();
+    }
+});
+
+window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY_ASSIGNMENTS || e.key === STORAGE_KEY_RESULTS) {
+        loadAssignments();
+    }
+});
+
+// Khởi chạy ban đầu
+document.addEventListener('DOMContentLoaded', () => {
+    tryDetectParentUser();
+    loadAssignments();
+    // Báo parent sẵn sàng nhận profile
+    try { window.parent.postMessage({ type: 'kgpt:student-ready' }, '*'); } catch (e) {}
+});
+</script>
+</body>
+</html>
