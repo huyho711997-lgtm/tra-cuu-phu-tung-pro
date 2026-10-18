@@ -2102,3 +2102,113 @@ html.dark #pdLoadOverlay{background:radial-gradient(ellipse at 50% 35%,#183358 0
 .pd-initial-card{flex:1;min-height:350px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:34px 20px 64px;background:radial-gradient(ellipse at 50% 45%,#eaf2ff99,transparent 65%);border:1px solid var(--pd-border);border-radius:20px;margin-top:8px}.pd-initial-icon{width:80px;height:80px;display:grid;place-items:center;border:1px solid #cfe0fb;border-radius:24px;background:linear-gradient(145deg,#fff,#eaf2ff);color:#437ee0;box-shadow:0 14px 35px #2563eb12;margin-bottom:25px}#partsDashboard .pd-initial-icon svg{width:34px;height:34px}.pd-initial-card h2{font-size:21px;letter-spacing:-.025em;font-weight:800;margin:0 0 12px}.pd-initial-card p{font-size:12px;line-height:1.85;color:var(--pd-muted);max-width:420px;margin:0 0 24px}.pd-initial-card .pd-initial-load{height:43px;padding:0 22px;font-size:12px;font-weight:800;gap:9px}.pd-initial-note{font-size:10px;color:var(--pd-muted);margin-top:18px}.pd-initial-error{font-size:11px;line-height:1.8;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;max-width:480px;padding:11px 15px;margin-bottom:20px}
 html.dark .pd-initial-card{background:radial-gradient(ellipse at 50% 45%,#1c375955,transparent 65%)}html.dark .pd-initial-icon{background:linear-gradient(145deg,#1c3558,#14243c);border-color:#345176;color:#9bc1ff}html.dark .pd-initial-error{color:#f8cf8d;background:#3b3020;border-color:#67502b}
 @media(max-width:600px){.pd-initial-header{padding:12px 4px}.pd-initial-header h1{font-size:23px}.pd-initial-card{min-height:390px;padding:32px 18px}.pd-initial-card h2{font-size:19px}}
+
+
+/* Premium password change dialog */
+#modalChangePassword{
+  padding:24px !important;
+  background:rgba(11,24,48,.58) !important;
+  backdrop-filter:blur(12px) saturate(125%) !important;
+  -webkit-backdrop-filter:blur(12px) saturate(125%) !important;
+}
+#modalChangePassword>div{
+  width:min(100%,520px) !important;
+  max-height:min( min(760px, calc(100dvh - 48px)), 100%) !important;
+  overflow:auto !important;
+  border:1px solid rgba(255,255,255,.78) !important;
+  border-radius:24px !important;
+  background:linear-gradient(180deg,#fff 0%,#fbfdff 100%) !important;
+  box-shadow:0 32px 90px -32px rgba(3,15,38,.52),0 10px 28px -18px rgba(37,99,235,.25) !important;
+  scrollbar-width:thin;
+  scrollbar-color:#cbd8ec transparent;
+}
+#modalChangePassword>div>div:first-child{
+  padding:23px 26px !important;
+  border-bottom:1px solid #e9eef7 !important;
+  background:radial-gradient(ellipse at 0 0,rgba(59,130,246,.09),transparent 58%),#fff !important;
+}
+#modalChangePassword>div>div:first-child>div:first-child{gap:14px !important;min-width:0}
+#modalChangePassword>div>div:first-child>div:first-child>div:first-child{
+  width:48px !important;height:48px !important;flex:none !important;border-radius:15px !important;
+  background:linear-gradient(145deg,#eef5ff,#dceaff) !important;color:#2563eb !important;
+  box-shadow:inset 0 1px 0 #fff,0 8px 18px -14px #2563eb !important;
+}
+#modalChangePassword>div>div:first-child>div:first-child>div:first-child svg{width:22px !important;height:22px !important}
+#modalChangePassword h3{
+  margin:0 !important;color:#14213a !important;font-size:16px !important;font-weight:850 !important;
+  line-height:1.3 !important;letter-spacing:-.025em !important;text-transform:none !important;
+}
+#modalChangePassword>div>div:first-child p{
+  margin-top:4px !important;color:#8392aa !important;font-size:10px !important;font-weight:650 !important;
+  line-height:1.5 !important;letter-spacing:.015em !important;text-transform:none !important;
+}
+#modalChangePassword>div>div:first-child>button{
+  display:grid !important;place-items:center !important;width:38px !important;height:38px !important;
+  padding:0 !important;border:1px solid #e6edf7 !important;border-radius:12px !important;
+  background:#fff !important;color:#71819a !important;flex:none !important;
+}
+#modalChangePassword>div>div:first-child>button:hover{background:#f1f6ff !important;border-color:#c9dcff !important;color:#2563eb !important}
+#modalChangePassword>div>div:first-child>button svg{width:18px !important;height:18px !important}
+#modalChangePassword>div>div:nth-child(2){
+  display:grid !important;gap:19px !important;padding:27px 30px 29px !important;
+  background:#fff !important;
+}
+#modalChangePassword .premium-input-group{min-width:0}
+#modalChangePassword .premium-input-group label{
+  display:block !important;margin:0 0 8px !important;padding:0 2px !important;
+  color:#5e6e87 !important;font-size:10px !important;font-weight:800 !important;
+  letter-spacing:.055em !important;line-height:1.4 !important;
+}
+#modalChangePassword .premium-input{
+  display:block !important;width:100% !important;height:52px !important;min-height:52px !important;
+  margin:0 !important;padding:0 16px !important;border:1px solid #dbe4f0 !important;
+  border-radius:13px !important;background:#f9fbfe !important;color:#1b2940 !important;
+  font-size:13px !important;font-weight:650 !important;line-height:normal !important;
+  box-shadow:0 3px 8px -7px rgba(15,23,42,.4) !important;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease !important;
+}
+#modalChangePassword .premium-input::placeholder{color:#9aa7b9 !important;font-weight:550 !important;opacity:1}
+#modalChangePassword .premium-input:hover{border-color:#c4d3e8 !important;background:#fff !important}
+#modalChangePassword .premium-input:focus{
+  border-color:#6ea1ff !important;background:#fff !important;outline:none !important;
+  box-shadow:0 0 0 4px rgba(59,130,246,.12),0 8px 18px -14px rgba(37,99,235,.35) !important;
+}
+#modalChangePassword>div>div:last-child{
+  display:flex !important;gap:10px !important;padding:18px 26px 22px !important;
+  border-top:1px solid #e9eef7 !important;background:#f8faff !important;
+}
+#modalChangePassword>div>div:last-child button{
+  min-width:0 !important;height:48px !important;border-radius:12px !important;font-size:11px !important;
+  font-weight:850 !important;letter-spacing:.045em !important;transition:transform .16s ease,box-shadow .16s ease,background .16s ease !important;
+}
+#modalChangePassword>div>div:last-child button:first-child{
+  flex:0 0 34% !important;border:1px solid #e0e8f3 !important;background:#fff !important;color:#596b84 !important;
+}
+#modalChangePassword>div>div:last-child button:first-child:hover{background:#f1f5fb !important;border-color:#cdd9e9 !important}
+#modalChangePassword>div>div:last-child button:last-child{
+  flex:1 !important;border:1px solid #2563eb !important;background:linear-gradient(135deg,#3b82f6,#1d4ed8) !important;
+  box-shadow:0 12px 24px -16px rgba(37,99,235,.78) !important;
+}
+#modalChangePassword>div>div:last-child button:last-child:hover{transform:translateY(-1px) !important;box-shadow:0 16px 26px -16px rgba(37,99,235,.85) !important}
+#modalChangePassword>div>div:last-child button:active{transform:translateY(0) scale(.99) !important}
+html.dark #modalChangePassword>div{border-color:rgba(71,85,105,.72) !important;background:linear-gradient(180deg,#111c2e,#0f172a) !important}
+html.dark #modalChangePassword>div>div:first-child{border-color:#26354a !important;background:radial-gradient(ellipse at 0 0,rgba(59,130,246,.14),transparent 58%),#111c2e !important}
+html.dark #modalChangePassword h3{color:#f4f7fc !important}
+html.dark #modalChangePassword>div>div:first-child p{color:#91a2bb !important}
+html.dark #modalChangePassword>div>div:first-child>button{border-color:#2b3b52 !important;background:#172338 !important;color:#a5b4c8 !important}
+html.dark #modalChangePassword>div>div:nth-child(2){background:#111c2e !important}
+html.dark #modalChangePassword .premium-input-group label{color:#a9b8cc !important}
+html.dark #modalChangePassword .premium-input{border-color:#35465f !important;background:#172338 !important;color:#e5edf8 !important}
+html.dark #modalChangePassword .premium-input::placeholder{color:#8191a8 !important}
+html.dark #modalChangePassword .premium-input:focus{border-color:#6096ff !important;background:#1a2940 !important}
+html.dark #modalChangePassword>div>div:last-child{border-color:#26354a !important;background:#0d1728 !important}
+html.dark #modalChangePassword>div>div:last-child button:first-child{border-color:#35465f !important;background:#172338 !important;color:#c0ccdc !important}
+@media(max-width:560px){
+  #modalChangePassword{padding:14px !important}
+  #modalChangePassword>div{width:100% !important;max-height:calc(100dvh - 28px) !important;border-radius:20px !important}
+  #modalChangePassword>div>div:first-child{padding:18px 18px !important}
+  #modalChangePassword>div>div:first-child>div:first-child>div:first-child{width:43px !important;height:43px !important;border-radius:13px !important}
+  #modalChangePassword>div>div:nth-child(2){gap:16px !important;padding:22px 20px 23px !important}
+  #modalChangePassword>div>div:last-child{padding:15px 18px 18px !important;gap:9px !important}
+  #modalChangePassword>div>div:last-child button{height:46px !important}
+}
+@media(prefers-reduced-motion:reduce){#modalChangePassword *,#modalChangePassword *::before,#modalChangePassword *::after{transition-duration:.01ms !important;animation-duration:.01ms !important}}
