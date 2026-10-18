@@ -190,6 +190,29 @@
   function dashboardVisible(){const el=$('partsDashboard');return !!el&&getComputedStyle(el).display!=='none'&&el.getClientRects().length>0;}
   function jobPercent(){return job.phase==='success'?100:(Number.isFinite(job.total)&&job.total>0?Math.min(100,Math.floor(job.loaded/job.total*100)):null);}
   function elapsed(){const seconds=Math.max(0,Math.floor(((job.finishedAt||Date.now())-job.startedAt)/1000));return seconds>=60?`${Math.floor(seconds/60)} phút ${seconds%60} giây`:`${seconds} giây`;}
+
+  // STATS_FULLSCREEN_LOADER
+  function syncLoadingOverlay(show,title,message,count,percent){
+    const overlay=$('pdLoadOverlay');if(!overlay)return;
+    if(show){
+      $('pdLoadTitle').textContent=title;$('pdLoadMessage').textContent=message;
+      $('pdLoadCount').textContent=count;$('pdLoadPercent').textContent=percent===null?'Đang xử lý':`${percent}%`;
+      $('pdLoadElapsed').textContent=`Đã chạy ${elapsed()} · Vui lòng giữ tab này mở`;
+      const track=$('pdLoadTrack');track.classList.toggle('pd-indeterminate',percent===null);track.querySelector('i').style.width=`${percent??0}%`;
+      if(percent===null)track.removeAttribute('aria-valuenow');else track.setAttribute('aria-valuenow',String(percent));
+      track.setAttribute('aria-valuetext',`${title}. ${count}`);
+      if(!overlay.open){window.KGPTDashboardSelects?.close();document.body.classList.add('pd-load-locked');overlay.showModal();}
+    }else if(overlay.open){overlay.close();document.body.classList.remove('pd-load-locked');}
+    else document.body.classList.remove('pd-load-locked');
+  }
+  function initLoadingOverlay(){
+    const overlay=document.createElement('dialog');overlay.id='pdLoadOverlay';overlay.setAttribute('aria-labelledby','pdLoadTitle');overlay.setAttribute('aria-describedby','pdLoadMessage');
+    overlay.innerHTML='<div class="pd-load-card"><div class="pd-load-visual" aria-hidden="true"><span class="pd-load-orbit"></span><span class="pd-load-orbit pd-load-inner"></span><span class="pd-load-core"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg></span></div><div class="pd-load-kicker">THỐNG KÊ PHỤ TÙNG</div><h2 id="pdLoadTitle" role="status" aria-live="polite" tabindex="-1" autofocus>Đang tải dữ liệu</h2><p class="pd-load-message" id="pdLoadMessage"></p><div class="pd-load-info"><span id="pdLoadCount"></span><strong id="pdLoadPercent"></strong></div><div class="pd-load-track" id="pdLoadTrack" role="progressbar" aria-label="Tiến độ tải dữ liệu" aria-valuemin="0" aria-valuemax="100"><i></i></div><p class="pd-load-footer" id="pdLoadElapsed"></p><button class="pd-load-cancel" id="pdLoadCancel" type="button">Hủy tải</button></div>';
+    document.body.appendChild(overlay);
+    $('pdLoadCancel').addEventListener('click',()=>{clear();$('pdRefresh')?.focus({preventScroll:true});});
+    overlay.addEventListener('cancel',event=>{event.preventDefault();clear();$('pdRefresh')?.focus({preventScroll:true});});
+  }
+
   function syncJob(){
     const phase=job.phase,active=phase!=='idle',visible=dashboardVisible(),loading=phase==='loading',success=phase==='success',percent=jobPercent();
     if(!visible)window.KGPTDashboardSelects?.close();
@@ -198,7 +221,7 @@
     const count=loading?(job.loaded?`Đã đọc ${fmt(job.loaded)}${job.total!==null?' / '+fmt(Math.max(job.loaded,job.total)):''} bản ghi`:'Đang kết nối dữ liệu…'):`${success?'Đã tổng hợp':'Đã đọc'} ${fmt(job.loaded)} bản ghi`;
     const message=job.message||(loading?'Bạn có thể chuyển mục trong hệ thống hoặc làm việc ở tab khác. Giữ tab này mở để tiến trình tiếp tục.':success?'Kết quả đã sẵn sàng. Các biểu đồ và bảng chi tiết đã được cập nhật.':'Vui lòng kiểm tra kết nối và nhấn “Làm mới” để thử lại.');
     if($('pdProgress')){
-      $('pdProgress').hidden=!active||success;$('pdProgress').dataset.state=phase;
+      $('pdProgress').hidden=!active||loading||success;$('pdProgress').dataset.state=phase;
       $('pdProgressTitle').textContent=title;$('pdProgressMessage').textContent=message;
       $('pdProgressPercent').textContent=success?'Hoàn tất':phase==='error'?'Cần thử lại':percent===null?'Đang xử lý':`${percent}%`;
       $('pdProgressCount').textContent=count;$('pdProgressElapsed').textContent=active?`${loading?'Đã chạy':'Thời gian xử lý'}: ${elapsed()}`:'';
@@ -206,6 +229,7 @@
       if(percent===null)track.removeAttribute('aria-valuenow');else track.setAttribute('aria-valuenow',String(percent));
       track.setAttribute('aria-valuetext',`${title}. ${count}`);
     }
+    syncLoadingOverlay(loading&&visible,title,message,count,percent);
     const nav=$('tiPartsStatisticsNav'),badge=$('pdNavJob');
     if(nav&&badge){const notify=active&&(loading||job.unread);nav.classList.toggle('pd-has-job',notify);badge.hidden=!notify;badge.dataset.state=phase;badge.textContent=loading?(percent===null?'…':`${percent}%`):success?'✓':'!';nav.title=notify?`${title}${loading&&percent!==null?' · '+percent+'%':''}`:'Thống kê phụ tùng';}
     const dock=$('pdJobDock');
@@ -461,6 +485,7 @@
   function init(){
     if(!$('partsDashboard'))return;
     window.KGPTDashboardSelects?.init($('partsDashboard'));
+    initLoadingOverlay();
     initJobNotifications();
     $('pdChartExpand').addEventListener('click',openChartDialog);
     $('pdChartClose').addEventListener('click',()=>closeChartDialog());
