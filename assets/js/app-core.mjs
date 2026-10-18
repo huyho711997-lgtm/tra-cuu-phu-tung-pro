@@ -10296,3 +10296,23 @@ window.searchData = async function(options = {}) {
         if (loading && searchRevision === PARTS_DATA_SEARCH_REVISION) loading.classList.add('hidden');
     }
 };
+
+// Use the same normalized vehicle scope as the part-count dropdowns.
+const applySupabaseConstraintBeforeVehicleFix = applySupabaseConstraint;
+applySupabaseConstraint = function(builder, source, constraint) {
+    const column = mapFieldToDb(source.collectionName, constraint.field);
+    if (constraint.type === 'where' && source.collectionName === 'LichSuBaoGia' && ['==', 'in'].includes(constraint.operator)) {
+        const values = constraint.operator === 'in' ? (constraint.value || []) : [constraint.value];
+        if (constraint.field === 'hang_xe') {
+            const brands = values.map(value => String(value ?? '').trim().toUpperCase());
+            return constraint.operator === 'in' ? builder.in('_kgpt_ai_brand_key', brands) : builder.eq('_kgpt_ai_brand_key', brands[0]);
+        }
+        if (constraint.field === 'hieu_xe') {
+            const models = values.map(value => String(value ?? '').trim()).filter(Boolean).map(value =>
+                value.split(/\s+/).map(token => token.replace(/[.*+?^{}$()|[\]\\]/g, '\\$&')).join('[[:space:]]+'));
+            if (!models.length) return builder.in(column, []);
+            return builder.filter(column, 'imatch', '^[[:space:]]*(' + models.join('|') + ')[[:space:]]*$');
+        }
+    }
+    return applySupabaseConstraintBeforeVehicleFix(builder, source, constraint);
+};
