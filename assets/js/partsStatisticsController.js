@@ -226,20 +226,46 @@
     const overlay=document.createElement('section');overlay.id='pdLoadOverlay';overlay.hidden=true;overlay.setAttribute('role','region');overlay.setAttribute('aria-labelledby','pdLoadTitle');overlay.setAttribute('aria-describedby','pdLoadMessage');
     overlay.innerHTML='<div class="pd-load-card"><div class="pd-load-visual" aria-hidden="true"><span class="pd-load-orbit"></span><span class="pd-load-orbit pd-load-inner"></span><span class="pd-load-core"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg></span></div><div class="pd-load-kicker">THỐNG KÊ PHỤ TÙNG</div><h2 id="pdLoadTitle" role="status" aria-live="polite" tabindex="-1">Đang tải dữ liệu</h2><p class="pd-load-message" id="pdLoadMessage"></p><div class="pd-load-info"><span id="pdLoadCount"></span><strong id="pdLoadPercent"></strong></div><div class="pd-load-track" id="pdLoadTrack" role="progressbar" aria-label="Tiến độ tải dữ liệu" aria-valuemin="0" aria-valuemax="100"><i></i></div><p class="pd-load-footer" id="pdLoadElapsed"></p><button class="pd-load-cancel" id="pdLoadCancel" type="button">Hủy tải</button></div>';
     document.body.appendChild(overlay);
-    $('pdLoadCancel').addEventListener('click',()=>{clear();$('pdRefresh')?.focus({preventScroll:true});});
-    overlay.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();clear();$('pdRefresh')?.focus({preventScroll:true});}});
+    $('pdLoadCancel').addEventListener('click',()=>{clear();$(state.loaded?'pdRefresh':'pdInitialLoad')?.focus({preventScroll:true});});
+    overlay.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();clear();$(state.loaded?'pdRefresh':'pdInitialLoad')?.focus({preventScroll:true});}});
     window.addEventListener('resize',positionLoadingOverlay);
     const header=document.querySelector('#mainApp > .app-topbar');
     if(header&&typeof ResizeObserver!=='undefined')new ResizeObserver(positionLoadingOverlay).observe(header);
   }
 
+
+  // STATS_MANUAL_LOAD
+  function syncInitialView(){
+    const empty=$('pdInitialView'),report=$('pdReportContent');if(!empty||!report)return;
+    empty.hidden=state.loaded||state.loading;report.hidden=!state.loaded;
+    const error=$('pdInitialError');error.hidden=job.phase!=='error';error.textContent=job.phase==='error'?job.message:'';
+    $('pdInitialLoad').disabled=state.loading;
+    const refreshLabel=$('pdRefresh')?.querySelector('span');if(refreshLabel)refreshLabel.textContent=state.loaded?'Tải lại phụ tùng':'Tải phụ tùng';
+  }
+  function initInitialView(){
+    const dashboard=$('partsDashboard'),report=document.createElement('div');report.id='pdReportContent';report.hidden=true;
+    while(dashboard.firstChild)report.appendChild(dashboard.firstChild);
+    dashboard.appendChild(report);
+    const empty=document.createElement('div');empty.id='pdInitialView';
+    empty.innerHTML='<div class="pd-initial-header"><div class="pd-eyebrow"><i></i> TRUNG TÂM DỮ LIỆU</div><h1>Thống kê phụ tùng</h1><p>Tổng hợp danh mục và cơ cấu phụ tùng trong kho dữ liệu.</p></div><section class="pd-initial-card" aria-labelledby="pdInitialTitle"><div class="pd-initial-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg></div><h2 id="pdInitialTitle">Chưa có dữ liệu thống kê</h2><p>Nhấn Tải phụ tùng để xem số liệu tổng hợp, biểu đồ và báo cáo theo hãng xe, dòng xe.</p><div class="pd-initial-error" id="pdInitialError" role="status" hidden></div><button type="button" class="pd-btn pd-primary pd-initial-load" id="pdInitialLoad"><svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg>Tải phụ tùng</button><span class="pd-initial-note">Dữ liệu chỉ được tải khi bạn yêu cầu.</span></section>';
+    dashboard.prepend(empty);
+    $('pdInitialLoad').addEventListener('click',()=>refresh(false));
+    syncInitialView();
+  }
+  function prepareStatisticsPage(){
+    const owner=state.config?.user(),scope=String(state.config?.cacheScope?.()||(state.config?.demo?'demo':'system'));
+    if((state.owner&&state.owner!==owner)||(state.scope&&state.scope!==scope)||!state.config?.canRead())clear();
+    syncInitialView();syncJob();
+  }
+
   function syncJob(){
+    syncInitialView();
     const phase=job.phase,active=phase!=='idle',visible=dashboardVisible(),loading=phase==='loading',success=phase==='success',percent=jobPercent();
     if(!visible)window.KGPTDashboardSelects?.close();
     if(active&&!loading&&visible&&document.visibilityState!=='hidden')job.unread=false;
     const title=loading?(job.stage==='analyzing'?'Đang tính toán thống kê':'Đang đọc dữ liệu phụ tùng'):success?'Thống kê đã hoàn tất':'Chưa hoàn tất thống kê';
     const count=loading?(job.loaded?`Đã đọc ${fmt(job.loaded)}${job.total!==null?' / '+fmt(Math.max(job.loaded,job.total)):''} bản ghi`:'Đang kết nối dữ liệu…'):`${success?'Đã tổng hợp':'Đã đọc'} ${fmt(job.loaded)} bản ghi`;
-    const message=job.message||(loading?'Bạn có thể chuyển mục trong hệ thống hoặc làm việc ở tab khác. Giữ tab này mở để tiến trình tiếp tục.':success?'Kết quả đã sẵn sàng. Các biểu đồ và bảng chi tiết đã được cập nhật.':'Vui lòng kiểm tra kết nối và nhấn “Làm mới” để thử lại.');
+    const message=job.message||(loading?'Bạn có thể chuyển mục trong hệ thống hoặc làm việc ở tab khác. Giữ tab này mở để tiến trình tiếp tục.':success?'Kết quả đã sẵn sàng. Các biểu đồ và bảng chi tiết đã được cập nhật.':'Vui lòng kiểm tra kết nối và nhấn “Tải lại phụ tùng” để thử lại.');
     if($('pdProgress')){
       $('pdProgress').hidden=!active||loading||success;$('pdProgress').dataset.state=phase;
       $('pdProgressTitle').textContent=title;$('pdProgressMessage').textContent=message;
@@ -490,21 +516,22 @@
       render(summary);status('');
       $('pdUpdated').textContent='Cập nhật '+new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(savedAt));
       $('pdSourceBadge').textContent=state.config.demo?'Dữ liệu minh họa':restored?'Dữ liệu đã lưu':'Dữ liệu hệ thống';
-      $('pdCacheNote').textContent=stored?'Đã lưu trên trình duyệt · Bấm “Làm mới” để cập nhật':'Chưa lưu được trên trình duyệt. Dữ liệu hiện vẫn dùng được; lần mở sau sẽ tải lại.';
+      $('pdCacheNote').textContent=stored?'Đã lưu trên trình duyệt · Bấm “Tải lại phụ tùng” để cập nhật':'Chưa lưu được trên trình duyệt. Dữ liệu hiện vẫn dùng được; lần mở sau sẽ tải lại.';
       job.loaded=summary.sourceTotal;job.total=summary.sourceTotal;
-      finishJob('success',restored?'Đã mở bản dữ liệu lưu trong trình duyệt. Bấm “Làm mới” khi cần dữ liệu mới nhất.':'Đã cập nhật báo cáo.'+(stored?' Dữ liệu đã được lưu cho lần mở sau.':''));
+      finishJob('success',restored?'Đã mở bản dữ liệu lưu trong trình duyệt. Bấm “Tải lại phụ tùng” khi cần dữ liệu mới nhất.':'Đã cập nhật báo cáo.'+(stored?' Dữ liệu đã được lưu cho lần mở sau.':''));
     }catch(error){
       nextBridge?.dispose();if(loadingBridge===nextBridge)loadingBridge=null;
       if(revision!==state.revision)return;if(owner!==state.config.user()||!state.config.canRead()){clear();return;}
       console.error('Không tải được thống kê phụ tùng:',error);
-      finishJob('error',(state.loaded?'Không thể làm mới. Đang giữ dữ liệu của lần cập nhật trước. ':'Chưa thể tải thống kê. ')+'Vui lòng kiểm tra kết nối, quyền xem dữ liệu và thử “Làm mới”.');
+      finishJob('error',(state.loaded?'Không thể làm mới. Đang giữ dữ liệu của lần cập nhật trước. ':'Chưa thể tải thống kê. ')+'Vui lòng kiểm tra kết nối, quyền xem dữ liệu và nhấn nút tải để thử lại.');
     }finally{
-      if(revision===state.revision){state.loading=false;$('partsDashboard').classList.remove('pd-loading');$('pdRefresh').disabled=false;$('pdExport').disabled=!state.total;$('pdChartExpand').disabled=false;}
+      if(revision===state.revision){state.loading=false;$('partsDashboard').classList.remove('pd-loading');$('pdRefresh').disabled=false;$('pdExport').disabled=!state.total;$('pdChartExpand').disabled=false;syncInitialView();}
     }
   }
   function init(){
     if(!$('partsDashboard'))return;
     window.KGPTDashboardSelects?.init($('partsDashboard'));
+    initInitialView();
     initLoadingOverlay();
     initJobNotifications();
     $('pdChartExpand').addEventListener('click',openChartDialog);
@@ -518,6 +545,6 @@
     $('pdRefresh').addEventListener('click',()=>refresh(true));$('pdExport').addEventListener('click',exportReport);render();
   }
   window.kgptStats={configure(config){state.config=config;if(config.demo){$('pdSourceBadge').textContent='Dữ liệu minh họa';$('pdSourceBadge').classList.add('pd-demo');}},refresh,clear};
-  window.partsDashboardRefresh=()=>refresh();
+  window.partsDashboardRefresh=prepareStatisticsPage;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
