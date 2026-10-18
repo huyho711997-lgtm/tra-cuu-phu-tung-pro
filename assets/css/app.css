@@ -2300,3 +2300,9 @@ html.dark .competition-hero-copy>p{color:#a8b7cc !important}
 .groq-usage-help{border-top:1px solid #e2e8f0;padding-top:10px}.groq-usage-help summary{cursor:pointer;font-weight:700}.groq-usage-help p{margin:8px 0 0}.groq-usage-help a{color:#2563eb;text-decoration:underline}
 html.dark .groq-usage-panel{background:#102036;border-color:#334155;color:#cbd5e1}html.dark .groq-usage-card{background:#17253b;border-color:#334155}html.dark .groq-usage-heading h3,html.dark .groq-usage-value{color:#f1f5f9}html.dark .groq-usage-card h4,html.dark .groq-usage-last-call,html.dark .groq-usage-notice,html.dark .groq-usage-help{color:#cbd5e1}html.dark .groq-usage-updated,html.dark .groq-usage-source,html.dark .groq-usage-reset{color:#94a3b8}html.dark .groq-usage-remaining{color:#93c5fd}html.dark .groq-usage-help{border-color:#334155}
 @media(max-width:420px){.groq-usage-panel{padding:12px}.groq-usage-grid{grid-template-columns:1fr}.groq-usage-value{font-size:19px}}
+#partsAiResults .parts-related-candidates li.parts-related-selectable,#partsBatchAiReview .parts-related-candidates li.parts-related-selectable{padding:0;overflow:hidden}
+.parts-related-choice{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;cursor:pointer;min-height:64px;transition:background .15s ease}
+.parts-related-choice>input[type=checkbox]{width:16px;height:16px;flex:0 0 16px;margin:2px 0 0;accent-color:#2563eb;cursor:pointer}
+.parts-related-choice>div{min-width:0;flex:1}.parts-related-choice:hover{background:#f1f6ff}.parts-related-choice.is-selected{background:#eaf2ff}
+.parts-related-choice:focus-within{outline:2px solid #93b4fb;outline-offset:-2px}.parts-related-choice.is-disabled{opacity:.6;cursor:wait}
+html.dark .parts-related-choice:hover{background:#243c58}html.dark .parts-related-choice.is-selected{background:#24416a}

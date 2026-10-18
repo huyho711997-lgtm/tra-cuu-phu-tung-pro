@@ -3485,13 +3485,17 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const selected = new Set();
             const q = partsAiNameKey(query);
             (candidates || []).forEach((candidate, index) => {
+                if (candidate.relation === 'related_part') return;
                 const names = partsAiCandidateNames(candidate);
                 const exact = names.some(name => partsAiNameKey(name) === q);
                 const reviews = Array.isArray(candidate.review_reasons) ? candidate.review_reasons : [];
                 if (exact || candidate.relation === 'same_part' && (candidate.relevance_verified || !reviews.length)) selected.add(index);
             });
-            if (!selected.size && candidates?.length === 1) selected.add(0);
+            if (!selected.size && candidates?.length === 1 && candidates[0].relation !== 'related_part') selected.add(0);
             return selected;
+        }
+        function partsAiSelectableCandidates(state) {
+            return [...(state.candidates || []), ...(state.relatedCandidates || [])];
         }
         function partsAiMatchLabel(candidate, query) {
             const names = partsAiCandidateNames(candidate);
@@ -3581,13 +3585,34 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             relatedCandidates.sort((a, b) => Number(b.record_count || 0) - Number(a.record_count || 0) || String(a.name).localeCompare(String(b.name), 'vi'));
             return { candidates, relatedCandidates, validationNotice: notice };
         };
-        window.createPartsRelatedCandidates = function(candidates) {
+        window.createPartsRelatedCandidates = function(candidates, options = {}) {
             if (!candidates?.length) return null;
+            const offset = options.offset || 0;
+            const isSelected = index => !!options.isSelected?.(index);
             const details = document.createElement('details'); details.className = 'parts-related-candidates';
+            details.open = candidates.some((_, index) => isSelected(offset + index));
             const summary = document.createElement('summary'); summary.textContent = 'Chi tiết liên quan / khác loại · ' + candidates.length + ' tên'; details.appendChild(summary);
-            const note = document.createElement('p'); note.textContent = 'Ốp, nẹp, xương hoặc sai vị trí — không gộp vào kết quả chính. Tra riêng nếu cần.'; details.appendChild(note);
+            const note = document.createElement('p'); note.textContent = 'Tích chọn tên cần tra cứu; các mục đã chọn sẽ được đưa vào kết quả chung.'; details.appendChild(note);
             const list = document.createElement('ul');
-            candidates.forEach(candidate => { const row = document.createElement('li'), name = document.createElement('strong'), reason = document.createElement('span'); name.textContent = candidate.name; reason.textContent = candidate.relevance_reason || candidate.review_reasons.join('; '); row.append(name, reason); list.appendChild(row); });
+            candidates.forEach((candidate, index) => {
+                const candidateIndex = offset + index;
+                const row = document.createElement('li'); row.className = 'parts-related-selectable';
+                const label = document.createElement('label'); label.className = 'parts-related-choice';
+                const input = document.createElement('input'); input.type = 'checkbox'; input.setAttribute('aria-label', candidate.name);
+                input.checked = isSelected(candidateIndex); input.disabled = typeof options.onChange !== 'function';
+                label.classList.toggle('is-selected', input.checked);
+                input.addEventListener('change', () => {
+                    options.onChange?.(candidateIndex, input.checked);
+                    input.checked = isSelected(candidateIndex); label.classList.toggle('is-selected', input.checked);
+                });
+                const copy = document.createElement('div'), name = document.createElement('strong'), reason = document.createElement('span'), meta = document.createElement('span');
+                name.textContent = candidate.name;
+                reason.textContent = candidate.relevance_reason || (candidate.review_reasons || []).join('; ');
+                const aliases = partsAiCandidateNames(candidate).filter(entry => entry !== candidate.name);
+                meta.textContent = (Number(candidate.record_count || 0) || 0).toLocaleString('vi-VN') + ' bản ghi' + (aliases.length ? ' · Cách viết: ' + aliases.join(' · ') : '');
+                copy.append(name, reason, meta); label.append(input, copy); row.appendChild(label); list.appendChild(row);
+                options.registerInput?.({ input, card: label, index: candidateIndex });
+            });
             details.appendChild(list); return details;
         };
         // PARTS_CANDIDATE_RELEVANCE_END
@@ -3764,10 +3789,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             heading.title = state.understood;
             if (state.loading) summary.textContent = 'Đang tải kết quả…';
             else if (applied && state.collapsed) {
-                const labels = state.candidates.filter((_, index) => applied.has(index)).map(candidate => candidate.name);
+                const labels = partsAiSelectableCandidates(state).filter((_, index) => applied.has(index)).map(candidate => candidate.name);
                 summary.textContent = labels.join(' · ') + (dirty ? ' · Có thay đổi chưa áp dụng' : '');
             } else if (applied) summary.textContent = applied.size + ' tên đang áp dụng' + (dirty ? ' · Có thay đổi chưa áp dụng' : ' · Có thể chỉnh lựa chọn bên dưới');
-            else summary.textContent = state.candidates.length + ' gợi ý · ' + state.records.toLocaleString('vi-VN') + ' bản ghi' + (state.collapsed ? ' · Chưa áp dụng' : '');
+            else summary.textContent = partsAiSelectableCandidates(state).length + ' gợi ý · ' + state.records.toLocaleString('vi-VN') + ' bản ghi' + (state.collapsed ? ' · Chưa áp dụng' : '');
             summary.title = summary.textContent;
         }
 
@@ -3775,17 +3800,17 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const state = PARTS_AI_STATE;
             if (!state?.controls) return;
             const { counter, apply, applyLabel, applyCount, all, clear, inputs } = state.controls;
-            counter.textContent = `${state.draft.size}/${state.candidates.length} tên đã chọn`;
+            counter.textContent = `${state.draft.size}/${partsAiSelectableCandidates(state).length} tên đã chọn`;
             updatePartsAiPanelSummary(state);
             document.getElementById('partsAiResults')?.setAttribute('aria-busy', String(!!state.loading));
             apply.disabled = !state.draft.size || !!state.loading;
             applyLabel.textContent = state.loading ? 'Đang tải giá...' : 'Xem kết quả';
             applyCount.textContent = String(state.draft.size);
             applyCount.hidden = !state.draft.size || !!state.loading;
-            all.disabled = !!state.loading || state.draft.size === state.candidates.length;
+            all.disabled = !!state.loading || state.draft.size === partsAiSelectableCandidates(state).length;
             clear.disabled = !!state.loading || !state.draft.size;
             apply.setAttribute('aria-busy',String(!!state.loading));
-            inputs.forEach(({ input, card },index) => {
+            inputs.forEach(({ input, card, index }) => {
                 input.checked = state.draft.has(index);
                 card.classList.toggle('is-selected',input.checked);
                 input.disabled = !!state.loading;
@@ -3794,7 +3819,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         }
         window.togglePartsAiCandidate = function(index,ticket,checked) {
             const state = currentPartsAiState(ticket);
-            if (!state || state.loading || !state.candidates[index]) return;
+            if (!state || state.loading || !partsAiSelectableCandidates(state)[index]) return;
             if (checked) state.draft.add(index); else state.draft.delete(index);
             updatePartsAiSelectionUI();
             setPartsAiStatus('');
@@ -3802,14 +3827,14 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         window.selectAllPartsAiCandidates = function(ticket,checked) {
             const state = currentPartsAiState(ticket);
             if (!state || state.loading) return;
-            state.draft = new Set(checked ? state.candidates.map((_,index) => index) : []);
+            state.draft = new Set(checked ? partsAiSelectableCandidates(state).map((_,index) => index) : []);
             updatePartsAiSelectionUI();
             setPartsAiStatus('');
         };
         window.applyPartsAiSelection = async function(ticket) {
             const state = currentPartsAiState(ticket);
             if (!state || state.loading) return;
-            const names = [...new Set(state.candidates.filter((_,index) => state.draft.has(index)).flatMap(partsAiCandidateNames))];
+            const names = [...new Set(partsAiSelectableCandidates(state).filter((_,index) => state.draft.has(index)).flatMap(partsAiCandidateNames))];
             if (!names.length) { setPartsAiStatus('Chọn ít nhất một tên phụ tùng trước khi xem kết quả.','error'); return; }
             document.getElementById('exactPartName').value = '1';
             document.getElementById('btnExactPartName')?.classList.add('active');
@@ -3864,11 +3889,12 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const panel = document.getElementById('partsAiResults');
             if (!panel) return;
             const state = PARTS_AI_STATE;
+            state.relatedCandidates = data.relatedCandidates || [];
             panel.replaceChildren(); panel.hidden = false;
             panel.classList.add('parts-ai-compact');
             state.collapsed = false;
             state.understood = data.normalized_name || state.criteria.query;
-            state.records = state.candidates.reduce((sum, candidate) => sum + Number(candidate.record_count || 0), 0);
+            state.records = partsAiSelectableCandidates(state).reduce((sum, candidate) => sum + Number(candidate.record_count || 0), 0);
             const hero = document.createElement('header'); hero.className = 'parts-ai-hero';
             const mark = document.createElement('span'); mark.className = 'parts-ai-hero-mark'; mark.setAttribute('aria-hidden','true');
             mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z" stroke-linejoin="round"/></svg>';
@@ -3919,13 +3945,16 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 meta.append(createPartsAiMetaChip((Number(candidate.record_count || 0) || 0).toLocaleString('vi-VN') + ' bản ghi'));
                 const badge = document.createElement('span'); const match = partsAiMatchLabel(candidate, state.criteria.query);
                 badge.className = 'parts-ai-badge'; badge.dataset.tone = match.tone; badge.textContent = match.text;
-                card.append(checkControl, text, meta, badge); list.appendChild(card); inputs.push({ input, card });
+                card.append(checkControl, text, meta, badge); list.appendChild(card); inputs.push({ input, card, index });
             });
             if (!state.candidates.length) {
-                const empty = document.createElement('p'); empty.className = 'parts-ai-empty'; empty.textContent = 'Chưa có tên phù hợp để chọn. Thử mô tả rõ hơn hoặc đổi bộ lọc.'; body.appendChild(empty);
+                const empty = document.createElement('p'); empty.className = 'parts-ai-empty'; empty.textContent = state.relatedCandidates.length ? 'Bạn có thể chọn các chi tiết liên quan bên dưới để tra cứu.' : 'Chưa có tên phù hợp để chọn. Thử mô tả rõ hơn hoặc đổi bộ lọc.'; body.appendChild(empty);
             }
             body.appendChild(list);
-            const related = window.createPartsRelatedCandidates?.(data.relatedCandidates); if (related) body.appendChild(related);
+            const related = window.createPartsRelatedCandidates?.(state.relatedCandidates, {
+                offset: state.candidates.length, isSelected: index => state.draft.has(index),
+                onChange: (index, checked) => togglePartsAiCandidate(index, ticket, checked), registerInput: entry => inputs.push(entry)
+            }); if (related) body.appendChild(related);
             const actions = document.createElement('div'); actions.className = 'parts-ai-actions';
             actions.setAttribute('role','group'); actions.setAttribute('aria-label','Thao tác với các tên phụ tùng');
             const counter = document.createElement('span'); counter.className = 'parts-ai-selection-count';
@@ -3964,6 +3993,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 const refined = await refinePartsAiCandidates(criteria, data?.candidates, { signal: PARTS_AI_STATE.controller.signal, isCurrent });
                 if (!isCurrent()) return;
                 PARTS_AI_STATE.candidates = refined.candidates;
+                PARTS_AI_STATE.relatedCandidates = refined.relatedCandidates;
                 PARTS_AI_STATE.draft = suggestPartsAiDraft(refined.candidates, criteria.query);
                 renderPartsAiCandidates({ ...data, ...refined },ticket);
                 setPartsAiStatus('');
@@ -4146,7 +4176,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             updatePartsBatchAiControls(state);
         }
         function getPartsBatchSelectedNames(group) {
-            return [...new Set(group.candidates.filter((_, index) => group.selected.has(index)).flatMap(partsAiCandidateNames))];
+            return [...new Set(partsAiSelectableCandidates(group).filter((_, index) => group.selected.has(index)).flatMap(partsAiCandidateNames))];
         }
         async function reconcilePartsBatchCandidates(state) {
             if (!isCurrentPartsBatchState(state) || state.routingBusy) return;
@@ -4200,10 +4230,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     owners.get(candidate.name).add(index);
                 }));
                 state.groups.forEach((group, index) => {
-                    // A suggestion placed in its proper requested group should not remain under another group.
-                    group.relatedCandidates = (group.relatedCandidates || []).filter(candidate => ![...(owners.get(candidate.name) || [])].some(owner => owner !== index));
                     const previousNames = new Set(selections[index] || []);
-                    group.selected = new Set(group.candidates.map((candidate, candidateIndex) => partsAiCandidateNames(candidate).some(name => previousNames.has(name)) ? candidateIndex : -1).filter(candidateIndex => candidateIndex >= 0));
+                    // Preserve a user's explicit related-part choice when suggestions are routed again.
+                    group.relatedCandidates = (group.relatedCandidates || []).filter(candidate => partsAiCandidateNames(candidate).some(name => previousNames.has(name)) || ![...(owners.get(candidate.name) || [])].some(owner => owner !== index));
+                    group.selected = new Set(partsAiSelectableCandidates(group).map((candidate, candidateIndex) => partsAiCandidateNames(candidate).some(name => previousNames.has(name)) ? candidateIndex : -1).filter(candidateIndex => candidateIndex >= 0));
                     if (!group.selected.size) group.selected = suggestPartsAiDraft(group.candidates, group.term);
                 });
             } catch (error) {
@@ -4220,7 +4250,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const apply = document.getElementById('btnPartsBatchApply');
             const selectedGroups = state.groups.filter(group => getPartsBatchSelectedNames(group).length).length;
             const selectedNames = state.groups.reduce((sum, group) => sum + group.selected.size, 0);
-            const suggestedNames = state.groups.reduce((sum, group) => sum + group.candidates.length, 0);
+            const suggestedNames = state.groups.reduce((sum, group) => sum + partsAiSelectableCandidates(group).length, 0);
             if (state.phase !== 'results') {
                 const stat = document.getElementById('statCount');
                 const ready = state.groups.filter(group => group.aiStatus === 'ready').length;
@@ -4231,7 +4261,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 apply.textContent = state.priceBusy ? 'Đang tải báo giá…' : 'Xem báo giá đã chọn' + (selectedNames ? ' · ' + selectedNames : '');
             }
             state.groups.forEach(group => {
-                if (group.selectionLabel) group.selectionLabel.textContent = group.aiStatus === 'ready' ? group.selected.size + '/' + group.candidates.length + ' tên đã chọn' : group.aiStatus === 'error' ? 'AI chưa hoàn tất' : 'Đang phân tích';
+                if (group.selectionLabel) group.selectionLabel.textContent = group.aiStatus === 'ready' ? group.selected.size + '/' + partsAiSelectableCandidates(group).length + ' tên đã chọn' : group.aiStatus === 'error' ? 'AI chưa hoàn tất' : 'Đang phân tích';
                 group.choiceInputs?.forEach(input => { input.disabled = state.stale || state.aiBusy || state.routingBusy || state.priceBusy || group.aiRequesting; });
                 if (group.aiRetryButton) group.aiRetryButton.disabled = state.stale || state.aiBusy || state.routingBusy || state.priceBusy || group.aiStatus === 'loading';
             });
@@ -4243,7 +4273,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         function changePartsBatchAiChoice(state, index, candidateIndex, checked) {
             if (!isCurrentPartsBatchState(state) || state.aiBusy || state.routingBusy || state.priceBusy) return;
             const group = state.groups[index];
-            if (!group || group.aiStatus !== 'ready' || !group.candidates[candidateIndex]) return;
+            if (!group || group.aiRequesting || group.aiStatus !== 'ready' || !partsAiSelectableCandidates(group)[candidateIndex]) return;
             if (checked) group.selected.add(candidateIndex); else group.selected.delete(candidateIndex);
             if (state.phase === 'results') {
                 state.selectionDirty = true;
@@ -4281,7 +4311,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 if (group.validationNotice) { const warning = document.createElement('p'); warning.className = 'parts-ai-validation-note'; warning.textContent = group.validationNotice; content.appendChild(warning); }
                 if (group.clarification) { const explanation = document.createElement('p'); explanation.className = 'parts-batch-ai-clarification'; explanation.textContent = group.clarification; content.appendChild(explanation); }
                 if (!group.candidates.length) {
-                    const empty = document.createElement('p'); empty.className = 'parts-batch-ai-empty'; empty.textContent = group.relatedCandidates?.length ? 'Gợi ý hiện chỉ có chi tiết liên quan hoặc khác loại. Chưa có tên phù hợp để gộp vào mục này.' : 'AI chưa tìm được tên phù hợp trong bộ lọc này. Hãy mô tả rõ hơn hoặc kiểm tra dòng xe, năm sản xuất.'; content.appendChild(empty);
+                    const empty = document.createElement('p'); empty.className = 'parts-batch-ai-empty'; empty.textContent = group.relatedCandidates?.length ? 'Bạn có thể chọn các chi tiết liên quan bên dưới để đưa vào kết quả của nhóm này.' : 'AI chưa tìm được tên phù hợp trong bộ lọc này. Hãy mô tả rõ hơn hoặc kiểm tra dòng xe, năm sản xuất.'; content.appendChild(empty);
                 }
                 const choices = document.createElement('div'); choices.className = 'parts-batch-ai-choices';
                 group.choiceInputs = [];
@@ -4314,7 +4344,11 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     label.append(control, text); choices.appendChild(label); group.choiceInputs.push(input);
                 });
                 content.appendChild(choices);
-                const related = createPartsRelatedCandidates(group.relatedCandidates); if (related) content.appendChild(related);
+                const related = createPartsRelatedCandidates(group.relatedCandidates, {
+                    offset: group.candidates.length, isSelected: candidateIndex => group.selected.has(candidateIndex),
+                    onChange: (candidateIndex, checked) => changePartsBatchAiChoice(state, index, candidateIndex, checked),
+                    registerInput: ({ input }) => group.choiceInputs.push(input)
+                }); if (related) content.appendChild(related);
             }
             group.aiCard.appendChild(content);
             updatePartsBatchAiControls(state);
