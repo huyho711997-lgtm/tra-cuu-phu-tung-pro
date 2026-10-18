@@ -1,5 +1,6 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { generateGroqContent } from "./ai-provider.mjs";
+        import { createGroqKeyPool } from "./groq-key-pool.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
         const SUPABASE_PROJECT_URL = "https://yxwmcpoklxpzlikxojez.supabase.co";
@@ -2770,6 +2771,9 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             provider: 'tascoQuoteAiProvider',
             llmProvider: 'tascoLlmProvider',
             groqKey: 'tascoGroqKey',
+            groqKey2: 'tascoGroqKey2',
+            groqKey3: 'tascoGroqKey3',
+            groqActiveKey: 'tascoGroqActiveKey',
             geminiKey: 'tascoGeminiQuoteKey',
             ocrSpaceKey: 'tascoOcrSpaceQuoteKey',
             ocrSpaceLang: 'tascoOcrSpaceQuoteLang',
@@ -2861,7 +2865,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             if (badge) badge.textContent = pending ? 'Chưa lưu' : groqLocal ? 'Trên máy này' : synced ? 'Đã đồng bộ' : 'Lưu tạm';
         }
         function clearQuoteApiInputsForPrivacy() {
-            ['quoteGeminiKeyInput', 'quoteGroqKeyInput', 'quoteOcrSpaceKeyInput'].forEach(id => {
+            ['quoteGeminiKeyInput', 'quoteGroqKeyInput', 'quoteGroqKeyInput2', 'quoteGroqKeyInput3', 'quoteOcrSpaceKeyInput'].forEach(id => {
                 const input = document.getElementById(id);
                 if (input) input.value = '';
             });
@@ -2961,7 +2965,14 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             return getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.llmProvider, 'gemini') === 'groq' ? 'groq' : 'gemini';
         }
         function getLlmProviderName() { return getLlmProvider() === 'groq' ? 'Groq' : 'Gemini'; }
-        function getGroqKey() { return getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.groqKey, '').trim(); }
+        function getGroqKeys() {
+            return ['groqKey', 'groqKey2', 'groqKey3'].map(name => getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS[name], '').trim());
+        }
+        function getGroqKey() {
+            const keys = getGroqKeys(), index = Number(getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.groqActiveKey, '1')) - 1;
+            return keys[index] || keys.find(Boolean) || '';
+        }
+        let GROQ_KEY_POOL_CONTEXT = null;
         function hasSelectedAiKey() { return getLlmProvider() === 'groq' ? !!getGroqKey() : !!getQuoteGeminiKeys().length; }
         window.saveLlmProvider = function() {
             const value = document.getElementById('quoteLlmProviderSelect')?.value;
@@ -2972,18 +2983,44 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             updateQuoteAiProviderUI();
         };
         window.saveGroqKey = function() {
-            setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.groqKey, document.getElementById('quoteGroqKeyInput')?.value || '');
+            ['groqKey', 'groqKey2', 'groqKey3'].forEach((name, index) => {
+                const input = document.getElementById('quoteGroqKeyInput' + (index ? index + 1 : ''));
+                if (input) setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS[name], input.value);
+            });
             updateQuoteApiOwnerHint();
+            window.refreshGroqUsagePanel?.();
+        };
+        window.selectGroqKey = function() {
+            const slot = document.getElementById('quoteGroqActiveKeySelect')?.value;
+            if (!['1', '2', '3'].includes(slot) || !getGroqKeys()[Number(slot) - 1]) return;
+            localStorage.setItem(getQuoteScopedStorageKey(QUOTE_AI_STORAGE_KEYS.groqActiveKey), slot);
             window.refreshGroqUsagePanel?.();
         };
         async function callSelectedAiGenerateContent(parts, config = {}, options = {}) {
             if (getLlmProvider() !== 'groq') return callGeminiGenerateContentWithRetry(parts, config, options);
-            const apiKey = getGroqKey();
-            const tracker = await getActiveGroqUsageTracker().catch(() => null);
-            let requestId;
-            return generateGroqContent(parts, config, { ...options, apiKey,
-                onRequest() { requestId = tracker?.start(); window.refreshGroqUsagePanel?.(); },
-                onUsage(metadata) { tracker?.finish(requestId, metadata); window.refreshGroqUsagePanel?.(); }
+            const ownerId = getQuoteApiOwnerId(), keys = getGroqKeys(), signature = JSON.stringify(keys);
+            if (!GROQ_KEY_POOL_CONTEXT || GROQ_KEY_POOL_CONTEXT.ownerId !== ownerId || GROQ_KEY_POOL_CONTEXT.signature !== signature) {
+                GROQ_KEY_POOL_CONTEXT = { ownerId, signature, pool: createGroqKeyPool({ generate: (...args) => generateGroqContent(...args) }) };
+            }
+            const trackers = new Map(), requests = new Map();
+            const isCurrent = () => ownerId === getQuoteApiOwnerId() && getLlmProvider() === 'groq' && signature === JSON.stringify(getGroqKeys());
+            return GROQ_KEY_POOL_CONTEXT.pool.generate(parts, config, { ...options, apiKeys: keys, preferredKey: getGroqKey(), isCurrent,
+                async getRetryAt(apiKey) {
+                    const tracker = await getActiveGroqUsageTracker(apiKey, ownerId).catch(() => null);
+                    trackers.set(apiKey, tracker);
+                    const snapshot = tracker?.snapshot();
+                    return Math.max(snapshot?.retryAt || 0, ...['requestDay', 'tokenMinute'].map(name => {
+                        const metric = snapshot?.[name];
+                        return metric?.source === 'groq' && metric.remaining === 0 ? metric.resetAt : 0;
+                    }));
+                },
+                onKeyChange(apiKey) {
+                    if (!isCurrent()) return;
+                    localStorage.setItem(getQuoteScopedStorageKey(QUOTE_AI_STORAGE_KEYS.groqActiveKey, ownerId), String(keys.indexOf(apiKey) + 1));
+                    window.refreshGroqUsagePanel?.();
+                },
+                onRequest(apiKey) { requests.set(apiKey, trackers.get(apiKey)?.start()); window.refreshGroqUsagePanel?.(); },
+                onUsage(apiKey, metadata) { trackers.get(apiKey)?.finish(requests.get(apiKey), metadata); window.refreshGroqUsagePanel?.(); }
             });
         }
         function getQuoteAiProviderName() {
@@ -3037,7 +3074,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 hint.textContent = 'OCR.Space nhận diện chữ trong ảnh hoặc PDF. Ngôn ngữ và engine được áp dụng theo lựa chọn của tài khoản.';
             } else if (groq) {
                 hint.classList.remove('warning');
-                hint.textContent = 'Groq GPT-OSS 120B xử lý văn bản và Excel. Ảnh/PDF cần OCR.Space API key để lấy chữ trước. Hết hạn mức sẽ báo lỗi, không tự chuyển nhà cung cấp.';
+                hint.textContent = 'Groq GPT-OSS 120B xử lý văn bản và Excel. Ảnh/PDF cần OCR.Space API key để lấy chữ trước. Tối đa 3 key; tự chuyển key khi bị giới hạn, không tự chuyển nhà cung cấp.';
             } else {
                 hint.classList.remove('warning');
                 hint.textContent = getQuoteGeminiModelLabel() + ' đọc nội dung báo giá từ ảnh, PDF hoặc văn bản. Khi model tạm thời không khả dụng, hệ thống sẽ thông báo và thử model dự phòng.';
@@ -3075,7 +3112,9 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const values = {
                 quoteAiProviderSelect: getQuoteAiProvider(),
                 quoteLlmProviderSelect: getLlmProvider(),
-                quoteGroqKeyInput: getGroqKey(),
+                quoteGroqKeyInput: getGroqKeys()[0],
+                quoteGroqKeyInput2: getGroqKeys()[1],
+                quoteGroqKeyInput3: getGroqKeys()[2],
                 quoteGeminiModelSelect: getQuoteGeminiModel(),
                 quoteGeminiKeyInput: getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey, ''),
                 quoteOcrSpaceKeyInput: getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceKey, ''),
@@ -3110,7 +3149,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 fillQuoteSettingsForm();
                 setQuoteSettingsBusy(false);
             } else {
-                ['quoteGeminiKeyInput', 'quoteGroqKeyInput', 'quoteOcrSpaceKeyInput'].forEach(id => {
+                ['quoteGeminiKeyInput', 'quoteGroqKeyInput', 'quoteGroqKeyInput2', 'quoteGroqKeyInput3', 'quoteOcrSpaceKeyInput'].forEach(id => {
                     const input = document.getElementById(id); if (input) input.value = '';
                 });
                 setQuoteSettingsBusy(true);
@@ -3178,19 +3217,28 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             fillQuoteSettingsForm();
         }
         let GROQ_USAGE_CONTEXT = null, GROQ_USAGE_PANEL_REVISION = 0;
-        function getActiveGroqUsageTracker() {
-            const ownerId = getQuoteApiOwnerId(), apiKey = getGroqKey();
+        function getActiveGroqUsageTracker(apiKey = getGroqKey(), ownerId = getQuoteApiOwnerId()) {
             if (!apiKey) return Promise.resolve(null);
-            if (!GROQ_USAGE_CONTEXT || GROQ_USAGE_CONTEXT.ownerId !== ownerId || GROQ_USAGE_CONTEXT.apiKey !== apiKey) {
-                GROQ_USAGE_CONTEXT = { ownerId, apiKey, tracker: createGroqUsageTracker({ ownerId, apiKey }) };
-            }
-            return GROQ_USAGE_CONTEXT.tracker;
+            if (!GROQ_USAGE_CONTEXT || GROQ_USAGE_CONTEXT.ownerId !== ownerId) GROQ_USAGE_CONTEXT = { ownerId, trackers: new Map() };
+            const configured = getGroqKeys();
+            for (const key of GROQ_USAGE_CONTEXT.trackers.keys()) if (!configured.includes(key)) GROQ_USAGE_CONTEXT.trackers.delete(key);
+            if (!GROQ_USAGE_CONTEXT.trackers.has(apiKey)) GROQ_USAGE_CONTEXT.trackers.set(apiKey, createGroqUsageTracker({ ownerId, apiKey }));
+            return GROQ_USAGE_CONTEXT.trackers.get(apiKey);
         }
         window.refreshGroqUsagePanel = async function() {
             const revision = ++GROQ_USAGE_PANEL_REVISION;
             const host = document.getElementById('groqUsagePanel');
             if (!host || getLlmProvider() !== 'groq' || document.getElementById('quoteGeminiSettingsModal')?.classList.contains('hidden')) return;
             const ownerId = getQuoteApiOwnerId(), apiKey = getGroqKey();
+            const keys = getGroqKeys(), slot = apiKey ? keys.indexOf(apiKey) + 1 : 1;
+            const select = document.getElementById('quoteGroqActiveKeySelect');
+            if (select) {
+                let changed = select.value !== String(slot);
+                Array.from(select.options).forEach((option, index) => { if (option.disabled !== !keys[index]) changed = true; option.disabled = !keys[index]; });
+                select.value = String(slot); if (changed) window.KGPTPremiumDropdown?.sync(select);
+            }
+            const label = document.getElementById('groqActiveKeyStatus');
+            if (label) label.textContent = apiKey ? `Đang dùng Key ${slot} · ${new Set(keys.filter(Boolean)).size} key riêng biệt đã lưu` : 'Chưa có key Groq';
             const tracker = await getActiveGroqUsageTracker().catch(() => null);
             if (revision !== GROQ_USAGE_PANEL_REVISION || ownerId !== getQuoteApiOwnerId() || apiKey !== getGroqKey() || getLlmProvider() !== 'groq') return;
             renderGroqUsagePanel(host, tracker?.snapshot(), { hasKey: !!apiKey });
@@ -3199,7 +3247,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             if (!document.getElementById('quoteGeminiSettingsModal')?.classList.contains('hidden') && getLlmProvider() === 'groq') window.refreshGroqUsagePanel();
         }, 1000);
         window.addEventListener('storage', event => {
-            if (event.key?.startsWith('tascoGroqUsage_v1__') && !document.getElementById('quoteGeminiSettingsModal')?.classList.contains('hidden')) window.refreshGroqUsagePanel();
+            if ((event.key?.startsWith('tascoGroqUsage_v1__') || event.key?.startsWith('tascoGroq')) && !document.getElementById('quoteGeminiSettingsModal')?.classList.contains('hidden')) window.refreshGroqUsagePanel();
         });
         setTimeout(() => { initQuoteAiSettings(); renderQuoteVehicleSelectors(); updateQuoteVehicleSummary(); }, 0);
         window.filterDropdown = function(type) {

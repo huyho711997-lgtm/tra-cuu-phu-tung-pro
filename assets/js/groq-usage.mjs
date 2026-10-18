@@ -83,10 +83,12 @@ export async function createGroqUsageTracker({ ownerId, apiKey, storage, now = D
         finish(requestId, { usage, headers, status } = {}) {
             const event = memory.get(requestId);
             if (!event) return;
-            const at = now(), retryMs = parseGroqReset(headers?.get?.('retry-after'));
+            const at = now(), rates = { requestDay: readRate(headers, 'requests', at), tokenMinute: readRate(headers, 'tokens', at) };
+            const retryMs = status === 429 ? Math.max(1000, parseGroqReset(headers?.get?.('retry-after')) ?? 60000,
+                ...Object.values(rates).map(rate => rate?.remaining === 0 ? rate.resetAt - at : 0)) : null;
             save({ ...event, updatedAt: at, completedAt: at, tokens: groqQuotaTokens(usage), status,
                 retryAt: status === 429 && retryMs !== null ? at + retryMs : null,
-                rates: { requestDay: readRate(headers, 'requests', at), tokenMinute: readRate(headers, 'tokens', at) } });
+                rates });
         },
         snapshot() {
             const at = now(), events = records(at), today = dayOf(at);

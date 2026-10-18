@@ -139,7 +139,19 @@ test('429 responses update remaining quota and retry countdown before throwing',
     assert.ok(tracker.snapshot().retryAt);
     assert.equal(tracker.snapshot().requestMinute.used, 1);
     advance(15000);
+    assert.ok(tracker.snapshot().retryAt); // Token quota needs 20 seconds, even if retry-after is shorter.
+    advance(5000);
     assert.equal(tracker.snapshot().retryAt, null);
+});
+
+test('429 without exposed headers survives reload with a bounded one-minute cooldown', async () => {
+    const { tracker, storage, options, advance } = await fixture();
+    tracker.finish(tracker.start(), { status: 429, headers: new Headers() });
+    advance(30000);
+    const restored = await createGroqUsageTracker({ ...options, storage });
+    assert.ok(restored.snapshot().retryAt);
+    advance(30000);
+    assert.equal(restored.snapshot().retryAt, null);
 });
 
 test('recording malformed/truncated successful completions still counts consumed tokens', async () => {

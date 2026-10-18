@@ -1691,9 +1691,14 @@
 <option value="gemini">Gemini</option><option value="groq">Groq · GPT-OSS 120B</option>
 </select></label>
 <p class="quote-settings-model-note">Lựa chọn Gemini/Groq và Groq key được lưu riêng theo tài khoản trên trình duyệt này.</p>
-<div class="quote-groq-group" hidden><label class="quote-settings-field" for="quoteGroqKeyInput"><span>Groq API key</span>
+<div class="quote-groq-group" hidden><label class="quote-settings-field" for="quoteGroqKeyInput"><span>Groq API key 1</span>
 <span class="quote-settings-input-wrap"><input autocomplete="off" spellcheck="false" id="quoteGroqKeyInput" oninput="saveGroqKey()" placeholder="Dán Groq API key của bạn (gsk_...)" type="password"/></span>
-</label><p class="quote-settings-model-note">Dùng tài khoản Groq Free để giữ chi phí 0 đồng. Hết hạn mức sẽ dừng và báo lỗi. Lấy key tại <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Groq Console</a>.</p>
+</label>
+<label class="quote-settings-field" for="quoteGroqKeyInput2"><span>Groq API key 2 · Không bắt buộc</span><span class="quote-settings-input-wrap"><input autocomplete="off" spellcheck="false" id="quoteGroqKeyInput2" oninput="saveGroqKey()" placeholder="Dán key dự phòng thứ hai" type="password"/></span></label>
+<label class="quote-settings-field" for="quoteGroqKeyInput3"><span>Groq API key 3 · Không bắt buộc</span><span class="quote-settings-input-wrap"><input autocomplete="off" spellcheck="false" id="quoteGroqKeyInput3" oninput="saveGroqKey()" placeholder="Dán key dự phòng thứ ba" type="password"/></span></label>
+<p class="quote-settings-model-note">Ưu tiên key đang chọn; tự chuyển sang key còn lại khi gặp giới hạn (429) hoặc key không có quyền (401/403). Key trùng chỉ dùng một lần. Khi tất cả key đều không khả dụng, ứng dụng dừng và thông báo. Lấy key tại <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Groq Console</a>.</p>
+<label class="quote-settings-field" for="quoteGroqActiveKeySelect"><span>Key ưu tiên / xem mức dùng</span><select class="quote-settings-select" id="quoteGroqActiveKeySelect" onchange="selectGroqKey()"><option value="1">Key 1</option><option value="2">Key 2</option><option value="3">Key 3</option></select></label>
+<p class="quote-settings-model-note" id="groqActiveKeyStatus" role="status" aria-live="polite">Chưa có key Groq</p>
 <section class="groq-usage-panel" id="groqUsagePanel" aria-labelledby="groqUsageTitle">
 <div class="groq-usage-heading"><div><h3 id="groqUsageTitle">Đã sử dụng · GPT-OSS 120B</h3><span class="groq-usage-updated">Chưa có dữ liệu</span></div><span class="groq-usage-plan">Groq Free</span></div>
 <div class="groq-usage-grid">
@@ -1703,7 +1708,7 @@
 <div class="groq-usage-card" data-groq-metric="tokenDay"><h4>Token / ngày</h4><strong class="groq-usage-value">0 / 200.000</strong><progress max="200000" value="0" aria-label="Token đã ghi nhận trong ngày UTC"></progress><span class="groq-usage-remaining">Ước tính còn 200.000</span><span class="groq-usage-source">Ghi nhận trên máy này</span><span class="groq-usage-reset"></span></div>
 </div>
 <p class="groq-usage-last-call"></p><p class="groq-usage-notice" role="status" aria-live="polite">Bảng sẽ cập nhật khi bạn dùng Groq.</p>
-<details class="groq-usage-help"><summary>Cách tính số liệu</summary><p>Yêu cầu/ngày và token/phút ưu tiên số liệu từ phản hồi Groq khi trình duyệt đọc được. Các mục “Ghi nhận trên máy này” chỉ tính lượt gọi từ trình duyệt này kể từ khi có tính năng, không gồm lịch sử cũ hoặc thiết bị khác; ngày ghi nhận tính theo UTC. Một lượt tra cứu có thể gọi AI nhiều lần. Token đã cache được loại khỏi số tính hạn mức khi API cung cấp dữ liệu.</p><p>Các mốc Free mặc định: 30 yêu cầu/phút, 1.000 yêu cầu/ngày, 8.000 token/phút, 200.000 token/ngày. Hạn mức thực tế có thể khác theo tài khoản. Xem tổng tài khoản tại <a href="https://console.groq.com/" target="_blank" rel="noopener noreferrer">Groq Console</a>.</p></details>
+<details class="groq-usage-help"><summary>Cách tính số liệu</summary><p>Bảng hiển thị riêng key đang chọn, không cộng dồn hạn mức của các key. Yêu cầu/ngày và token/phút ưu tiên số liệu từ phản hồi Groq khi trình duyệt đọc được. Các mục “Ghi nhận trên máy này” chỉ tính lượt gọi từ trình duyệt này kể từ khi có tính năng, không gồm lịch sử cũ hoặc thiết bị khác; ngày ghi nhận tính theo UTC. Một lượt tra cứu có thể gọi AI nhiều lần. Token đã cache được loại khỏi số tính hạn mức khi API cung cấp dữ liệu.</p><p>Các mốc Free mặc định: 30 yêu cầu/phút, 1.000 yêu cầu/ngày, 8.000 token/phút, 200.000 token/ngày. Hạn mức thực tế có thể khác theo tài khoản. Các key cùng tổ chức dùng chung hạn mức. Xem tổng tài khoản tại <a href="https://console.groq.com/" target="_blank" rel="noopener noreferrer">Groq Console</a>.</p></details>
 </section></div>
 <label class="quote-settings-field quote-ocr-only">
 <span>Công cụ đọc báo giá</span>

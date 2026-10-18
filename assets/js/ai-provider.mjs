@@ -1,6 +1,6 @@
 export const GROQ_MODEL = 'openai/gpt-oss-120b';
 
-// One request per action: do not spend a free account's quota on automatic retries.
+// One request per key attempt; key fallback is handled separately by groq-key-pool.
 export async function generateGroqContent(parts, config = {}, options = {}) {
     const { apiKey, signal, timeoutMs = 60000, fetchImpl = globalThis.fetch } = options;
     const notify = (name, value) => { try { options[name]?.(value); } catch (_) {} };
