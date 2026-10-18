@@ -191,26 +191,46 @@
   function jobPercent(){return job.phase==='success'?100:(Number.isFinite(job.total)&&job.total>0?Math.min(100,Math.floor(job.loaded/job.total*100)):null);}
   function elapsed(){const seconds=Math.max(0,Math.floor(((job.finishedAt||Date.now())-job.startedAt)/1000));return seconds>=60?`${Math.floor(seconds/60)} phút ${seconds%60} giây`:`${seconds} giây`;}
 
-  // STATS_FULLSCREEN_LOADER
+  // STATS_PAGE_LOADING_COVER
+  function positionLoadingOverlay(){
+    const overlay=$('pdLoadOverlay');if(!overlay||overlay.hidden)return;
+    const header=document.querySelector('#mainApp > .app-topbar');
+    const rect=(header||$('partsDashboard')).getBoundingClientRect();
+    const left=Math.max(0,Math.min(window.innerWidth,rect.left));
+    const top=Math.max(0,Math.min(window.innerHeight,header?rect.bottom:rect.top));
+    overlay.style.left=left+'px';overlay.style.top=top+'px';
+    overlay.style.width=Math.max(0,window.innerWidth-left)+'px';overlay.style.height=Math.max(0,window.innerHeight-top)+'px';
+  }
+  const loadingInertState=new Map();
+  function setLoadingContentBlocked(blocked){
+    const dashboard=$('partsDashboard');if(!dashboard)return;
+    dashboard.setAttribute('aria-busy',String(blocked));
+    if(blocked){
+      for(const child of dashboard.children){if(!loadingInertState.has(child))loadingInertState.set(child,child.inert);if(!child.inert)child.inert=true;}
+    }else{for(const [child,inert] of loadingInertState){child.inert=inert;}loadingInertState.clear();}
+  }
   function syncLoadingOverlay(show,title,message,count,percent){
     const overlay=$('pdLoadOverlay');if(!overlay)return;
     if(show){
       $('pdLoadTitle').textContent=title;$('pdLoadMessage').textContent=message;
       $('pdLoadCount').textContent=count;$('pdLoadPercent').textContent=percent===null?'Đang xử lý':`${percent}%`;
-      $('pdLoadElapsed').textContent=`Đã chạy ${elapsed()} · Vui lòng giữ tab này mở`;
+      $('pdLoadElapsed').textContent=`Đã chạy ${elapsed()} · Có thể chuyển mục trong lúc chờ`;
       const track=$('pdLoadTrack');track.classList.toggle('pd-indeterminate',percent===null);track.querySelector('i').style.width=`${percent??0}%`;
       if(percent===null)track.removeAttribute('aria-valuenow');else track.setAttribute('aria-valuenow',String(percent));
       track.setAttribute('aria-valuetext',`${title}. ${count}`);
-      if(!overlay.open){window.KGPTDashboardSelects?.close();document.body.classList.add('pd-load-locked');overlay.showModal();}
-    }else if(overlay.open){overlay.close();document.body.classList.remove('pd-load-locked');}
-    else document.body.classList.remove('pd-load-locked');
+      if(overlay.hidden)window.KGPTDashboardSelects?.close();
+      overlay.hidden=false;setLoadingContentBlocked(true);positionLoadingOverlay();
+    }else{overlay.hidden=true;setLoadingContentBlocked(false);}
   }
   function initLoadingOverlay(){
-    const overlay=document.createElement('dialog');overlay.id='pdLoadOverlay';overlay.setAttribute('aria-labelledby','pdLoadTitle');overlay.setAttribute('aria-describedby','pdLoadMessage');
-    overlay.innerHTML='<div class="pd-load-card"><div class="pd-load-visual" aria-hidden="true"><span class="pd-load-orbit"></span><span class="pd-load-orbit pd-load-inner"></span><span class="pd-load-core"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg></span></div><div class="pd-load-kicker">THỐNG KÊ PHỤ TÙNG</div><h2 id="pdLoadTitle" role="status" aria-live="polite" tabindex="-1" autofocus>Đang tải dữ liệu</h2><p class="pd-load-message" id="pdLoadMessage"></p><div class="pd-load-info"><span id="pdLoadCount"></span><strong id="pdLoadPercent"></strong></div><div class="pd-load-track" id="pdLoadTrack" role="progressbar" aria-label="Tiến độ tải dữ liệu" aria-valuemin="0" aria-valuemax="100"><i></i></div><p class="pd-load-footer" id="pdLoadElapsed"></p><button class="pd-load-cancel" id="pdLoadCancel" type="button">Hủy tải</button></div>';
+    const overlay=document.createElement('section');overlay.id='pdLoadOverlay';overlay.hidden=true;overlay.setAttribute('role','region');overlay.setAttribute('aria-labelledby','pdLoadTitle');overlay.setAttribute('aria-describedby','pdLoadMessage');
+    overlay.innerHTML='<div class="pd-load-card"><div class="pd-load-visual" aria-hidden="true"><span class="pd-load-orbit"></span><span class="pd-load-orbit pd-load-inner"></span><span class="pd-load-core"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg></span></div><div class="pd-load-kicker">THỐNG KÊ PHỤ TÙNG</div><h2 id="pdLoadTitle" role="status" aria-live="polite" tabindex="-1">Đang tải dữ liệu</h2><p class="pd-load-message" id="pdLoadMessage"></p><div class="pd-load-info"><span id="pdLoadCount"></span><strong id="pdLoadPercent"></strong></div><div class="pd-load-track" id="pdLoadTrack" role="progressbar" aria-label="Tiến độ tải dữ liệu" aria-valuemin="0" aria-valuemax="100"><i></i></div><p class="pd-load-footer" id="pdLoadElapsed"></p><button class="pd-load-cancel" id="pdLoadCancel" type="button">Hủy tải</button></div>';
     document.body.appendChild(overlay);
     $('pdLoadCancel').addEventListener('click',()=>{clear();$('pdRefresh')?.focus({preventScroll:true});});
-    overlay.addEventListener('cancel',event=>{event.preventDefault();clear();$('pdRefresh')?.focus({preventScroll:true});});
+    overlay.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();clear();$('pdRefresh')?.focus({preventScroll:true});}});
+    window.addEventListener('resize',positionLoadingOverlay);
+    const header=document.querySelector('#mainApp > .app-topbar');
+    if(header&&typeof ResizeObserver!=='undefined')new ResizeObserver(positionLoadingOverlay).observe(header);
   }
 
   function syncJob(){
