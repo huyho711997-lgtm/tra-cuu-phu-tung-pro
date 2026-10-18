@@ -225,7 +225,7 @@
   function initLoadingOverlay(){
     const overlay=document.createElement('section');overlay.id='pdLoadOverlay';overlay.hidden=true;overlay.setAttribute('role','region');overlay.setAttribute('aria-labelledby','pdLoadTitle');overlay.setAttribute('aria-describedby','pdLoadMessage');
     overlay.innerHTML='<div class="pd-load-card"><div class="pd-load-visual" aria-hidden="true"><span class="pd-load-orbit"></span><span class="pd-load-orbit pd-load-inner"></span><span class="pd-load-core"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg></span></div><div class="pd-load-kicker">THỐNG KÊ PHỤ TÙNG</div><h2 id="pdLoadTitle" role="status" aria-live="polite" tabindex="-1">Đang tải dữ liệu</h2><p class="pd-load-message" id="pdLoadMessage"></p><div class="pd-load-info"><span id="pdLoadCount"></span><strong id="pdLoadPercent"></strong></div><div class="pd-load-track" id="pdLoadTrack" role="progressbar" aria-label="Tiến độ tải dữ liệu" aria-valuemin="0" aria-valuemax="100"><i></i></div><p class="pd-load-footer" id="pdLoadElapsed"></p><button class="pd-load-cancel" id="pdLoadCancel" type="button">Hủy tải</button></div>';
-    document.body.appendChild(overlay);
+    ($('mainApp')||document.body).appendChild(overlay);
     $('pdLoadCancel').addEventListener('click',()=>{clear();$(state.loaded?'pdRefresh':'pdInitialLoad')?.focus({preventScroll:true});});
     overlay.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();clear();$(state.loaded?'pdRefresh':'pdInitialLoad')?.focus({preventScroll:true});}});
     window.addEventListener('resize',positionLoadingOverlay);
