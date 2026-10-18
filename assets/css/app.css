@@ -2254,7 +2254,7 @@ html.dark .competition-hero h1{color:#f4f7fc !important}
 html.dark .competition-hero-copy>p{color:#a8b7cc !important}
 @media(max-width:640px){
   .competition-hero{margin-bottom:12px !important;padding:19px 18px !important;border-radius:17px !important}
-  .competition-hero-head{align-items:flex-start !important;gap:12px !important}
+  .competition-hero-head{align-items:flex-start !important;flex-direction:row !important;gap:12px !important}
   .competition-hero-copy{max-width:none !important}
   .competition-hero h1{font-size:21px !important}
   .competition-hero-copy>p{font-size:10.5px !important;line-height:1.55 !important}
