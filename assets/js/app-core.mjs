@@ -4460,7 +4460,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             return JSON.stringify({ ...criteria, query: document.getElementById('searchInput')?.value || '', exact: document.getElementById('exactPartName')?.value || '' });
         }
         function isCurrentPartsPriceReview(state) {
-            return !!state && PARTS_PRICE_REVIEW === state && !state.controller.signal.aborted && auth.currentUser?.uid === state.criteria.uid && canCurrentUserAccessPage('parts', 'view') && state.isCurrent();
+            return PARTS_BATCH_MODE && !!state && PARTS_PRICE_REVIEW === state && !state.controller.signal.aborted && auth.currentUser?.uid === state.criteria.uid && canCurrentUserAccessPage('parts', 'view') && state.isCurrent();
         }
         window.resetPartsPriceReview = function() {
             PARTS_PRICE_REVIEW?.controller.abort();
@@ -4780,7 +4780,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         }
         window.startPartsPriceReview = function(options) {
             resetPartsPriceReview();
-            if (!options?.groups?.length) return;
+            // PRICE_REVIEW_BATCH_ONLY
+            if (!PARTS_BATCH_MODE || !options?.groups?.length) return;
             const state = { ...options, controller: new AbortController(), phase: 'loading', visible: true, loaded: 0, buckets: [], notes: new Map(), today: partsPriceReviewToday(), error: '', model: '' };
             PARTS_PRICE_REVIEW = state;
             if (!isCurrentPartsPriceReview(state)) { resetPartsPriceReview(); return; }
@@ -4913,12 +4914,6 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 document.getElementById('statCount').innerText = MASTER_DATA.length + " kết quả";
                 CURRENT_PAGE = 1;
                 renderTable();
-                const reviewScope = partsPriceReviewScope();
-                // Exact-name matching is an ordinary search. Only applied AI suggestions enable an AI review.
-                if (aiWarehouseNames.length) {
-                    const reviewNameKey = JSON.stringify(aiWarehouseNames);
-                    window.startPartsPriceReview?.({ criteria: { uid: auth.currentUser?.uid || '', brand: hang, models: hieus, years: nams, kind: type }, groups: [{ term: document.getElementById('searchInput')?.value?.trim() || searchDescription, names: aiWarehouseNames }], isCurrent: () => searchRevision === PARTS_DATA_SEARCH_REVISION && reviewScope === partsPriceReviewScope() && document.getElementById('exactPartName')?.value === '1' && reviewNameKey === JSON.stringify(getSelectedPartsAiNames()) });
-                }
                 await recordPartsSearchUsage({ searchDescription, aiWarehouseNames, hang, hieus, nams, exactPartName, skipLog, resultsCount: MASTER_DATA.length });
                 return true;
             } catch (e) {
