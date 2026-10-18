@@ -530,7 +530,7 @@
 </div>
 <div class="text-[12.5px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-4xl pl-12">Thiết lập nhanh tiêu chí tra cứu theo hãng xe, dòng xe, năm sản xuất, loại hàng và tên phụ tùng. Khi cần đối chiếu chuyên sâu, bạn có thể bật khớp chính xác để so sánh đúng một phụ tùng qua nhiều hồ sơ.</div>
 </div>
-<button class="parts-ai-settings parts-ai-header-settings" type="button" onclick="openQuoteGeminiSettings('parts')" aria-label="Cài đặt Gemini" title="Cài đặt Gemini"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 3.4h4.8l.7 2.2 2 .9 2.1-1.1 2.4 4.2-1.8 1.5v2.2l1.8 1.5-2.4 4.2-2.1-1.1-2 .9-.7 2.2H9.6l-.7-2.2-2-.9L4.8 19l-2.4-4.2 1.8-1.5v-2.2L2.4 9.6l2.4-4.2 2.1 1.1 2-.9z"/><circle cx="12" cy="12" r="3.2"/></svg><span>Cài đặt Gemini</span></button>
+<button class="parts-ai-settings parts-ai-header-settings" type="button" onclick="openQuoteGeminiSettings('parts')" aria-label="Cài đặt AI" title="Cài đặt AI"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 3.4h4.8l.7 2.2 2 .9 2.1-1.1 2.4 4.2-1.8 1.5v2.2l1.8 1.5-2.4 4.2-2.1-1.1-2 .9-.7 2.2H9.6l-.7-2.2-2-.9L4.8 19l-2.4-4.2 1.8-1.5v-2.2L2.4 9.6l2.4-4.2 2.1 1.1 2-.9z"/><circle cx="12" cy="12" r="3.2"/></svg><span>Cài đặt AI</span></button>
 <div aria-hidden="true" class="parts-hero-watermark">
 <svg class="parts-watermark-path" fill="none" viewbox="0 0 480 120">
 <path d="M22 78C92 18 151 104 218 50S344 16 458 62"></path>
@@ -744,7 +744,7 @@
 </div>
 </div>
 <div class="exec-panel-actions">
-<button class="quote-settings-btn" onclick="openQuoteGeminiSettings()" title="Cấu hình Gemini API Key" type="button">
+<button class="quote-settings-btn" onclick="openQuoteGeminiSettings()" title="Cấu hình Gemini / Groq API key" type="button">
 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.89 3.31.877 2.42 2.42a1.724 1.724 0 001.065 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.89 1.543-.877 3.31-2.42 2.42a1.724 1.724 0 00-2.573 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.89-3.31-.877-2.42-2.42a1.724 1.724 0 00-1.065-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.89-1.543.877-3.31 2.42-2.42.996.575 2.25.04 2.573-1.065z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4"></path></svg>
 </button>
 </div>
@@ -1674,7 +1674,7 @@
     <span class="quote-settings-brand"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"/></svg></span>
     <div class="quote-settings-heading-copy">
       <div class="quote-settings-kicker">Cấu hình AI · Tài khoản</div>
-      <h2 class="quote-settings-title" id="quoteSettingsTitle">Gemini &amp; OCR</h2>
+      <h2 class="quote-settings-title" id="quoteSettingsTitle">Gemini / Groq &amp; OCR</h2>
       <p class="quote-settings-desc" id="quoteSettingsDescription">Chọn công cụ đọc báo giá. API key được lưu riêng theo từng tài khoản.</p>
     </div>
     <button class="quote-settings-close" onclick="closeQuoteGeminiSettings()" title="Đóng" aria-label="Đóng cấu hình AI" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
@@ -1685,10 +1685,19 @@
       <div class="quote-settings-owner-copy"><span class="quote-settings-owner-label">Tài khoản sử dụng</span><strong id="quoteApiOwnerName">Đang đọc thông tin…</strong><span id="quoteApiOwnerStatus" role="status" aria-live="polite">Đang tải cấu hình tài khoản.</span></div>
       <span class="quote-settings-sync" id="quoteApiOwnerBadge">Đang tải</span>
     </div>
-    <div class="quote-settings-fields"><label class="quote-settings-field quote-ocr-only">
+    <div class="quote-settings-fields">
+<label class="quote-settings-field" for="quoteLlmProviderSelect"><span>Nhà cung cấp AI</span>
+<select class="quote-settings-select" id="quoteLlmProviderSelect" onchange="saveLlmProvider()">
+<option value="gemini">Gemini</option><option value="groq">Groq · GPT-OSS 120B</option>
+</select></label>
+<p class="quote-settings-model-note">Lựa chọn Gemini/Groq và Groq key được lưu riêng theo tài khoản trên trình duyệt này.</p>
+<div class="quote-groq-group" hidden><label class="quote-settings-field" for="quoteGroqKeyInput"><span>Groq API key</span>
+<span class="quote-settings-input-wrap"><input autocomplete="off" spellcheck="false" id="quoteGroqKeyInput" oninput="saveGroqKey()" placeholder="Dán Groq API key của bạn (gsk_...)" type="password"/></span>
+</label><p class="quote-settings-model-note">Dùng tài khoản Groq Free để giữ chi phí 0 đồng. Hết hạn mức sẽ dừng và báo lỗi. Lấy key tại <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Groq Console</a>.</p></div>
+<label class="quote-settings-field quote-ocr-only">
 <span>Công cụ đọc báo giá</span>
 <select class="quote-settings-select" id="quoteAiProviderSelect" onchange="saveQuoteAiProvider(); updateQuoteAiProviderUI()">
-<option value="gemini">Gemini · Đọc báo giá bằng AI</option>
+<option value="gemini">AI đã chọn · Gemini hoặc Groq</option>
 <option value="ocrspace">OCR.Space — OCR miễn phí + parser nội bộ</option>
 </select>
 </label>
@@ -1701,7 +1710,7 @@
 <p class="quote-settings-model-note">Lựa chọn model được ghi nhớ trên trình duyệt này theo tài khoản.</p>
 </div>
 <div class="quote-provider-grid">
-<label class="quote-settings-field">
+<label class="quote-settings-field quote-gemini-key-group">
 <span>Gemini API key</span>
 <span class="quote-settings-input-wrap"><span class="quote-settings-key-icon" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="m11 11 9 9m-4-4 2-2m-5-1 2-2"/></svg></span><input autocomplete="off" id="quoteGeminiKeyInput" oninput="saveQuoteGeminiKey()" placeholder="Dán Gemini API Key riêng của user — có thể nhập nhiều key, mỗi dòng một key" type="password" value=""/></span>
 </label>
@@ -1730,7 +1739,7 @@
 </div>
 <div class="quote-ai-provider-hint quote-ocr-only" id="quoteAiProviderHint"></div>
 </div>
-    <details class="parts-ai-settings-note quote-settings-info"><summary><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></svg><span>Thông tin sử dụng Gemini</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></summary><div>Tra cứu tên phụ tùng sử dụng dịch vụ AI và API key của tài khoản. Model cho tính năng này được quản lý riêng; lựa chọn model đọc báo giá không thay đổi model tra cứu tên phụ tùng. Hạn mức sử dụng do Google quy định.</div></details>
+    <details class="parts-ai-settings-note quote-settings-info"><summary><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></svg><span>Thông tin sử dụng AI</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></summary><div>Nhà cung cấp đã chọn áp dụng cho tìm tên phụ tùng, đánh giá giá và phân tích báo giá. Groq dùng GPT-OSS 120B; ảnh/PDF cần thêm OCR.Space API key. Hạn mức miễn phí do từng nhà cung cấp quy định. Groq key chỉ được lưu trên trình duyệt theo tài khoản, không đồng bộ lên máy khác.</div></details>
   </div>
   <div class="quote-settings-actions">
     <span class="quote-settings-footer-note"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></svg><span>Cấu hình theo tài khoản</span></span>

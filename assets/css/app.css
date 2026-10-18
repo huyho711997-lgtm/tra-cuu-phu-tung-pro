@@ -2273,3 +2273,7 @@ html.dark .competition-hero-copy>p{color:#a8b7cc !important}
 
 /* Balance the trophy stroke with its laurel branches. */
 .competition-hero:before{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20280%20124%22%20fill%3D%22none%22%20stroke%3D%22%234779bd%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cg%20transform%3D%22translate%28104%2015%29%20scale%283%29%22%20stroke-width%3D%22.55%22%3E%3Cpath%20d%3D%22M8%2021h8M12%2017v4M7%204h10v7a5%205%200%200%201-10%200V4ZM7%207H4v2a4%204%200%200%200%204%204M17%207h3v2a4%204%200%200%201-4%204%22%2F%3E%3C%2Fg%3E%3Cg%20id%3D%22laurel%22%20stroke-width%3D%221.25%22%3E%3Cpath%20d%3D%22M114%20100C87%2089%2078%2064%2090%2034%22%2F%3E%3Cpath%20d%3D%22M89%2042C78%2040%2075%2032%2078%2025C88%2028%2092%2034%2089%2042ZM85%2055C72%2054%2067%2046%2068%2039C80%2040%2086%2047%2085%2055ZM87%2070C74%2072%2066%2066%2063%2058C77%2056%2085%2061%2087%2070ZM94%2084C81%2090%2072%2087%2066%2080C78%2073%2088%2076%2094%2084ZM105%2095C96%20105%2086%20106%2078%20100C87%2091%2097%2089%20105%2095Z%22%2F%3E%3C%2Fg%3E%3Cuse%20href%3D%22%23laurel%22%20transform%3D%22translate%28280%200%29%20scale%28-1%201%29%22%2F%3E%3C%2Fsvg%3E")!important}
+
+/* Provider fields must stay hidden even when the field layout uses display:flex. */
+#quoteGeminiSettingsModal [hidden]{display:none!important}
+#quoteGeminiSettingsModal #quoteGroqKeyInput{padding-left:14px}
