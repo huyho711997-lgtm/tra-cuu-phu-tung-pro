@@ -10316,3 +10316,67 @@ applySupabaseConstraint = function(builder, source, constraint) {
     }
     return applySupabaseConstraintBeforeVehicleFix(builder, source, constraint);
 };
+
+
+// Share the normalized vehicle predicates in multi-part and price-review queries.
+fetchPartsBatchPage = async function(criteria, names, page, signal) {
+            if (!Array.isArray(names) || !names.length) throw new Error('Chưa chọn tên kho từ gợi ý AI.');
+            assertAuthenticatedDataAccess();
+            const reference = collection(db, 'LichSuBaoGia');
+            let builder = supabase.from(reference.table).select('*', { count: 'exact' });
+            if (criteria.brand) builder = applySupabaseConstraint(builder, reference, where('hang_xe', '==', criteria.brand));
+            if (criteria.models.length) builder = applySupabaseConstraint(builder, reference, where('hieu_xe', 'in', criteria.models));
+            if (criteria.years.length) builder = builder.in('nam_sx', criteria.years.map(Number));
+            if (criteria.kind === 'genuine') builder = builder.eq('chinh_hang', 'Chính hãng');
+            if (criteria.kind === 'aftermarket') builder = builder.in('chinh_hang', ['Thay thế', 'Hàng ngoài']);
+            builder = builder.in('ten_phu_tung', names)
+                .order('ngay_bao_gia', { ascending: false, nullsFirst: false }).order('id', { ascending: true })
+                .range((page - 1) * PARTS_BATCH_PAGE_SIZE, page * PARTS_BATCH_PAGE_SIZE - 1)
+                .abortSignal(signal);
+            const { data, error, count } = await builder;
+            if (error) throw error;
+            const items = (data || []).map(row => {
+                const item = fromDbPayload('LichSuBaoGia', row);
+                return { ...item, id: row[reference.pk || 'id'], chinh_hang: normalizePartTypeValue(item.chinh_hang) };
+            });
+            return { items, total: typeof count === 'number' && Number.isFinite(count) ? count : null };
+        };
+
+fetchPartsPriceReviewRows = async function(state) {
+            assertAuthenticatedDataAccess();
+            const names = [...new Set(state.groups.flatMap(group => group.names))];
+            const rows = [], seen = new Set();
+            const reference = collection(db, 'LichSuBaoGia');
+            for (let index = 0; index < names.length; index += 30) {
+                const chunk = names.slice(index, index + 30);
+                let offset = 0, expected = null;
+                while (isCurrentPartsPriceReview(state)) {
+                    let builder = supabase.from(reference.table).select('id,ten_phu_tung,so_hsbt,hang_xe,hieu_xe,nam_sx,chinh_hang,gia_duyet,ngay_bao_gia', { count: 'exact' }).in('ten_phu_tung', chunk);
+                    const criteria = state.criteria;
+                    if (criteria.brand) builder = applySupabaseConstraint(builder, reference, where('hang_xe', '==', criteria.brand));
+                    if (criteria.models.length) builder = applySupabaseConstraint(builder, reference, where('hieu_xe', 'in', criteria.models));
+                    if (criteria.years.length) builder = builder.in('nam_sx', criteria.years.map(Number));
+                    if (criteria.kind === 'genuine') builder = builder.eq('chinh_hang', 'Chính hãng');
+                    if (criteria.kind === 'aftermarket') builder = builder.in('chinh_hang', ['Thay thế', 'Hàng ngoài']);
+                    const { data, count, error } = await builder.order('id', { ascending: true }).range(offset, offset + 499).abortSignal(state.controller.signal);
+                    if (!isCurrentPartsPriceReview(state)) return null;
+                    if (error) throw new Error('Chưa tải đủ kho giá để đánh giá. Hãy thử lại.');
+                    if (!Number.isInteger(count) || count < 0) throw new Error('Chưa xác nhận được tổng số báo giá trong kho. Hãy thử lại.');
+                    if (expected !== null && expected !== count) throw new Error('Kho giá vừa thay đổi trong lúc tổng hợp. Hãy bấm Đánh giá lại.');
+                    expected = count;
+                    const page = data || [];
+                    if (offset + page.length > expected || (!page.length && offset < expected)) throw new Error('Dữ liệu kho giá chưa đầy đủ. Hãy bấm Đánh giá lại.');
+                    for (const row of page) {
+                        const id = row[reference.pk || 'id'];
+                        if (!id || seen.has(id)) throw new Error('Dữ liệu kho giá thay đổi hoặc trùng bản ghi. Hãy bấm Đánh giá lại.');
+                        seen.add(id); rows.push(row);
+                    }
+                    if (rows.length > 30000) throw new Error('Có hơn 30.000 báo giá phù hợp. Chọn cụ thể dòng xe, năm sản xuất hoặc ít tên phụ tùng hơn để đánh giá đầy đủ.');
+                    offset += page.length;
+                    state.loaded = rows.length;
+                    const meta = document.getElementById('partsPriceReviewStatus'); if (meta) meta.textContent = 'Đang tổng hợp ' + formatVND(rows.length) + ' báo giá trong kho…';
+                    if (offset >= expected) break;
+                }
+            }
+            return isCurrentPartsPriceReview(state) ? rows : null;
+        };
