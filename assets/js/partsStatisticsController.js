@@ -249,6 +249,10 @@
     const empty=document.createElement('div');empty.id='pdInitialView';
     empty.innerHTML='<div class="pd-initial-header"><div class="pd-eyebrow"><i></i> TRUNG TÂM DỮ LIỆU</div><h1>Thống kê phụ tùng</h1><p>Tổng hợp danh mục và cơ cấu phụ tùng trong kho dữ liệu.</p></div><section class="pd-initial-card" aria-labelledby="pdInitialTitle"><div class="pd-initial-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg></div><h2 id="pdInitialTitle">Chưa có dữ liệu thống kê</h2><p>Nhấn Tải phụ tùng để xem số liệu tổng hợp, biểu đồ và báo cáo theo hãng xe, dòng xe.</p><div class="pd-initial-error" id="pdInitialError" role="status" hidden></div><button type="button" class="pd-btn pd-primary pd-initial-load" id="pdInitialLoad"><svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg>Tải phụ tùng</button><span class="pd-initial-note">Dữ liệu chỉ được tải khi bạn yêu cầu.</span></section>';
     dashboard.prepend(empty);
+    const refreshButton=$('pdRefresh');if(refreshButton&&!refreshButton.querySelector('span')){
+      for(const node of [...refreshButton.childNodes])if(node.nodeType===3)node.remove();
+      refreshButton.appendChild(document.createElement('span'));
+    }
     $('pdInitialLoad').addEventListener('click',()=>refresh(false));
     syncInitialView();
   }
