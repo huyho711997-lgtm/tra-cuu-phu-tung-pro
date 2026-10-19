@@ -88,6 +88,8 @@
 .pk-table-wrap td { font-size:12px; line-height:1.6; padding:16px 18px; border-top:1px solid #edf1f5; vertical-align:middle; max-width:360px; overflow-wrap:anywhere; }
 .pk-table-wrap tbody tr:hover { background:#fbfdff; }
 .pk-table-wrap tr.pk-row-selected td { background:#f2f7ff; }
+.pk-table-wrap tr.pk-row-processed td { background:#f8fbff; }
+.pk-table-wrap tr.pk-row-processed .pk-row-check { opacity:.45; }
 .pk-table-wrap strong { display:block; font-size:12.5px; font-weight:700; }
 .pk-table-wrap small { display:block; font-size:10.5px; color:#8290a3; margin-top:5px; }
 .pk-user { display:flex; align-items:center; gap:11px; min-width:205px; }
@@ -115,6 +117,7 @@
 .dark .pk-page .pk-panel-head, .dark .pk-page .pk-tabs, .dark .pk-page .pk-filters, .dark .pk-page .pk-pagination, .dark .pk-table-wrap td { border-color:#2b3b53; }
 .dark .pk-table-wrap tbody tr:hover { background:#1a2b43; }
 .dark .pk-table-wrap tr.pk-row-selected td { background:#1b3355; }
+.dark .pk-table-wrap tr.pk-row-processed td { background:#17283d; }
 .dark .pk-page .pk-selection-bar { border-color:#2b3b53; color:#a2b3ca; }
 .dark .pk-note { background:#193153; border-color:#304e79; color:#adc5e9; }
 .dark .pk-page .pk-next-step { background:#193153; border-color:#304e79; }
