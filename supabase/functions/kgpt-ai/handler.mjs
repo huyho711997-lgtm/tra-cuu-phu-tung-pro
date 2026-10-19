@@ -149,7 +149,7 @@ async function generate(fetchImpl, body, credentials, signal) {
 export function createHandler({createClient,env,fetchImpl=globalThis.fetch}) {
   return async req => {
     const origin = req.headers.get('origin');
-    const allowed = (env('ALLOWED_ORIGINS') || 'https://huyho711997-lgtm.github.io').split(',').map(s => s.trim()).filter(Boolean);
+    const allowed = (env('ALLOWED_ORIGINS') || 'https://huyho711997-lgtm.github.io,https://tra-cuu-phu-tung-pro.vercel.app').split(',').map(s => s.trim()).filter(Boolean);
     const cors = {Vary:'Origin','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type',
       'Access-Control-Allow-Methods':'POST, OPTIONS',...(origin && allowed.includes(origin) ? {'Access-Control-Allow-Origin':origin} : {})};
     const reply = (data,status=200) => new Response(JSON.stringify(data),{status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});

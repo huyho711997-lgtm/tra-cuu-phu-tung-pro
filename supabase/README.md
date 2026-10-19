@@ -27,7 +27,7 @@ Mã nguồn gồm migration Vault, Edge Function `kgpt-ai`, bản tra cứu `kgp
 
 Supabase tự cấp `SUPABASE_URL` và `SUPABASE_SERVICE_ROLE_KEY` cho Edge Functions. Không đặt chúng trong frontend. Không tạo thêm key nếu project đã có cấu hình chuẩn.
 
-Origin mặc định: `https://huyho711997-lgtm.github.io`. Nếu dùng tên miền khác, đặt secret `ALLOWED_ORIGINS` là danh sách origin cách nhau bằng dấu phẩy, không gồm đường dẫn. CORS chỉ là giới hạn trình duyệt; xác thực và phân quyền luôn do máy chủ thực hiện.
+Origin mặc định gồm GitHub Pages `https://huyho711997-lgtm.github.io` và tên miền Vercel hiện có `https://tra-cuu-phu-tung-pro.vercel.app`. Nếu dùng tên miền khác, đặt secret `ALLOWED_ORIGINS` là danh sách origin cách nhau bằng dấu phẩy, không gồm đường dẫn. CORS chỉ là giới hạn trình duyệt; xác thực và phân quyền luôn do máy chủ thực hiện.
 
 Nếu triển khai bằng CLI đã được đăng nhập:
 

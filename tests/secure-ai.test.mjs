@@ -46,6 +46,8 @@ test('CORS preflight allows only configured origin and does not substitute for a
     const app=server();
     let res=await app.handler(new Request('https://test/functions/v1/kgpt-ai',{method:'OPTIONS',headers:{Origin:origin}}));
     assert.equal(res.status,204);assert.equal(res.headers.get('Access-Control-Allow-Origin'),origin);
+    res=await app.handler(new Request('https://test/functions/v1/kgpt-ai',{method:'OPTIONS',headers:{Origin:'https://tra-cuu-phu-tung-pro.vercel.app'}}));
+    assert.equal(res.status,204);assert.equal(res.headers.get('Access-Control-Allow-Origin'),'https://tra-cuu-phu-tung-pro.vercel.app');
     res=await app.request(ask,{Origin:'https://malicious.example'});assert.equal(res.status,403);assert.equal(app.calls.length,0);
     res=await app.request(ask,{Origin:'',Authorization:''});assert.equal(res.status,401);
 });
