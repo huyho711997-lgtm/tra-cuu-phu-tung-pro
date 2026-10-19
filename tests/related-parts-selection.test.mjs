@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
+import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from '../assets/js/parts-relevance.mjs';
 
 const source = readFileSync(new URL('../assets/js/app-core.mjs', import.meta.url), 'utf8');
 const between = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
@@ -51,7 +52,7 @@ function harness() {
     document.activeElement = document.body;
     let searchedNames = [], currentBatch = null;
     const context = vm.createContext({
-        document, console, AbortController, Set, Map, auth: { currentUser: { uid: 'user-a' } },
+        document, console, AbortController, Set, Map, classifyPartsCandidateFamily, evaluatePartsCandidateRelevance, canRoutePartsCandidate, auth: { currentUser: { uid: 'user-a' } },
         canCurrentUserAccessPage: () => true, PARTS_BATCH_MODE: false, EXACT_SOURCE_CONTEXT: null,
         requestAnimationFrame: callback => callback(), matchMedia: () => ({ matches: true }),
         isCurrentPartsBatchState: state => state === currentBatch && !state.stale,
@@ -188,4 +189,41 @@ test('reconciling newly inserted primary suggestions remaps related indices by n
     assert.equal(entry.candidates.length, 2);
     assert.equal(entry.selected.has(2), true);
     assert.deepEqual([...api.getPartsBatchSelectedNames(entry)], related.names);
+});
+
+test('batch reconciliation cannot promote an uncertain AI response from another group',async()=>{
+    const {context,api,setBatch}=harness();
+    const pump={...primary,name:'Bơm nước',names:['Bơm nước']};
+    const foreign={name:'Bơm nước phụ',names:['Bơm nước phụ'],record_count:9};
+    const entry={...group('bơm nước'),candidates:[pump],relatedCandidates:[],rawCandidates:[pump],selected:new Set([0])};
+    const other={...group('vòi phun'),candidates:[],relatedCandidates:[],rawCandidates:[foreign],selected:new Set()};
+    let calls=0;
+    context.refinePartsAiCandidates=async()=>{calls++;return {candidates:[{...foreign,relation:'uncertain',relevance_verified:true,review_reasons:['Chưa đủ thông tin']}],relatedCandidates:[]};};
+    await api.reconcilePartsBatchCandidates(setBatch([entry,other]));
+    assert.equal(calls,1);
+    assert.equal(entry.candidates.length,1);
+    assert.deepEqual([...api.getPartsBatchSelectedNames(entry)],['Bơm nước']);
+});
+
+test('HVAC groups do not request AI to classify unrelated foreign warehouse names',async()=>{
+    const {context,api,setBatch}=harness();
+    const compressor={...primary,name:'Máy nén điều hòa',names:['Máy nén điều hòa']};
+    const condenser={...primary,name:'Giàn nóng',names:['Giàn nóng']};
+    const internal={...related,name:'Bộ hơi máy nén',names:['Bộ hơi máy nén']};
+    const frame={...related,name:'Thanh đứng khung xương két nước trái',names:['Thanh đứng khung xương két nước trái']};
+    const entry={...group('máy nén'),candidates:[compressor],relatedCandidates:[internal],rawCandidates:[compressor,internal],selected:new Set([0])};
+    const other={...group('giàn nóng'),candidates:[condenser],relatedCandidates:[frame],rawCandidates:[condenser,frame],selected:new Set([0])};
+    context.refinePartsAiCandidates=async()=>assert.fail('Unrelated names must not be imported for classification');
+    await api.reconcilePartsBatchCandidates(setBatch([entry,other]));
+    assert.deepEqual(entry.candidates.map(c=>c.name),['Máy nén điều hòa']);
+    assert.deepEqual(other.candidates.map(c=>c.name),['Giàn nóng']);
+});
+
+test('a user who deselected every candidate is not auto-selected again during routing',async()=>{
+    const {api,setBatch}=harness(),entry=group();
+    const state=setBatch([entry]);
+    api.changePartsBatchAiChoice(state,0,0,false);
+    assert.equal(entry.selectionTouched,true);assert.equal(entry.selected.size,0);
+    await api.reconcilePartsBatchCandidates(state);
+    assert.equal(entry.selected.size,0);
 });
