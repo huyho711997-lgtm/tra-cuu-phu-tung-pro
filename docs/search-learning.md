@@ -31,6 +31,8 @@ Chọn cả trang chỉ gồm các gợi ý đang hiển thị (tối đa 25), k
 
 Duyệt, từ chối, ngừng áp dụng và lưu chỉnh sửa cập nhật ngay dòng hiện tại, không tải lại bảng. Dòng đã xử lý được giữ tại chỗ và hiện trạng thái mới để không làm nhảy vị trí cuộn; các dòng chưa xử lý vẫn giữ lựa chọn. Thống kê cập nhật trong nền. **Gợi ý tiếp theo** lấy tiếp sau các dòng chưa xử lý trên trang; chuyển trang, đổi bộ lọc hoặc Làm mới sẽ nạp lại danh sách từ máy chủ.
 
+Nút và dòng đang lưu hiện trạng thái ngay khi bấm; chỉ dòng đó bị khóa, các dòng khác vẫn có thể chọn và duyệt tiếp. Chuyển trang/bộ lọc tạm khóa đến khi các thao tác lưu hoàn tất. Duyệt nhiều dòng cập nhật từng dòng ngay khi máy chủ phản hồi; chỉ hiện thành công sau khi lưu được. Nếu lỗi, dòng được mở lại để thử và có thông báo tại chỗ. Thanh chọn nhiều dòng bám khi cuộn; nút biểu tượng có nhãn trợ năng và chú thích khi trỏ chuột. Hiệu ứng tuân theo cài đặt giảm chuyển động của thiết bị.
+
 Chỉ kiến thức **approved** được dùng lại. Hãng, tập dòng xe, tập năm, loại hàng phải trùng phạm vi; tên phải còn trong kho và qua quyền tài khoản tra cứu. Kiểm tra loại chi tiết/vị trí vẫn có hiệu lực. Không có quy tắc phù hợp thì dùng dịch vụ AI hiện có. Tích lũy kiến thức không huấn luyện lại mô hình.
 
 ## Dữ liệu và quyền
