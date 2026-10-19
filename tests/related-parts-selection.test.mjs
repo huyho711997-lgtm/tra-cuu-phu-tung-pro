@@ -54,6 +54,7 @@ function harness() {
     const context = vm.createContext({
         document, console, AbortController, Set, Map, classifyPartsCandidateFamily, evaluatePartsCandidateRelevance, canRoutePartsCandidate, auth: { currentUser: { uid: 'user-a' } },
         canCurrentUserAccessPage: () => true, PARTS_BATCH_MODE: false, EXACT_SOURCE_CONTEXT: null,
+        partsLearning: { selection() {}, feedback() {}, hasMissing: () => false },
         requestAnimationFrame: callback => callback(), matchMedia: () => ({ matches: true }),
         isCurrentPartsBatchState: state => state === currentBatch && !state.stale,
         setPartsBatchStatus() {}, formatVND: value => String(value),

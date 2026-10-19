@@ -6,6 +6,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>KHO GIÁ PHỤ TÙNG - Hệ Thống Tra Cứu Giá Phụ Tùng</title>
 <link rel="stylesheet" href="assets/css/search-tools.css"/>
+<link rel="stylesheet" href="assets/css/parts-search-learning.css?v=20261019-learning-v1"/>
 
 
 
@@ -666,6 +667,7 @@
 <span class="parts-ai-hint">Gộp cách viết hoa/thường, hiểu tên đồng nghĩa, chọn sẵn đúng loại phụ tùng trong kho xe đã chọn.</span>
 <div class="parts-ai-status" id="partsAiStatus" role="status" aria-live="polite"></div>
 </div>
+<div class="parts-learning-toolbar"><button type="button" class="pl-button" onclick="partsSearchLearning.openHistory()">Lịch sử &amp; kiến thức tìm kiếm</button><span id="partsLearningStatus" role="status" aria-live="polite">Các lần xác nhận tên sẽ được gửi quản trị viên duyệt trước khi dùng chung.</span></div>
 <section id="partsBatchComposer" hidden aria-labelledby="partsBatchTitle">
 <div class="parts-batch-composer-head"><div><h3 id="partsBatchTitle">Tìm nhiều phụ tùng bằng AI</h3><p class="parts-batch-help" id="partsBatchHelp">Nhập mỗi tên một dòng hoặc cách nhau bằng dấu phẩy. AI hiểu từng mục theo bộ lọc xe; chọn tên kho phù hợp rồi xem báo giá.</p></div><div class="parts-batch-composer-tools"><span id="partsBatchDraftCount">0/20 phụ tùng</span><button id="btnPartsBatchEdit" type="button" hidden aria-expanded="true" aria-controls="partsBatchEditor" onclick="setPartsBatchComposerCollapsed(false, { focus: true })"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15l-1 6Z"/></svg>Chỉnh sửa lựa chọn</button></div></div>
 <p id="partsBatchAppliedSummary" hidden role="status"></p>
@@ -1765,7 +1767,7 @@
 </div>
 <script src="assets/js/document-libraries.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js" defer></script>
-<script type="module" src="assets/js/app-core.mjs?v=20261019-parts-relevance-v1"></script>
+<script type="module" src="assets/js/app-core.mjs?v=20261019-learning-v1"></script>
 <script src="assets/js/app-training.js"></script>
 
 <script id="kgptUnifiedPremiumDropdowns" src="assets/js/kgptUnifiedPremiumDropdowns.js"></script>

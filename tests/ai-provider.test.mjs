@@ -14,6 +14,7 @@ function searchHarness({ provider = 'groq', pages, terms = ['cản trước'] } 
     builder.then = (resolve, reject) => Promise.resolve(pages?.[networkCalls++] ?? { data: [], count: 0, error: null }).then(resolve, reject);
     const context = vm.createContext({
         DOMException, getLlmProvider: () => provider, getQuoteApiOwnerId: () => 'user-a', assertAuthenticatedDataAccess: () => calls.push(['auth']),
+        partsLearning: { search: (criteria, options, rawSearch) => rawSearch(criteria, options) },
         collection: () => ({ table: 'lich_su_bao_gia' }), db: {}, where: (...args) => args,
         applySupabaseConstraint: (query, _, condition) => { calls.push(['constraint', condition]); return query; },
         callSelectedAiGenerateContent: async () => { aiCalls++; return { output: JSON.stringify({ terms }) }; },
@@ -122,7 +123,7 @@ test('Gemini preserves PDF/image input to the secure dispatcher with no OCR.Spac
 });
 
 test('both searches, price review and document extraction use the provider dispatcher', () => {
-    assert.equal((core.match(/await requestPartsAiSearch\(criteria/g) || []).length, 2);
+    assert.equal((core.match(/await requestPartsAiSearch\((?:criteria|searchCriteria)/g) || []).length, 2);
     assert.equal((core.match(/const result = await callSelectedAiGenerateContent\(/g) || []).length, 4);
     assert.equal((core.match(/if \(file && getLlmProvider\(\) === 'groq'\)/g) || []).length, 2);
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');

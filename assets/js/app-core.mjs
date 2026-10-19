@@ -1,4 +1,5 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
+        import { createPartsSearchLearning } from "./parts-search-learning.mjs";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
@@ -14,6 +15,8 @@
             }
         });
         const secureAi = createSecureAiClient({supabase,getOwner:() => auth.currentUser?.uid || ''});
+        const partsLearning = createPartsSearchLearning({supabase,getOwner:()=>auth.currentUser?.uid || '',isAdmin:()=>currentUserProfile?.role === 'admin',canSearch:()=>canCurrentUserAccessPage('parts','view')});
+        window.partsSearchLearning = partsLearning;
         const db = { provider: 'supabase' };
         let SUPABASE_CURRENT_USER = null;
         function normalizeSupabaseUser(user) {
@@ -3453,7 +3456,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const q = partsAiNameKey(query);
             (candidates || []).forEach((candidate, index) => {
                 const guard = getPartsCandidateRelevance(query,candidate.name);
-                if (candidate.relation === 'related_part' || guard.relation === 'related_part') return;
+                if (candidate.relation === 'related_part' || guard.relation === 'related_part' || candidate.relation === 'uncertain' && candidate.review_reasons?.length) return;
                 const names = partsAiCandidateNames(candidate);
                 const exact = names.some(name => partsAiNameKey(name) === q);
                 const reviews = Array.isArray(candidate.review_reasons) ? candidate.review_reasons : [];
@@ -3479,7 +3482,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         function getPartsCandidateRelevance(query,name) { return evaluatePartsCandidateRelevance(query,name); }
         window.refinePartsAiCandidates = async function(criteria, rawCandidates, options = {}) {
             const source = mergePartsAiRawCandidates(rawCandidates, criteria.query);
-            const local = source.map(candidate => getPartsCandidateRelevance(criteria.query, candidate.name));
+            const local = source.map(candidate => {
+                const guard = getPartsCandidateRelevance(criteria.query,candidate.name);
+                return candidate.knowledge_verified && guard.relation !== 'related_part' && !guard.reason ? {...guard,relation:'same_part',verified:true} : guard;
+            });
             const pendingIds = new Set(source.map((_, index) => !local[index].verified && local[index].relation !== 'related_part' ? 'c' + index : '').filter(Boolean));
             let decisions = null, notice = '';
             const current = () => !options.signal?.aborted && (!options.isCurrent || options.isCurrent());
@@ -3558,6 +3564,9 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         // PARTS_CANDIDATE_RELEVANCE_END
 
         async function requestPartsAiSearch(criteria, options = {}) {
+            return partsLearning.search(criteria,options,requestPartsAiSearchRaw);
+        }
+        async function requestPartsAiSearchRaw(criteria, options = {}) {
             if (getLlmProvider() !== 'groq') {
                 const { data, error } = await supabase.functions.invoke('kgpt-ai-part-search', { body: criteria, signal: options.signal });
                 if (error) throw await createPartsAiRequestError(error);
@@ -3742,40 +3751,43 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const { counter, apply, applyLabel, applyCount, all, clear, inputs } = state.controls;
             counter.textContent = `${state.draft.size}/${partsAiSelectableCandidates(state).length} tên đã chọn`;
             updatePartsAiPanelSummary(state);
-            document.getElementById('partsAiResults')?.setAttribute('aria-busy', String(!!state.loading));
-            apply.disabled = !state.draft.size || !!state.loading;
-            applyLabel.textContent = state.loading ? 'Đang tải giá...' : 'Xem kết quả';
+            document.getElementById('partsAiResults')?.setAttribute('aria-busy', String(!!(state.loading || state.confirming)));
+            apply.disabled = !state.draft.size || !!(state.loading || state.confirming);
+            applyLabel.textContent = state.confirming ? 'Đang xác nhận...' : state.loading ? 'Đang tải giá...' : 'Xem kết quả';
             applyCount.textContent = String(state.draft.size);
-            applyCount.hidden = !state.draft.size || !!state.loading;
-            all.disabled = !!state.loading || state.draft.size === partsAiSelectableCandidates(state).length;
-            clear.disabled = !!state.loading || !state.draft.size;
-            apply.setAttribute('aria-busy',String(!!state.loading));
+            applyCount.hidden = !state.draft.size || !!(state.loading || state.confirming);
+            all.disabled = !!(state.loading || state.confirming) || state.draft.size === partsAiSelectableCandidates(state).length;
+            clear.disabled = !!(state.loading || state.confirming) || !state.draft.size;
+            apply.setAttribute('aria-busy',String(!!(state.loading || state.confirming)));
             inputs.forEach(({ input, card, index }) => {
                 input.checked = state.draft.has(index);
                 card.classList.toggle('is-selected',input.checked);
-                input.disabled = !!state.loading;
-                card.classList.toggle('is-disabled', !!state.loading);
+                input.disabled = !!(state.loading || state.confirming);
+                card.classList.toggle('is-disabled', !!(state.loading || state.confirming));
             });
         }
         window.togglePartsAiCandidate = function(index,ticket,checked) {
             const state = currentPartsAiState(ticket);
-            if (!state || state.loading || !partsAiSelectableCandidates(state)[index]) return;
+            if (!state || state.loading || state.confirming || !partsAiSelectableCandidates(state)[index]) return;
             if (checked) state.draft.add(index); else state.draft.delete(index);
+            void partsLearning.selection(state.learning,[...new Set(partsAiSelectableCandidates(state).filter((_,i)=>state.draft.has(i)).flatMap(partsAiCandidateNames))]);
             updatePartsAiSelectionUI();
             setPartsAiStatus('');
         };
         window.selectAllPartsAiCandidates = function(ticket,checked) {
             const state = currentPartsAiState(ticket);
-            if (!state || state.loading) return;
+            if (!state || state.loading || state.confirming) return;
             state.draft = new Set(checked ? partsAiSelectableCandidates(state).map((_,index) => index) : []);
+            void partsLearning.selection(state.learning,checked?[...new Set(partsAiSelectableCandidates(state).flatMap(partsAiCandidateNames))]:[]);
             updatePartsAiSelectionUI();
             setPartsAiStatus('');
         };
         window.applyPartsAiSelection = async function(ticket) {
             const state = currentPartsAiState(ticket);
-            if (!state || state.loading) return;
+            if (!state || state.loading || state.confirming) return;
             const names = [...new Set(partsAiSelectableCandidates(state).filter((_,index) => state.draft.has(index)).flatMap(partsAiCandidateNames))];
             if (!names.length) { setPartsAiStatus('Chọn ít nhất một tên phụ tùng trước khi xem kết quả.','error'); return; }
+            void partsLearning.selection(state.learning,names);
             document.getElementById('exactPartName').value = '1';
             document.getElementById('btnExactPartName')?.classList.add('active');
             EXACT_SOURCE_CONTEXT = null;
@@ -3883,7 +3895,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 if (reviews.length) { const review = document.createElement('small'); review.dataset.review = 'true'; review.textContent = reviews.join('; '); text.appendChild(review); }
                 const meta = document.createElement('div'); meta.className = 'parts-ai-option-meta';
                 meta.append(createPartsAiMetaChip((Number(candidate.record_count || 0) || 0).toLocaleString('vi-VN') + ' bản ghi'));
-                const badge = document.createElement('span'); const match = partsAiMatchLabel(candidate, state.criteria.query);
+                const badge = document.createElement('span'); const match = partsAiMatchLabel(candidate, state.learning?.resolvedQuery || state.criteria.query);
                 badge.className = 'parts-ai-badge'; badge.dataset.tone = match.tone; badge.textContent = match.text;
                 card.append(checkControl, text, meta, badge); list.appendChild(card); inputs.push({ input, card, index });
             });
@@ -3906,39 +3918,54 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const applyLabel = document.createElement('span'); applyLabel.className = 'parts-ai-action-label';
             const applyCount = document.createElement('span'); applyCount.className = 'parts-ai-action-count'; applyCount.setAttribute('aria-hidden','true');
             apply.append(createPartsAiActionIcon('search'),createPartsAiActionIcon('spinner'),applyLabel,applyCount);
-            actions.append(counter,all,clear,apply); body.appendChild(actions); panel.appendChild(body);
+            actions.append(counter,all,clear,apply); body.appendChild(actions);
+            partsLearning.feedback(body,state.learning,()=>[...new Set(partsAiSelectableCandidates(state).filter((_,index)=>state.draft.has(index)).flatMap(partsAiCandidateNames))],async()=>{
+                const drafts=await partsLearning.clarify([state.criteria.query],state.criteria,{previous:[state.learning],isCurrent:()=>currentPartsAiState(ticket)===state});
+                if(drafts&&currentPartsAiState(ticket)===state) await window.runPartsAiSearch({learningDraft:drafts[0]});
+            },()=>currentPartsAiState(ticket)===state&&!state.loading,{onNoMatch:()=>selectAllPartsAiCandidates(ticket,false),onBusy:busy=>{state.confirming=busy;updatePartsAiSelectionUI();}});
+            panel.appendChild(body);
             state.controls = { body, toggle, toggleLabel, summary, heading, counter, apply, applyLabel, applyCount, all, clear, inputs };
             revealPartsElement(panel, 0, 4, 220);
             updatePartsAiSelectionUI();
         }
-        window.runPartsAiSearch = async function() {
+        window.runPartsAiSearch = async function(options = {}) {
             if (PARTS_BATCH_MODE) return runPartsBatchSearch();
             if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts','view')) {
                 setPartsAiStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.','error'); return;
             }
-            const criteria = getPartsAiCriteria();
+            let criteria = getPartsAiCriteria();
+            if (criteria.query.length > 180) { setPartsAiStatus('Mô tả phụ tùng tối đa 180 ký tự.','error'); return; }
             if (criteria.query.length < 2) { setPartsAiStatus('Nhập tên hoặc mô tả phụ tùng cần tìm.','error'); document.getElementById('searchInput')?.focus(); return; }
             if (!criteria.brand || !criteria.models.length) { setPartsAiStatus('Chọn hãng và ít nhất một dòng xe trước khi tìm bằng AI.','error'); return; }
+            if(partsLearning.isPreparing() || PARTS_AI_STATE?.confirming)return;
+            const originalKey=JSON.stringify({...criteria,uid:auth.currentUser?.uid}),originalOwner=auth.currentUser?.uid;
+            const drafts=options.learningDraft?[options.learningDraft]:await partsLearning.clarify([criteria.query],criteria,{isCurrent:()=>JSON.stringify({...getPartsAiCriteria(),uid:auth.currentUser?.uid})===originalKey});
+            if(!drafts||auth.currentUser?.uid!==originalOwner)return;
+            criteria=getPartsAiCriteria();
+            if(criteria.query!==drafts[0].originalQuery)return;
+            const searchCriteria={...criteria,query:drafts[0].resolvedQuery};
             resetPartsAiSearch();
             const ticket = PARTS_AI_REVISION, scope = partsAiScopeKey(criteria);
-            PARTS_AI_STATE = { criteria, scope, candidates: [], draft: new Set(), loading: false, controller: new AbortController() };
+            PARTS_AI_STATE = { criteria, scope, learning:drafts[0], candidates: [], draft: new Set(), loading: false, controller: new AbortController() };
             const isCurrent = () => ticket === PARTS_AI_REVISION && scope === partsAiScopeKey() && criteria.query === getPartsAiCriteria().query;
             setPartsAiBusy(true); setPartsAiStatus('Đang hiểu tên phụ tùng và đối chiếu với kho của xe đã chọn...');
             try {
-                const data = await requestPartsAiSearch(criteria, { signal: PARTS_AI_STATE.controller.signal });
+                const data = await requestPartsAiSearch(searchCriteria, { signal: PARTS_AI_STATE.controller.signal });
                 if (!isCurrent()) { if (ticket === PARTS_AI_REVISION) resetPartsAiSearch(); return; }
                 if (typeof data?.error === 'string' && !Array.isArray(data?.candidates)) throw new Error(data.error);
                 if (!Array.isArray(data?.candidates)) throw new Error('Dịch vụ AI trả về dữ liệu chưa hợp lệ. Hãy thử lại hoặc dùng tìm kiếm thường.');
                 setPartsAiStatus('AI đang kiểm tra loại chi tiết và vị trí của các tên gợi ý…');
-                const refined = await refinePartsAiCandidates(criteria, data?.candidates, { signal: PARTS_AI_STATE.controller.signal, isCurrent });
+                const refined = partsLearning.assess(drafts[0],await refinePartsAiCandidates(searchCriteria, data?.candidates, { signal: PARTS_AI_STATE.controller.signal, isCurrent }));
                 if (!isCurrent()) return;
                 PARTS_AI_STATE.candidates = refined.candidates;
                 PARTS_AI_STATE.relatedCandidates = refined.relatedCandidates;
-                PARTS_AI_STATE.draft = suggestPartsAiDraft(refined.candidates, criteria.query);
+                PARTS_AI_STATE.draft = suggestPartsAiDraft(refined.candidates, searchCriteria.query);
+                await partsLearning.ready(drafts[0],refined);
+                if(!isCurrent())return;
                 renderPartsAiCandidates({ ...data, ...refined },ticket);
                 setPartsAiStatus('');
             } catch (error) {
-                if (isCurrent()) setPartsAiStatus(error.message || 'Không kết nối được AI đã chọn. Hãy thử lại sau.','error');
+                if (isCurrent()) { await partsLearning.fail(drafts[0]); setPartsAiStatus(error.message || 'Không kết nối được AI đã chọn. Hãy thử lại sau.','error'); }
             } finally { if (ticket === PARTS_AI_REVISION) setPartsAiBusy(false); }
         };
         // PARTS_AI_SEARCH_END
@@ -4135,19 +4162,20 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 while (cursor < state.groups.length && isCurrentPartsBatchState(state)) {
                     const index = cursor++, group = state.groups[index];
                     const ownNames = new Set((group.rawCandidates || []).map(candidate => candidate.name));
+                    if(group.learning && partsLearning.hasMissing(group.learning))continue;
                     const currentNames = new Set(group.candidates.map(candidate => candidate.name));
-                    const queryTokens = normalizePartsCandidateText(group.term).split(' ').filter(Boolean);
-                    const family = getPartsCandidateFamily(group.term);
+                    const queryTokens = normalizePartsCandidateText(partsBatchResolvedTerm(group)).split(' ').filter(Boolean);
+                    const family = getPartsCandidateFamily(partsBatchResolvedTerm(group));
                     const ranked = [...pool.values()].filter(candidate => !ownNames.has(candidate.name) && !currentNames.has(candidate.name)).map(candidate => {
-                        const guard = getPartsCandidateRelevance(group.term, candidate.name);
+                        const guard = getPartsCandidateRelevance(partsBatchResolvedTerm(group), candidate.name);
                         const tokens = new Set(normalizePartsCandidateText(candidate.name).split(' '));
                         const shared = queryTokens.filter(token => tokens.has(token)).length;
                         const sameFamily = !!family && family === getPartsCandidateFamily(candidate.name);
                         const strong = !!guard.verified || sameFamily && shared === queryTokens.length;
-                        return { candidate, guard, strong, sameFamily, route: canRoutePartsCandidate(group.term,candidate.name), rank: guard.exact ? 0 : strong ? 1 : sameFamily ? 2 : shared ? 3 : 4 };
+                        return { candidate, guard, strong, sameFamily, route: canRoutePartsCandidate(partsBatchResolvedTerm(group),candidate.name), rank: guard.exact ? 0 : strong ? 1 : sameFamily ? 2 : shared ? 3 : 4 };
                     }).filter(item => item.route && item.guard.relation !== 'related_part').sort((a, b) => a.rank - b.rank).slice(0, Math.max(0, 12 - group.candidates.length));
                     if (!ranked.length) continue;
-                    const criteria = { query: group.term, brand: state.criteria.brand, models: [...state.criteria.models], years: state.criteria.years.map(Number), kind: state.criteria.kind };
+                    const criteria = { query: partsBatchResolvedTerm(group), brand: state.criteria.brand, models: [...state.criteria.models], years: state.criteria.years.map(Number), kind: state.criteria.kind };
                     // Re-evaluate foreign suggestions against this request, without reusing another group's warnings.
                     const refined = await refinePartsAiCandidates(criteria, ranked.map(item => ({ ...item.candidate, review_reasons: [] })), { signal: state.controller.signal, isCurrent: () => isCurrentPartsBatchState(state) });
                     if (!isCurrentPartsBatchState(state)) return;
@@ -4161,7 +4189,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                         currentNames.add(candidate.name);
                         group.candidates.push(candidate);
                     });
-                    if (added.length && group.aiStatus === 'error') { group.aiStatus = 'ready'; group.aiError = ''; group.normalizedName = group.term; }
+                    if (added.length && group.aiStatus === 'error') { group.aiStatus = 'ready'; group.aiError = ''; group.normalizedName = partsBatchResolvedTerm(group); }
                     if (added.length && refined.validationNotice) group.validationNotice = refined.validationNotice;
                 }
             };
@@ -4178,7 +4206,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     // Preserve a user's explicit related-part choice when suggestions are routed again.
                     group.relatedCandidates = (group.relatedCandidates || []).filter(candidate => partsAiCandidateNames(candidate).some(name => previousNames.has(name)) || ![...(owners.get(candidate.name) || [])].some(owner => owner !== index));
                     group.selected = new Set(partsAiSelectableCandidates(group).map((candidate, candidateIndex) => partsAiCandidateNames(candidate).some(name => previousNames.has(name)) ? candidateIndex : -1).filter(candidateIndex => candidateIndex >= 0));
-                    if (!group.selected.size && !group.selectionTouched) group.selected = suggestPartsAiDraft(group.candidates, group.term);
+                    if (!group.selected.size && !group.selectionTouched) group.selected = suggestPartsAiDraft(group.candidates, partsBatchResolvedTerm(group));
                 });
             } catch (error) {
                 if (isCurrentPartsBatchState(state) && error?.name !== 'AbortError') state.groups.forEach(group => { group.validationNotice = 'Chưa hoàn tất đối chiếu chung giữa các nhóm. Có thể phân tích lại danh sách bằng AI để bổ sung gợi ý.'; });
@@ -4201,13 +4229,13 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 if (stat) stat.textContent = state.aiBusy ? 'AI đang phân tích ' + state.groups.length + ' nhóm' : 'AI đã phân tích ' + ready + '/' + state.groups.length + ' nhóm';
             }
             if (apply) {
-                apply.disabled = state.stale || state.aiBusy || state.routingBusy || state.priceBusy || state.groups.some(group => group.aiRequesting) || !selectedNames;
+                apply.disabled = state.stale || state.aiBusy || state.routingBusy || state.priceBusy || state.groups.some(group => group.aiRequesting || group.confirming) || !selectedNames;
                 apply.textContent = state.priceBusy ? 'Đang tải báo giá…' : 'Xem báo giá đã chọn' + (selectedNames ? ' · ' + selectedNames : '');
             }
             state.groups.forEach(group => {
                 if (group.selectionLabel) group.selectionLabel.textContent = group.aiStatus === 'ready' ? group.selected.size + '/' + partsAiSelectableCandidates(group).length + ' tên đã chọn' : group.aiStatus === 'error' ? 'AI chưa hoàn tất' : 'Đang phân tích';
-                group.choiceInputs?.forEach(input => { input.disabled = state.stale || state.aiBusy || state.routingBusy || state.priceBusy || group.aiRequesting; });
-                if (group.aiRetryButton) group.aiRetryButton.disabled = state.stale || state.aiBusy || state.routingBusy || state.priceBusy || group.aiStatus === 'loading';
+                group.choiceInputs?.forEach(input => { input.disabled = state.stale || state.aiBusy || state.routingBusy || state.priceBusy || group.aiRequesting || group.confirming; });
+                if (group.aiRetryButton) group.aiRetryButton.disabled = state.stale || state.aiBusy || state.routingBusy || state.priceBusy || group.aiStatus === 'loading' || group.confirming;
             });
             if (!state.stale && !state.aiBusy && !state.routingBusy && !state.priceBusy && state.phase === 'review') {
                 setPartsBatchStatus(selectedNames ? 'Đã chọn ' + selectedNames + ' tên kho cho ' + selectedGroups + '/' + state.groups.length + ' nhóm. Bấm Xem báo giá đã chọn để tra cứu.'
@@ -4217,9 +4245,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         function changePartsBatchAiChoice(state, index, candidateIndex, checked) {
             if (!isCurrentPartsBatchState(state) || state.aiBusy || state.routingBusy || state.priceBusy) return;
             const group = state.groups[index];
-            if (!group || group.aiRequesting || group.aiStatus !== 'ready' || !partsAiSelectableCandidates(group)[candidateIndex]) return;
+            if (!group || group.aiRequesting || group.confirming || group.aiStatus !== 'ready' || !partsAiSelectableCandidates(group)[candidateIndex]) return;
             group.selectionTouched = true;
             if (checked) group.selected.add(candidateIndex); else group.selected.delete(candidateIndex);
+            void partsLearning.selection(group.learning,getPartsBatchSelectedNames(group));
             if (state.phase === 'results') {
                 state.selectionDirty = true;
                 window.resetPartsPriceReview?.();
@@ -4274,7 +4303,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     const text = document.createElement('span'); text.className = 'parts-batch-ai-choice-text';
                     const head = document.createElement('span'); head.className = 'parts-ai-option-head';
                     const name = document.createElement('strong'); name.textContent = candidate.name;
-                    const match = partsAiMatchLabel(candidate, group.term);
+                    const match = partsAiMatchLabel(candidate, partsBatchResolvedTerm(group));
                     const badge = document.createElement('span'); badge.className = 'parts-ai-badge'; badge.dataset.tone = match.tone; badge.textContent = match.text;
                     head.append(name, badge);
                     const meta = document.createElement('small');
@@ -4295,16 +4324,29 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     registerInput: ({ input }) => group.choiceInputs.push(input)
                 }); if (related) content.appendChild(related);
             }
+            if(group.aiStatus==='ready') partsLearning.feedback(content,group.learning,()=>getPartsBatchSelectedNames(group),()=>editPartsBatchLearning(state,index),()=>isCurrentPartsBatchState(state)&&!group.aiRequesting&&!state.aiBusy&&!state.routingBusy&&!state.priceBusy,{
+                onNoMatch:()=>{group.selectionTouched=true;for(const selectedIndex of [...group.selected])changePartsBatchAiChoice(state,index,selectedIndex,false);},
+                onBusy:busy=>{group.confirming=busy;updatePartsBatchAiControls(state);}
+            });
             group.aiCard.appendChild(content);
             updatePartsBatchAiControls(state);
         }
+        function partsBatchResolvedTerm(group) { return group.learning?.resolvedQuery || group.term; }
+        async function editPartsBatchLearning(state,index) {
+            const group=state.groups[index];
+            if(!isCurrentPartsBatchState(state)||state.aiBusy||state.routingBusy||state.priceBusy||group.aiRequesting||group.confirming)return;
+            const drafts=await partsLearning.clarify([group.term],state.criteria,{source:'batch',previous:[group.learning],isCurrent:()=>isCurrentPartsBatchState(state)});
+            if(!drafts||!isCurrentPartsBatchState(state))return;
+            group.learning=drafts[0];state.selectionDirty=true;window.resetPartsPriceReview?.();
+            await analysePartsBatchAiGroup(state,index);
+        }
         async function analysePartsBatchAiGroup(state, index) {
             if (!isCurrentPartsBatchState(state)) return;
-            const group = state.groups[index]; if (!group || group.aiRequesting || state.routingBusy || state.priceBusy) return;
+            const group = state.groups[index]; if (!group || group.aiRequesting || group.confirming || state.routingBusy || state.priceBusy) return;
             group.aiRequesting = true; group.aiStatus = 'loading'; group.aiError = ''; group.selectionTouched = false; group.selected.clear(); group.relatedCandidates = []; group.validationNotice = '';
             renderPartsBatchAiGroup(state, index);
             try {
-                const criteria = { query: group.term, brand: state.criteria.brand, models: [...state.criteria.models], years: state.criteria.years.map(Number), kind: state.criteria.kind };
+                const criteria = { query: partsBatchResolvedTerm(group), brand: state.criteria.brand, models: [...state.criteria.models], years: state.criteria.years.map(Number), kind: state.criteria.kind };
                 // Use the same authenticated warehouse-aware AI service as the single-part AI search.
                 const data = await requestPartsAiSearch(criteria, { signal: state.controller.signal });
                 if (!isCurrentPartsBatchState(state)) return;
@@ -4316,20 +4358,26 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     seen.add(candidate.name); return true;
                 }).slice(0, 12);
                 group.rawCandidates = group.candidates.map(candidate => ({ ...candidate }));
-                const refined = await refinePartsAiCandidates(criteria, group.rawCandidates, { signal: state.controller.signal, isCurrent: () => isCurrentPartsBatchState(state) });
+                const refined = partsLearning.assess(group.learning,await refinePartsAiCandidates(criteria, group.rawCandidates, { signal: state.controller.signal, isCurrent: () => isCurrentPartsBatchState(state) }));
                 if (!isCurrentPartsBatchState(state)) return;
                 group.candidates = refined.candidates; group.relatedCandidates = refined.relatedCandidates; group.validationNotice = refined.validationNotice;
-                group.selected = suggestPartsAiDraft(group.candidates, group.term);
+                group.selected = suggestPartsAiDraft(group.candidates, partsBatchResolvedTerm(group));
+                await partsLearning.ready(group.learning,refined);
+                if(!isCurrentPartsBatchState(state))return;
                 group.normalizedName = typeof data.normalized_name === 'string' ? data.normalized_name : group.term;
                 group.clarification = typeof data.clarification === 'string' ? data.clarification : '';
                 group.aiStatus = 'ready';
             } catch (error) {
                 if (!isCurrentPartsBatchState(state)) return;
+                await partsLearning.fail(group.learning);
                 group.aiStatus = 'error'; group.candidates = []; group.aiError = String(error.message || 'Không phân tích được bằng AI.').slice(0, 240);
             } finally {
                 group.aiRequesting = false;
                 if (isCurrentPartsBatchState(state)) {
-                    if (!state.aiBusy && !state.groups.some(entry => entry.aiRequesting)) await reconcilePartsBatchCandidates(state);
+                    if (!state.aiBusy && !state.groups.some(entry => entry.aiRequesting)) {
+                        await reconcilePartsBatchCandidates(state);
+                        if(isCurrentPartsBatchState(state)) await Promise.all(state.groups.filter(entry=>entry.aiStatus==='ready').map(entry=>partsLearning.ready(entry.learning,{candidates:entry.candidates,relatedCandidates:entry.relatedCandidates})));
+                    }
                     if (!isCurrentPartsBatchState(state)) return;
                     renderPartsBatchAiGroup(state, index);
                     const done = state.groups.filter(entry => ['ready', 'error'].includes(entry.aiStatus)).length;
@@ -4339,9 +4387,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         }
         window.applyPartsBatchAiSelection = async function(options = {}) {
             const state = PARTS_BATCH_STATE;
-            if (!isCurrentPartsBatchState(state) || state.aiBusy || state.routingBusy || state.priceBusy || state.groups.some(group => group.aiRequesting)) { markPartsBatchCriteriaChanged(); return false; }
+            if (!isCurrentPartsBatchState(state) || state.aiBusy || state.routingBusy || state.priceBusy || state.groups.some(group => group.aiRequesting || group.confirming)) { markPartsBatchCriteriaChanged(); return false; }
             const selected = state.groups.map(getPartsBatchSelectedNames);
             if (!selected.some(names => names.length)) { setPartsBatchStatus('Chọn ít nhất một tên kho do AI gợi ý trước khi xem báo giá.', true); return false; }
+            state.groups.forEach((group,index)=>{void partsLearning.selection(group.learning,selected[index]);});
             setPartsBatchComposerCollapsed(false);
             window.resetPartsPriceReview?.();
             state.controller.abort(); state.controller = new AbortController();
@@ -4516,12 +4565,17 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 criteria = getPartsBatchCriteria(terms);
                 if (!criteria.brand || !criteria.models.length) throw new Error('Chọn hãng và ít nhất một dòng xe trước khi phân tích danh sách bằng AI.');
             } catch (error) { setPartsBatchStatus(error.message, true); return false; }
+            if(partsLearning.isPreparing() || PARTS_BATCH_STATE?.groups.some(group=>group.confirming))return false;
+            const learningKey=JSON.stringify(criteria),learningOwner=auth.currentUser?.uid;
+            const learningDrafts=await partsLearning.clarify(terms,criteria,{source:'batch',isCurrent:()=>JSON.stringify(getPartsBatchCriteria())===learningKey});
+            if(!learningDrafts||auth.currentUser?.uid!==learningOwner)return false;
+            criteria=getPartsBatchCriteria(terms);
             if (!PARTS_BATCH_MODE) window.setPartsBatchMode(true, { focus: false, render: false });
             clearPartsBatchResults(); window.resetPartsAiSearch?.();
             const aiButton = document.getElementById('btnPartsAiSearch'); if (aiButton) aiButton.disabled = true;
             EXACT_SOURCE_CONTEXT = null;
             const state = { revision: ++PARTS_DATA_SEARCH_REVISION, criteria, key: JSON.stringify(criteria), controller: new AbortController(), stale: false, phase: 'analysing', aiBusy: true, priceBusy: false, selectionDirty: false,
-                groups: terms.map(term => ({ term, items: [], pages: new Map(), page: 1, total: null, loading: false, requesting: false, request: 0, error: null, body: null,
+                groups: terms.map((term,index) => ({ term, learning:learningDrafts[index], items: [], pages: new Map(), page: 1, total: null, loading: false, requesting: false, request: 0, error: null, body: null,
                     aiStatus: 'pending', aiRequesting: false, candidates: [], selected: new Set(), appliedNames: [], aiError: '', aiCard: null })) };
             PARTS_BATCH_STATE = state;
             document.getElementById('loadingIndicator')?.classList.add('hidden');
@@ -4541,6 +4595,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             if (!isCurrentPartsBatchState(state)) { if (state === PARTS_BATCH_STATE) markPartsBatchCriteriaChanged(); return false; }
             await reconcilePartsBatchCandidates(state);
             if (!isCurrentPartsBatchState(state)) return false;
+            await Promise.all(state.groups.filter(group=>group.aiStatus==='ready').map(group=>partsLearning.ready(group.learning,{candidates:group.candidates,relatedCandidates:group.relatedCandidates})));
+            if(!isCurrentPartsBatchState(state))return false;
             state.aiBusy = false; state.phase = 'review'; setPartsBatchBusy(false); updatePartsBatchAiControls(state);
             if (!state.groups.some(group => group.aiStatus === 'ready')) setPartsBatchStatus('AI chưa phân tích được danh sách. Hãy kiểm tra Cài đặt AI hoặc thử lại từng mục.', true);
             return state.groups.some(group => group.aiStatus === 'ready');
@@ -10267,6 +10323,8 @@ window.searchData = async function(options = {}) {
     const nams = Array.from(document.querySelectorAll('input[name="nam_sx"]:checked')).map(cb => cb.value);
     const type = document.getElementById('filterType').value;
     const search = document.getElementById('searchInput').value.toLowerCase().trim();
+    const learningManualOwner=auth.currentUser?.uid;
+    const learningManualKey=JSON.stringify(getPartsAiCriteria());
     const exactPartName = document.getElementById('exactPartName')?.value === '1';
     const aiWarehouseNames = exactPartName ? getSelectedPartsAiNames() : [];
     const aiNameSet = new Set(aiWarehouseNames);
@@ -10318,6 +10376,9 @@ window.searchData = async function(options = {}) {
         document.getElementById('statCount').innerText = MASTER_DATA.length + ' kết quả';
         CURRENT_PAGE = 1;
         renderTable();
+        if(!skipLog && !aiWarehouseNames.length && search.length>=2 && learningManualOwner===auth.currentUser?.uid && learningManualKey===JSON.stringify(getPartsAiCriteria())) {
+            await partsLearning.recordManual({...getPartsAiCriteria(),query:search},MASTER_DATA.map(item=>item.ten_phu_tung).filter(Boolean));
+        }
         await recordPartsSearchUsage({ searchDescription, aiWarehouseNames, hang, hieus, nams, exactPartName, skipLog, resultsCount: MASTER_DATA.length });
         return true;
     } catch (e) {
