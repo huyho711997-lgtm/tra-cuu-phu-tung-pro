@@ -258,6 +258,26 @@
 .dark .pk-page .pk-toast { background:rgba(24,40,63,.98); border-color:#36506a; }
 .dark .pk-page .pk-toast-text { color:#c8d8ec; }
 .dark .pk-page .pk-toast-icon { background:#173e35; color:#95d7b9; }
+/* Search overview: clear column contrast and distinct numeric signals. */
+.pk-page .pk-overview-table th { padding:16px 20px; background:#19395f; color:#f2f6ff; font-size:10px; font-weight:800; letter-spacing:.055em; border-bottom:2px solid #316cbb; }
+.pk-page .pk-overview-table th:not(:first-child), .pk-page .pk-overview-table td:not(:first-child) { text-align:center; }
+.pk-page .pk-overview-table td { padding:13px 20px; border-color:#dfe7f2; }
+.pk-page .pk-overview-table tbody tr:nth-child(even) td { background:#f3f7fd; }
+.pk-page .pk-overview-table tbody tr:hover td { background:#e8f1ff; }
+.pk-page .pk-overview-query { color:#19395f; font-size:13px; font-weight:700; }
+.pk-page .pk-overview-count { display:inline-flex; align-items:center; justify-content:center; min-width:36px; min-height:28px; padding:3px 10px; border:1px solid #d7e0eb; border-radius:8px; background:#edf1f6; color:#526176; font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; }
+.pk-page .pk-overview-count[data-tone=blue] { color:#1746a2; background:#e2edff; border-color:#b9cffa; }
+.pk-page .pk-overview-count[data-tone=rose] { color:#b4233e; background:#ffe7ed; border-color:#f4b8c6; }
+.pk-page .pk-overview-count[data-tone=green] { color:#067347; background:#dcf5e9; border-color:#a2ddc0; }
+.dark .pk-page .pk-overview-table th { background:#244b78; color:#f2f6ff; border-color:#548ee2; }
+.dark .pk-page .pk-overview-table td { border-color:#314967; }
+.dark .pk-page .pk-overview-table tbody tr:nth-child(even) td { background:#192d47; }
+.dark .pk-page .pk-overview-table tbody tr:hover td { background:#23436a; }
+.dark .pk-page .pk-overview-query { color:#e4eeff; }
+.dark .pk-page .pk-overview-count { color:#aebed3; background:#20324b; border-color:#3a506f; }
+.dark .pk-page .pk-overview-count[data-tone=blue] { color:#c5dcff; background:#224578; border-color:#4574b3; }
+.dark .pk-page .pk-overview-count[data-tone=rose] { color:#ffc6d2; background:#572a40; border-color:#94516b; }
+.dark .pk-page .pk-overview-count[data-tone=green] { color:#a8edca; background:#164937; border-color:#347b5c; }
 @keyframes pk-spin { to { transform:rotate(360deg); } }
 @keyframes pk-check-in { from { opacity:0; transform:scale(.8); } to { opacity:1; transform:scale(1); } }
 @keyframes pk-toast-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }

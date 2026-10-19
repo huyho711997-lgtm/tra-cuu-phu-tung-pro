@@ -141,7 +141,9 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
     function renderOverview(view,rows){
         view.content.append(node('p','Dùng bảng này để phát hiện từ khóa cần bổ sung kiến thức, ưu tiên các lượt chưa có kết quả hoặc gặp lỗi. Tổng hợp tối đa 500 phiên mới nhất trong bộ lọc.','pk-note'));
         const terms=new Map();for(const row of rows){const key=row.original_query.normalize('NFC').toLowerCase(),item=terms.get(key)||{query:row.original_query,total:0,missing:0,selected:0};item.total++;if(['not_found','error'].includes(row.outcome))item.missing++;if(row.selected_names?.length)item.selected++;terms.set(key,item);}
-        view.content.append(table(['Nội dung tìm kiếm','Số phiên','Chưa có kết quả / gặp lỗi','Phiên có lựa chọn'],[...terms.values()].sort((a,b)=>b.missing-a.missing||b.total-a.total).slice(0,50).map(item=>[item.query,String(item.total),String(item.missing),String(item.selected)])));
+        const count=(value,tone)=>{const cell=node('span',formatNumber(value),'pk-overview-count');cell.dataset.tone=value?tone:'zero';return cell;};
+        const overviewTable=table(['Nội dung tìm kiếm','Số phiên','Chưa có kết quả / gặp lỗi','Phiên có lựa chọn'],[...terms.values()].sort((a,b)=>b.missing-a.missing||b.total-a.total).slice(0,50).map(item=>[node('strong',item.query,'pk-overview-query'),count(item.total,'blue'),count(item.missing,'rose'),count(item.selected,'green')]));
+        overviewTable.classList.add('pk-overview-table');view.content.append(overviewTable);
     }
     function renderSessions(view,rows){
         view.content.append(table(['Tài khoản / thời gian','Yêu cầu tìm kiếm','Phạm vi xe','Kết quả','Chi tiết'],rows.map(row=>{
