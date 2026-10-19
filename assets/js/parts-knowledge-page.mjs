@@ -1,4 +1,5 @@
 const labels={started:'Đã bắt đầu',clarifying:'Bổ sung theo luồng cũ',ready:'Có kết quả',selected:'Có lựa chọn',not_found:'Không có kết quả',error:'Gặp lỗi',abandoned:'Đã hủy',pending:'Chờ duyệt',approved:'Đã duyệt',rejected:'Từ chối',disabled:'Ngừng áp dụng'};
+import {autoReviewKnowledgeRows,knowledgeReviewHint} from './knowledge-automation.mjs';
 const eventLabels={search_started:'Bắt đầu tra cứu',results_ready:'Nhận kết quả',selection_changed:'Thay đổi lựa chọn',results_applied:'Mở kết quả giá',search_failed:'Tra cứu gặp lỗi'};
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const icons={search:'m21 21-4.4-4.4M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0',file:'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5',open:'M15 3h6v6 M10 14 21 3 M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6',empty:'M9 9l6 6 M15 9l-6 6 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',clock:'M12 8v4l3 2 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',check:'m8 12 3 3 5-6 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',refresh:'M20 7v5h-5 M4 17v-5h5 M6 7a7 7 0 0 1 12-2l2 3 M4 16l2 3a7 7 0 0 0 12-2',download:'M12 3v12 m-5-5 5 5 5-5 M4 16v4h16v-4',filter:'M4 7h16 M7 12h10 M10 17h4',shield:'M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z m-4 9 3 3 5-6'};
@@ -114,7 +115,13 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
             setButtonLabel(view.nextButton,'Mở gợi ý chờ duyệt');
         }
         if(rows.error){view.status.textContent='Chưa tải được dữ liệu. Kiểm tra kết nối và bấm Làm mới.';view.total.textContent='Chưa tải được';view.content.replaceChildren(node('div','Chưa tải được danh sách. Bấm Làm mới để thử lại.','pk-empty'));view.pagination.replaceChildren();view.loading=false;view.content.classList.remove('is-loading');view.content.removeAttribute('inert');view.content.style.minHeight='';return;}
-        view.rows=rows.data || [];view.count=rows.count || 0;
+        let automated={rows:rows.data || [],reviewed:0,error:false};
+        if(view.mode==='pending'){
+            view.status.textContent='Đang đối chiếu tự động các tên tương đương và quy tắc đã duyệt…';
+            automated=await autoReviewKnowledgeRows({supabase,rows:automated.rows,signal:AbortSignal.any([signal,AbortSignal.timeout(15000)]),isCurrent:current});
+            if(!current())return;
+        }
+        view.rows=automated.rows;view.count=Math.max(0,(rows.count || 0)-automated.reviewed);
         if(isKnowledge(view)&&view.offset>0&&view.offset>=view.count){view.offset=Math.max(0,view.count-25);return load();}
         if(!isKnowledge(view)&&view.mode!=='overview'&&view.page>0&&view.page*25>=view.count){view.page=Math.max(0,Math.ceil(view.count/25)-1);return load();}
         setButtonLabel(view.export,view.mode==='overview'?'Xuất mẫu phiên':'Xuất trang hiện tại');
@@ -127,7 +134,8 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         if(!view.rows.length)view.content.append(node('div',view.mode==='pending'?'Chưa có gợi ý chờ duyệt trong bộ lọc. Gợi ý được tạo khi người dùng mở kết quả tra cứu có hãng và dòng xe.':view.mode==='approved'?'Chưa có kiến thức đã duyệt trong bộ lọc. Mở Gợi ý chờ duyệt để kiểm tra và duyệt tên đúng.':'Không có dữ liệu phù hợp với bộ lọc.','pk-empty'));
         view.loading=false;view.content.classList.remove('is-loading');view.content.removeAttribute('inert');view.content.style.minHeight='';renderPagination(view);
         view.export.disabled=!view.rows.length;
-        view.status.textContent=(overview.error?'Chưa tải được chỉ số tổng hợp. ':'')+'Cập nhật lúc '+new Date().toLocaleTimeString('vi-VN')+'. Chỉ số tổng hợp dựa trên phiên tạo trong khoảng ngày đã chọn.';
+        view.status.textContent=(automated.reviewed?'Đã tự duyệt '+formatNumber(automated.reviewed)+' mục đủ điều kiện. ':'')+(automated.error?'Chưa nhận được kết quả tự động; bấm Làm mới để kiểm tra trạng thái. ':'')+(overview.error?'Chưa tải được chỉ số tổng hợp. ':'')+'Cập nhật lúc '+new Date().toLocaleTimeString('vi-VN')+'. Chỉ số tổng hợp dựa trên phiên tạo trong khoảng ngày đã chọn.';
+        if(automated.reviewed)refreshMetrics(view,view.status.textContent);
         return ticket;
     }
     function renderOverview(view,rows){
@@ -150,7 +158,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         })));
     }
     function renderKnowledge(view,rows){
-        view.content.append(node('p',view.mode==='pending'?'Đúng tên và phạm vi xe: bấm Duyệt. Có thể chọn nhiều dòng để duyệt cùng lúc. Chỉnh sửa và xem nguồn khi cần.':view.mode==='approved'?'Các tên gọi này được dùng lại trong tra cứu bằng AI khi trùng từ khóa và toàn bộ bộ lọc xe, đồng thời tên còn trong kho.':'Các kiến thức tại đây không được dùng trong tra cứu. Bạn có thể chỉnh sửa hoặc duyệt lại.','pk-note'));
+        view.content.append(node('p',view.mode==='pending'?'Các mục đủ điều kiện đã được máy chủ tự xử lý. Tên gọi mới chỉ là đề xuất chạy thử; kiểm tra rồi Duyệt nếu đúng. Có thể chọn nhiều dòng để duyệt cùng lúc.':view.mode==='approved'?'Các tên gọi này được dùng lại trong tra cứu bằng AI khi trùng từ khóa và toàn bộ bộ lọc xe, đồng thời tên còn trong kho. Nhãn Tự duyệt cho biết lý do xử lý.':'Các kiến thức tại đây không được dùng trong tra cứu. Bạn có thể chỉnh sửa hoặc duyệt lại.','pk-note'));
         const selected=new Map(),checks=new Map(),entries=new Map(),all=node('input'),selectionCount=node('span','Chọn gợi ý để duyệt cùng lúc','pk-selection-count'),bulk=btn('Duyệt đã chọn',()=>changeStatus([...selected.values()],'approved'),true,'check');let selectionBar=null;all.type='checkbox';all.setAttribute('aria-label','Chọn tất cả gợi ý chưa xử lý trên trang này');bulk.disabled=true;
         function syncSelection(){
             const eligible=rows.filter(row=>row.status===view.mode&&!view.busyRows.has(row.id)),idle=eligible.filter(row=>selected.has(row.id)),saving=view.busyRows.size;
@@ -173,9 +181,9 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         const headers=['Tên gọi → tên kho','Phạm vi xe','Nguồn bằng chứng','Cập nhật','Thao tác'];if(view.mode==='pending')headers.unshift('Chọn');
         view.content.append(table(headers,rows.map(row=>{
             const name=node('div',undefined,'pk-part-mapping'),canonical=node('div',undefined,'pk-canonical-line');canonical.append(icon('arrow'),node('strong',row.canonical_name,'pk-canonical'));name.append(node('span',row.alias,'pk-alias'),canonical,node('small',row.note || '','pk-row-note'));
-            const evidence=node('div');evidence.append(badge(observed(row),row.evidence_type==='observed'?'amber':'blue'),node('small',userName(row.created_by)));
+            const evidence=node('div');evidence.append(badge(observed(row),row.evidence_type==='observed'?'amber':'blue'),node('small',userName(row.created_by)),node('small',knowledgeReviewHint(row),'pk-auto-reason'));
             const actions=node('div',undefined,'pk-row-actions pk-knowledge-actions'),vehicle=vehicleChips(row),updated=node('span',date(row.updated_at)),actionCell=node('div'),feedback=node('span','','pk-row-feedback');fillActions(row,actions);actionCell.append(actions,feedback);
-            entries.set(row.id,{row,name,vehicle,updated,actions,feedback});
+            entries.set(row.id,{row,name,vehicle,evidence,updated,actions,feedback});
             const cells=[name,vehicle,evidence,updated,actionCell];
             if(view.mode==='pending'){const check=node('input');check.type='checkbox';check.className='pk-row-check';check.setAttribute('aria-label','Chọn gợi ý '+row.alias+' → '+row.canonical_name+' · '+scope(row));check.addEventListener('change',()=>{if(check.checked)selected.set(row.id,row);else selected.delete(row.id);syncSelection();});checks.set(row.id,check);cells.unshift(check);}
             return cells;
@@ -197,6 +205,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
             Object.assign(row,updated);const matches=row.status===view.mode;
             if(wasCurrent!==matches)view.count=Math.max(0,view.count+(matches?1:-1));
             entry.name.querySelector('.pk-alias').textContent=row.alias;entry.name.querySelector('.pk-canonical').textContent=row.canonical_name;entry.name.querySelector('small').textContent=row.note || '';entry.vehicle.replaceChildren(...vehicleChips(row).childNodes);entry.updated.textContent=date(row.updated_at);entry.feedback.textContent='';fillActions(row,entry.actions);
+            entry.evidence.replaceChildren(badge(observed(row),row.evidence_type==='observed'?'amber':'blue'),node('small',userName(row.created_by)),node('small',knowledgeReviewHint(row),'pk-auto-reason'));
             tr?.classList.toggle('pk-row-processed',!matches);if(tr)tr.dataset.status=row.status;
             if(!matches){selected.delete(row.id);const check=checks.get(row.id);if(check)check.checked=false;}
             syncSelection();view.total.textContent=formatNumber(view.count)+' bản ghi';renderPagination(view);
@@ -213,7 +222,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         const current=()=>writeToken===token&&allowed()&&owner===actor&&state===view;let saved=0,failed=0;
         for(let index=0;index<rows.length&&current();index+=3){
             await Promise.allSettled(rows.slice(index,index+3).map(async row=>{
-                let result;try{result=await supabase.from('parts_search_knowledge').update({status}).eq('id',row.id).eq('status',row.status).eq('updated_at',row.updated_at).select('*').abortSignal(AbortSignal.timeout(15000));}catch{result={error:true};}
+                let result;try{result=await supabase.from('parts_search_knowledge').update({status,...(status==='approved'?{review_method:'manual',review_reason:'',inherited_from:null}:{})}).eq('id',row.id).eq('status',row.status).eq('updated_at',row.updated_at).select('*').abortSignal(AbortSignal.timeout(15000));}catch{result={error:true};}
                 if(!current())return;
                 view.setKnowledgeBusy?.([row.id],false);
                 if(!result.error&&result.data?.length===1){const position=window.scrollY;view.applyKnowledgeChange?.(result.data[0]);window.scrollTo({top:position,behavior:'instant'});saved++;}
@@ -247,12 +256,15 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
     async function knowledgeEvidence(row){
         if(!allowed())return;const actor=owner,view=dialog('Bằng chứng & lịch sử kiến thức');
         view.body.append(node('p',observed(row),'pk-note'),node('h3',row.alias+' → '+row.canonical_name),node('p',scope(row),'pl-muted'));
+        view.body.append(node('p',knowledgeReviewHint(row),'pk-note'));
+        if(row.review_reason)view.body.append(node('p',row.review_reason));
+        if(row.inherited_from)view.body.append(node('p','Mã quy tắc nguồn: '+row.inherited_from,'pl-muted'));
         if(row.session_id)view.body.append(btn('Xem phiên và thao tác nguồn',()=>sessionDetail(row.session_id)));
         const {data,error}=await supabase.from('parts_search_knowledge_audit').select('*').eq('knowledge_id',row.id).order('created_at',{ascending:false}).limit(50);
         if(!allowed()||owner!==actor||!view.dialog.open)return;
         if(error){view.status.textContent='Chưa tải được lịch sử duyệt.';return;}
         view.body.append(node('p','50 thay đổi gần nhất.','pl-muted'));
-        for(const change of data || []){const card=node('article',undefined,'pl-card'),after=change.after_data,before=change.before_data;card.append(node('h3',(change.action==='proposed'?'Tạo gợi ý':labels[change.action] || change.action)+' · '+date(change.created_at)),node('p','Người thực hiện: '+userName(change.actor_id)));if(before)card.append(node('p','Trước: '+before.alias+' → '+before.canonical_name+' · '+scope(before)));card.append(node('p','Sau: '+after.alias+' → '+after.canonical_name+' · '+scope(after)),node('p',after.note || 'Chưa có ghi chú'));view.body.append(card);}
+        for(const change of data || []){const card=node('article',undefined,'pl-card'),after=change.after_data,before=change.before_data;card.append(node('h3',(change.action==='proposed'?'Tạo gợi ý':labels[change.action] || change.action)+' · '+date(change.created_at)),node('p','Người thực hiện: '+userName(change.actor_id)));if(before)card.append(node('p','Trước: '+before.alias+' → '+before.canonical_name+' · '+scope(before)));card.append(node('p','Sau: '+after.alias+' → '+after.canonical_name+' · '+scope(after)),node('p',after.review_reason || after.note || 'Chưa có ghi chú'));view.body.append(card);}
     }
     function review(row){
         if(!allowed()||state?.loading||state?.busyRows.has(row.id))return;const actor=owner,view=state,openedVersion=version,form=dialog('Chỉnh sửa kiến thức tìm kiếm'),fields={};
@@ -317,9 +329,10 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         for(const [key,title] of modes){const tab=btn(title,()=>selectMode(key));tab.dataset.mode=key;tab.setAttribute('aria-pressed',String(key==='overview'));tabs.append(tab);}
         const help=node('details',undefined,'pk-help'),steps=node('ol',undefined,'pk-help-steps');help.append(node('summary','Trang này hoạt động thế nào? Xem ví dụ'));
         for(const [title,description] of [['1. Tự động ghi nhận','Lưu từ khóa, bộ lọc xe, tên gợi ý và tên người dùng đã mở. Tab Phiên tra cứu và Thao tác giúp xem lại nguồn.'],['2. Duyệt ngay trên danh sách','Đúng tên và phạm vi xe thì bấm Duyệt, hoặc chọn nhiều dòng rồi Duyệt đã chọn. Mở Chỉnh sửa hoặc Nguồn khi cần xem thêm.'],['3. Dùng lại khi tìm bằng AI','Khi trùng từ khóa và toàn bộ bộ lọc xe, hệ thống đối chiếu tên đã duyệt với kho. Không có kiến thức phù hợp thì tiếp tục gọi AI.']]){const item=node('li');item.append(node('strong',title),node('p',description));steps.append(item);}
-        help.append(steps,node('p','Ví dụ: người dùng tìm “cản trước”, mở tên “CẢN TRƯỚC” trong kho. Hệ thống tạo gợi ý tên gọi → tên kho. Sau khi bạn kiểm tra và duyệt đúng phạm vi xe, lần tìm bằng AI với “cản trước” và cùng bộ lọc sẽ dùng lại tên này nếu vẫn có trong kho. Mở giá chỉ là tín hiệu sử dụng; bạn cần kiểm tra đúng phụ tùng trước khi duyệt.','pk-help-example'));
+        help.append(steps,node('p','Ví dụ: “cản trước” và “CẢN TRƯỚC” là cùng tên, không tạo thêm hàng chờ. Nếu là tên mới như “ba đờ sốc trước”, hệ thống chỉ ghi nhận đề xuất. Sau khi quản trị viên xác nhận đúng tên kho và phạm vi xe, quy tắc mới được dùng lại. Mở giá nhiều lần không tự biến một tên mới thành kiến thức đã duyệt.','pk-help-example'));
         const notice=node('p',undefined,'pk-notice');notice.append(icon('shield'),node('span','Tự động ghi nhận trong phạm vi tra cứu: nội dung tìm, bộ lọc xe, lựa chọn và thao tác mở kết quả. Dữ liệu các tài khoản chỉ dành cho quản trị viên.'));
-        hero.append(header,metrics,nextStep,help,notice);workspace.append(panelHead,tabs,filtersBox,status,content,pagination);host.append(hero,workspace,notification);
+        const automation=node('aside',undefined,'pk-automation');automation.append(badge('Tự động an toàn đang bật','green'),node('p','Tên trùng cách viết không tạo thêm hàng chờ. Khi mở Gợi ý chờ duyệt, mỗi trang tự xử lý tối đa 25 mục trùng tên hoặc kế thừa quy tắc do quản trị viên đã duyệt trong đúng phạm vi xe. Tên mới chỉ được ghi nhận để kiểm tra; không tự duyệt theo số lượt mở giá.'),node('small','Xem nhãn và lý do tại Nguồn & lịch sử. Có thể Ngừng áp dụng mục tự duyệt; thay đổi quy tắc gốc sẽ ngừng các mục kế thừa.'));
+        hero.append(header,metrics,automation,nextStep,help,notice);workspace.append(panelHead,tabs,filtersBox,status,content,pagination);host.append(hero,workspace,notification);
         const actor=owner;
         const {data}=await supabase.from('user_profiles').select('id,full_name,email').order('full_name',{ascending:true}).limit(1000).abortSignal(AbortSignal.timeout(12000));
         if(!allowed()||owner!==actor)return;

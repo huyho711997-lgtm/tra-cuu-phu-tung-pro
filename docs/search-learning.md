@@ -1,5 +1,17 @@
 # Quản lý lịch sử và kiến thức tìm kiếm
 
+## Tự động an toàn
+
+Thao tác mở giá vẫn lưu lịch sử, nhưng nếu tên tìm và tên kho chỉ khác chữ hoa/thường, khoảng trắng hoặc biểu diễn Unicode NFC thì không tạo gợi ý chờ duyệt mới. Không bỏ dấu tiếng Việt, dấu câu, mã phụ tùng hoặc vị trí để suy ra cùng tên. Quy tắc đã tồn tại trong cùng phạm vi không tạo lại hàng chờ; quyết định từ chối/ngừng áp dụng được giữ.
+
+Khi quản trị viên mở **Gợi ý chờ duyệt**, máy chủ tự đánh giá tối đa 25 mục trên trang. Chỉ tự duyệt khi tên tương đương theo quy tắc trên, hoặc trùng một quy tắc **do quản trị viên duyệt thủ công** với cùng tên kho và đúng toàn bộ hãng, tập dòng xe, tập năm và loại hàng. Tên kho phải còn trong dữ liệu đúng bộ lọc. Quyết định từ chối/ngừng áp dụng cùng phạm vi chặn tự duyệt.
+
+Các tên gọi mới vẫn ở trạng thái chờ duyệt, có lý do hoặc nhãn chạy thử; không dùng số lượt mở giá hay kết luận AI làm căn cứ duy nhất để tự duyệt. Không gọi thêm AI để xét duyệt. Nếu chưa nhận được kết quả kiểm tra tự động, giao diện không đánh dấu thành công; bấm Làm mới để đọc trạng thái máy chủ trước khi tiếp tục.
+
+Mục đã xử lý giữ nguyên vị trí trên trang. Nhãn **Tự duyệt · Cùng tên, khác cách viết** hoặc **Tự duyệt · Quy tắc đã xác nhận** phân biệt nguồn quyết định. Mở **Nguồn & lịch sử** để xem `review_method`, lý do, quy tắc nguồn, người thực hiện và thời điểm. Vẫn có nút **Ngừng áp dụng** ở tab Đã duyệt. Khi quy tắc nguồn ngừng áp dụng hoặc thay đổi tên/phạm vi, các quy tắc kế thừa cũng được ngừng áp dụng.
+
+RPC xét duyệt chỉ cho quản trị viên hoạt động, chạy theo quyền người gọi và RLS. Không thêm quyền duyệt cho người dùng tra cứu. Migration: `20261019122606_parts_knowledge_safe_automation.sql`.
+
 ## Trang quản lý riêng
 
 Quản trị viên mở **Công cụ hệ thống → Lịch sử & kiến thức tìm kiếm** hoặc vào **?view=knowledge** sau khi đăng nhập.

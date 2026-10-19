@@ -252,3 +252,6 @@
 .pk-capture-notice { display:block; max-width:100%; font-size:9px; line-height:1.5; color:#a3b5cc; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; }
 .pk-capture-status { display:block; font-size:9px; color:#d6ad6c; line-height:1.5; }
 .pk-capture-status:empty { display:none; }
+.pk-automation{margin:18px 0;padding:16px 18px;border:1px solid #bce0cf;border-radius:14px;background:#f1faf5;color:#285344}
+.pk-automation p{margin:9px 0;font-size:13px;line-height:1.7}.pk-automation small{font-size:12px;color:#4b6b60}.pk-auto-reason{display:block;max-width:280px;margin-top:7px;color:#526879;font-size:11px;line-height:1.6}
+html.dark .pk-automation{background:#112d27;border-color:#2d6251;color:#d8eee4}html.dark .pk-automation small,html.dark .pk-auto-reason{color:#a9c7ba}
