@@ -25,7 +25,9 @@ Việc lưu xếp hàng trong nền; lỗi lưu không ngăn tìm/mở giá. M�
 
 RPC **kgpt_observe_parts_search** ghi thao tác mở giá và tạo gợi ý **pending**, nguồn **observed**, trong cùng transaction. Chỉ chấp nhận tên có trong phiên của người gọi; cần hãng và dòng xe để tạo gợi ý. Chọn checkbox đơn thuần chưa tạo kiến thức áp dụng.
 
-Quản trị viên xem bằng chứng, kiểm tra nghiệp vụ, nhập căn cứ rồi duyệt. Tín hiệu tự động có nhãn riêng với xác nhận theo luồng cũ. Dữ liệu cũ được giữ; RPC xác nhận cũ còn để tương thích, nhưng giao diện mới không gọi luồng đó.
+Quản trị viên bấm **Duyệt** trực tiếp trên dòng, hoặc chọn các gợi ý trong trang rồi **Duyệt đã chọn**. Không mở hộp xác nhận, không yêu cầu ghi chú hay đánh dấu xác nhận nghiệp vụ. **Từ chối** và **Ngừng áp dụng** cũng thao tác trực tiếp trên danh sách. **Nguồn** dùng để xem bằng chứng khi cần; **Chỉnh sửa** cho phép sửa tên/phạm vi, lưu thay đổi hoặc lưu và duyệt, ghi chú không bắt buộc.
+
+Chọn cả trang chỉ gồm các gợi ý đang hiển thị (tối đa 25), không bao gồm các trang khác. Khi lưu, từng bản ghi được kiểm tra phiên bản để tránh ghi đè thay đổi đồng thời; lỗi từng phần được báo rõ. Máy chủ vẫn ghi người duyệt, thời điểm và lịch sử thay đổi. Tín hiệu tự động có nhãn riêng với xác nhận theo luồng cũ. Dữ liệu cũ được giữ; RPC xác nhận cũ còn để tương thích, nhưng giao diện mới không gọi luồng đó.
 
 Chỉ kiến thức **approved** được dùng lại. Hãng, tập dòng xe, tập năm, loại hàng phải trùng phạm vi; tên phải còn trong kho và qua quyền tài khoản tra cứu. Kiểm tra loại chi tiết/vị trí vẫn có hiệu lực. Không có quy tắc phù hợp thì dùng dịch vụ AI hiện có. Tích lũy kiến thức không huấn luyện lại mô hình.
 
