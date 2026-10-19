@@ -1,5 +1,5 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
-        import { createPartsSearchLearning } from "./parts-search-learning.mjs";
+        import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-passive-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
@@ -649,7 +649,7 @@
         let activeAdminTab = 'dashboard';
         let activeMainLookupTab = localStorage.getItem('tasco_main_lookup_tab') || 'parts';
         const requestedMainView = new URLSearchParams(window.location.search).get('view');
-        if (['parts', 'quote', 'paint', 'stats', 'teacher', 'student', 'ranking', 'users', 'feedbacks'].includes(requestedMainView)) activeMainLookupTab = requestedMainView;
+        if (['parts', 'quote', 'paint', 'stats', 'teacher', 'student', 'ranking', 'users', 'feedbacks', 'knowledge'].includes(requestedMainView)) activeMainLookupTab = requestedMainView;
         if (activeMainLookupTab === 'home') activeMainLookupTab = 'parts';
         let ADMIN_USER_CACHE = [];
         let ADMIN_USER_REFRESH_VERSION = 0;
@@ -686,7 +686,7 @@
             if (['paint', 'stats'].includes(page) && action !== 'view') return false;
             if (currentUserProfile.role === 'admin') return true;
             if (page === 'stats') return currentUserProfile.permissions?.stats?.view === true;
-            if (page === 'users') return false;
+            if (page === 'users' || page === 'knowledge') return false;
             if (page === 'ranking') return action === 'view' && (currentUserProfile.permissions?.student?.view === true || currentUserProfile.permissions?.teacher?.view === true);
             return currentUserProfile.permissions?.[page]?.[action] === true;
         }
@@ -1243,7 +1243,7 @@
 
         // CHUYỂN TAB TRA CỨU CHÍNH
         window.switchMainLookupTab = function(tab = 'home', persist = true) {
-            const requestedTab = ['quote', 'parts', 'paint', 'stats', 'teacher', 'student', 'ranking', 'users', 'feedbacks'].includes(tab) ? tab : 'parts';
+            const requestedTab = ['quote', 'parts', 'paint', 'stats', 'teacher', 'student', 'ranking', 'users', 'feedbacks', 'knowledge'].includes(tab) ? tab : 'parts';
             if (requestedTab !== 'student' && window.isStudentQuizInProgress?.()) {
                 customAlert('Bài làm đang diễn ra. Bạn không thể chuyển sang trang khác trước khi nộp bài.', 'warning');
                 return false;
@@ -1299,6 +1299,7 @@
             const isRankingTab = activeMainLookupTab === 'ranking';
             const isUsersTab = activeMainLookupTab === 'users';
             const isFeedbacksTab = activeMainLookupTab === 'feedbacks';
+            const isKnowledgeTab = activeMainLookupTab === 'knowledge';
             const pageContextMap = {
                 stats: { kicker: 'Trung tâm dữ liệu', title: 'Thống kê phụ tùng' },
                 parts: { kicker: 'Tra cứu nghiệp vụ', title: 'Tra cứu theo dòng xe' },
@@ -1308,7 +1309,8 @@
                 student: { kicker: 'Đào tạo nghiệp vụ', title: 'Bài tập của tôi' },
                 ranking: { kicker: 'Đào tạo nghiệp vụ', title: 'Bảng xếp hạng thi đua' },
                 users: { kicker: 'Công cụ hệ thống', title: 'Quản lý người dùng' },
-                feedbacks: { kicker: 'Công cụ hệ thống', title: 'Phản hồi người dùng' }
+                feedbacks: { kicker: 'Công cụ hệ thống', title: 'Phản hồi người dùng' },
+                knowledge: { kicker: 'Công cụ hệ thống', title: 'Lịch sử & kiến thức tìm kiếm' }
             };
             const pageContext = pageContextMap[activeMainLookupTab] || pageContextMap.parts;
             const pageContextKicker = document.getElementById('tiPageContextKicker');
@@ -1334,6 +1336,9 @@
             if (trainingRankingSection) trainingRankingSection.style.display = isRankingTab ? 'block' : 'none';
             if (userManagementSection) userManagementSection.style.display = isUsersTab ? 'block' : 'none';
             if (feedbackManagementSection) feedbackManagementSection.style.display = isFeedbacksTab ? 'block' : 'none';
+            const knowledgeSection=document.getElementById('searchKnowledgeSection');
+            if(knowledgeSection)knowledgeSection.style.display=isKnowledgeTab?'block':'none';
+            if(isKnowledgeTab)void partsLearning.showPage();
             const partsHeroArtwork = searchPanel?.querySelector('.parts-hero-watermark');
             if (partsHeroArtwork) {
                 partsHeroArtwork.classList.remove('parts-hero-animate');
@@ -1387,6 +1392,10 @@
             const trainingRankingSection = document.getElementById('trainingRankingSection');
             const userManagementSection = document.getElementById('userManagementSection');
             const feedbackManagementSection = document.getElementById('feedbackManagementSection');
+            if(view!=='main'){
+                const knowledgeSection=document.getElementById('searchKnowledgeSection');
+                if(knowledgeSection)knowledgeSection.style.display='none';
+            }
             if (view !== 'main') {
                 const statisticsSection = document.getElementById('partsDashboard');
                 if (statisticsSection) statisticsSection.style.display = 'none';
@@ -1532,7 +1541,7 @@
                 if (main) main.style.display = 'block';
                 if (sysMgr) sysMgr.style.display = 'none';
                 if (headerTabs) headerTabs.style.display = 'flex';
-                ['searchPanel', 'dataSection', 'quotePriceSection', 'outsideGarageSection', 'teacherLearningSection', 'studentLearningSection', 'trainingRankingSection', 'userManagementSection', 'feedbackManagementSection'].forEach(id => {
+                ['searchPanel', 'dataSection', 'quotePriceSection', 'outsideGarageSection', 'teacherLearningSection', 'studentLearningSection', 'trainingRankingSection', 'userManagementSection', 'feedbackManagementSection', 'searchKnowledgeSection'].forEach(id => {
                     const section = document.getElementById(id);
                     if (section) section.style.display = 'none';
                 });
@@ -3787,7 +3796,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             if (!state || state.loading || state.confirming) return;
             const names = [...new Set(partsAiSelectableCandidates(state).filter((_,index) => state.draft.has(index)).flatMap(partsAiCandidateNames))];
             if (!names.length) { setPartsAiStatus('Chọn ít nhất một tên phụ tùng trước khi xem kết quả.','error'); return; }
-            void partsLearning.selection(state.learning,names);
+            void partsLearning.selection(state.learning,names,'apply');
             document.getElementById('exactPartName').value = '1';
             document.getElementById('btnExactPartName')?.classList.add('active');
             EXACT_SOURCE_CONTEXT = null;
@@ -3801,6 +3810,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     if (loaded === false) {
                         setPartsAiStatus('Chưa tải được kết quả. Hãy kiểm tra bộ lọc và thử lại.', 'error');
                     } else {
+                        partsLearning.applied(state.learning,names);
                         state.appliedDraft = new Set(state.draft);
                         setPartsAiStatus('');
                         state.loading = false;
@@ -3919,10 +3929,6 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const applyCount = document.createElement('span'); applyCount.className = 'parts-ai-action-count'; applyCount.setAttribute('aria-hidden','true');
             apply.append(createPartsAiActionIcon('search'),createPartsAiActionIcon('spinner'),applyLabel,applyCount);
             actions.append(counter,all,clear,apply); body.appendChild(actions);
-            partsLearning.feedback(body,state.learning,()=>[...new Set(partsAiSelectableCandidates(state).filter((_,index)=>state.draft.has(index)).flatMap(partsAiCandidateNames))],async()=>{
-                const drafts=await partsLearning.clarify([state.criteria.query],state.criteria,{previous:[state.learning],isCurrent:()=>currentPartsAiState(ticket)===state});
-                if(drafts&&currentPartsAiState(ticket)===state) await window.runPartsAiSearch({learningDraft:drafts[0]});
-            },()=>currentPartsAiState(ticket)===state&&!state.loading,{onNoMatch:()=>selectAllPartsAiCandidates(ticket,false),onBusy:busy=>{state.confirming=busy;updatePartsAiSelectionUI();}});
             panel.appendChild(body);
             state.controls = { body, toggle, toggleLabel, summary, heading, counter, apply, applyLabel, applyCount, all, clear, inputs };
             revealPartsElement(panel, 0, 4, 220);
@@ -3937,12 +3943,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             if (criteria.query.length > 180) { setPartsAiStatus('Mô tả phụ tùng tối đa 180 ký tự.','error'); return; }
             if (criteria.query.length < 2) { setPartsAiStatus('Nhập tên hoặc mô tả phụ tùng cần tìm.','error'); document.getElementById('searchInput')?.focus(); return; }
             if (!criteria.brand || !criteria.models.length) { setPartsAiStatus('Chọn hãng và ít nhất một dòng xe trước khi tìm bằng AI.','error'); return; }
-            if(partsLearning.isPreparing() || PARTS_AI_STATE?.confirming)return;
-            const originalKey=JSON.stringify({...criteria,uid:auth.currentUser?.uid}),originalOwner=auth.currentUser?.uid;
-            const drafts=options.learningDraft?[options.learningDraft]:await partsLearning.clarify([criteria.query],criteria,{isCurrent:()=>JSON.stringify({...getPartsAiCriteria(),uid:auth.currentUser?.uid})===originalKey});
-            if(!drafts||auth.currentUser?.uid!==originalOwner)return;
-            criteria=getPartsAiCriteria();
-            if(criteria.query!==drafts[0].originalQuery)return;
+            const drafts=partsLearning.begin([criteria.query],criteria);
+            if(!drafts.length)return;
             const searchCriteria={...criteria,query:drafts[0].resolvedQuery};
             resetPartsAiSearch();
             const ticket = PARTS_AI_REVISION, scope = partsAiScopeKey(criteria);
@@ -4324,22 +4326,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     registerInput: ({ input }) => group.choiceInputs.push(input)
                 }); if (related) content.appendChild(related);
             }
-            if(group.aiStatus==='ready') partsLearning.feedback(content,group.learning,()=>getPartsBatchSelectedNames(group),()=>editPartsBatchLearning(state,index),()=>isCurrentPartsBatchState(state)&&!group.aiRequesting&&!state.aiBusy&&!state.routingBusy&&!state.priceBusy,{
-                onNoMatch:()=>{group.selectionTouched=true;for(const selectedIndex of [...group.selected])changePartsBatchAiChoice(state,index,selectedIndex,false);},
-                onBusy:busy=>{group.confirming=busy;updatePartsBatchAiControls(state);}
-            });
             group.aiCard.appendChild(content);
             updatePartsBatchAiControls(state);
         }
         function partsBatchResolvedTerm(group) { return group.learning?.resolvedQuery || group.term; }
-        async function editPartsBatchLearning(state,index) {
-            const group=state.groups[index];
-            if(!isCurrentPartsBatchState(state)||state.aiBusy||state.routingBusy||state.priceBusy||group.aiRequesting||group.confirming)return;
-            const drafts=await partsLearning.clarify([group.term],state.criteria,{source:'batch',previous:[group.learning],isCurrent:()=>isCurrentPartsBatchState(state)});
-            if(!drafts||!isCurrentPartsBatchState(state))return;
-            group.learning=drafts[0];state.selectionDirty=true;window.resetPartsPriceReview?.();
-            await analysePartsBatchAiGroup(state,index);
-        }
         async function analysePartsBatchAiGroup(state, index) {
             if (!isCurrentPartsBatchState(state)) return;
             const group = state.groups[index]; if (!group || group.aiRequesting || group.confirming || state.routingBusy || state.priceBusy) return;
@@ -4390,7 +4380,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             if (!isCurrentPartsBatchState(state) || state.aiBusy || state.routingBusy || state.priceBusy || state.groups.some(group => group.aiRequesting || group.confirming)) { markPartsBatchCriteriaChanged(); return false; }
             const selected = state.groups.map(getPartsBatchSelectedNames);
             if (!selected.some(names => names.length)) { setPartsBatchStatus('Chọn ít nhất một tên kho do AI gợi ý trước khi xem báo giá.', true); return false; }
-            state.groups.forEach((group,index)=>{void partsLearning.selection(group.learning,selected[index]);});
+            state.groups.forEach((group,index)=>{void partsLearning.selection(group.learning,selected[index],'apply');});
             setPartsBatchComposerCollapsed(false);
             window.resetPartsPriceReview?.();
             state.controller.abort(); state.controller = new AbortController();
@@ -4410,6 +4400,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 if (!isCurrentPartsBatchState(state)) return false;
                 const successful = state.groups.filter(group => group.appliedNames.length && !group.error).length;
                 if (successful) {
+                    if(!options.skipLog) state.groups.filter(group=>group.appliedNames.length&&!group.error).forEach(group=>partsLearning.applied(group.learning,group.appliedNames));
                     revealPartsBatchResults(state);
                     window.startPartsPriceReview?.({ criteria: state.criteria, groups: state.groups.filter(group => group.appliedNames.length).map(group => ({ term: group.term, names: [...group.appliedNames] })), isCurrent: () => isCurrentPartsBatchState(state) && !state.selectionDirty });
                 }
@@ -4565,11 +4556,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 criteria = getPartsBatchCriteria(terms);
                 if (!criteria.brand || !criteria.models.length) throw new Error('Chọn hãng và ít nhất một dòng xe trước khi phân tích danh sách bằng AI.');
             } catch (error) { setPartsBatchStatus(error.message, true); return false; }
-            if(partsLearning.isPreparing() || PARTS_BATCH_STATE?.groups.some(group=>group.confirming))return false;
-            const learningKey=JSON.stringify(criteria),learningOwner=auth.currentUser?.uid;
-            const learningDrafts=await partsLearning.clarify(terms,criteria,{source:'batch',isCurrent:()=>JSON.stringify(getPartsBatchCriteria())===learningKey});
-            if(!learningDrafts||auth.currentUser?.uid!==learningOwner)return false;
-            criteria=getPartsBatchCriteria(terms);
+            const learningDrafts=partsLearning.begin(terms,criteria,{source:'batch'});
+            if(!learningDrafts.length)return false;
             if (!PARTS_BATCH_MODE) window.setPartsBatchMode(true, { focus: false, render: false });
             clearPartsBatchResults(); window.resetPartsAiSearch?.();
             const aiButton = document.getElementById('btnPartsAiSearch'); if (aiButton) aiButton.disabled = true;
@@ -8165,6 +8153,7 @@ ${text}` });
                 </div>
             `).join('');
             openModal('modalDetail');
+            if(activeMainLookupTab==='parts'&&!PARTS_BATCH_MODE&&!getSelectedPartsAiNames().length)partsLearning.openedManual(getPartsAiCriteria(),String(item.ten_phu_tung || ''));
         };
         // ============================================================
         // IMPORT EXCEL → FIRESTORE — CHỐNG TRÙNG + GẮN PHẠM VI VCX/TNDS
@@ -10333,6 +10322,7 @@ window.searchData = async function(options = {}) {
     const loading = document.getElementById('loadingIndicator');
     const silent = !!options?.silent;
     const skipLog = !!options?.skipLog;
+    const manualCapture=!skipLog&&!aiWarehouseNames.length&&search.length>=2?partsLearning.startManual({...getPartsAiCriteria(),query:search}):null;
     if (loading) loading.classList.remove('hidden');
     let constraints = [];
     if (hang) constraints.push(where('hang_xe', '==', hang));
@@ -10377,11 +10367,12 @@ window.searchData = async function(options = {}) {
         CURRENT_PAGE = 1;
         renderTable();
         if(!skipLog && !aiWarehouseNames.length && search.length>=2 && learningManualOwner===auth.currentUser?.uid && learningManualKey===JSON.stringify(getPartsAiCriteria())) {
-            await partsLearning.recordManual({...getPartsAiCriteria(),query:search},MASTER_DATA.map(item=>item.ten_phu_tung).filter(Boolean));
+            await partsLearning.recordManual({...getPartsAiCriteria(),query:search},MASTER_DATA.map(item=>item.ten_phu_tung).filter(Boolean),manualCapture);
         }
         await recordPartsSearchUsage({ searchDescription, aiWarehouseNames, hang, hieus, nams, exactPartName, skipLog, resultsCount: MASTER_DATA.length });
         return true;
     } catch (e) {
+        partsLearning.fail(manualCapture);
         console.error(e);
         if (!silent) customAlert('Lỗi máy chủ khi tải dữ liệu phụ tùng: ' + e.message);
         return false;

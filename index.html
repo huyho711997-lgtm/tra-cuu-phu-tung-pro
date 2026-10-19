@@ -6,7 +6,8 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>KHO GIÁ PHỤ TÙNG - Hệ Thống Tra Cứu Giá Phụ Tùng</title>
 <link rel="stylesheet" href="assets/css/search-tools.css"/>
-<link rel="stylesheet" href="assets/css/parts-search-learning.css?v=20261019-learning-v1"/>
+<link rel="stylesheet" href="assets/css/parts-search-learning.css?v=20261019-passive-v1"/>
+<link rel="stylesheet" href="assets/css/parts-knowledge-page.css?v=20261019-passive-v1"/>
 
 
 
@@ -90,10 +91,11 @@
         <button class="ti-nav-btn" id="tiCompetitionNav" type="button" data-ti-view="ranking" onclick="tiNavigate('ranking',this)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 4h8v3.5a4 4 0 0 1-8 0V4Z" stroke-linejoin="round" stroke-width="1.8"/><path d="M8 6H5v1.5A3.5 3.5 0 0 0 8.5 11M16 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5M12 12v4m-3 4h6m-7 0h8" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span>Bảng xếp hạng</span></button>
         <div class="ti-nav-label ti-nav-label-spaced">Công cụ hệ thống</div>
         <button class="ti-nav-btn" id="tiUserManagementNav" style="display:none" type="button" data-ti-view="users" onclick="tiNavigate('users',this)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" stroke-width="1.8"/><path d="M3 20v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2M17 8h4M19 6v4" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg><span>Quản lý người dùng</span></button>
+        <button class="ti-nav-btn" id="tiSearchKnowledgeNav" style="display:none" type="button" data-ti-view="knowledge" onclick="tiNavigate('knowledge',this)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 5h16v15H4zM8 3v4m8-4v4M4 10h16M8 14h3m-3 3h7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Lịch sử &amp; kiến thức tìm kiếm</span></button>
         <button class="ti-nav-btn" id="tiSidebarAdmin" hidden style="display:none" type="button" data-ti-view="feedbacks" onclick="tiNavigate('feedbacks',this)"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3V5Z" stroke-linejoin="round" stroke-width="1.8"/><path d="M8.5 9h7M8.5 12h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/><circle cx="18" cy="18" r="3" fill="currentColor" stroke="none"/></svg><span>Phản hồi người dùng</span></button>
         <button class="ti-nav-btn" type="button" onclick="openFeedbackModal();tiCloseSidebar()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 5h16v12H9l-5 4V5Z" stroke-linejoin="round" stroke-width="2"/><path d="M8 9h8M8 13h5" stroke-linecap="round" stroke-width="2"/></svg><span>Góp ý hệ thống</span></button>
     </nav>
-    <div class="ti-sidebar-footer"><div class="ti-version-card"><div class="ti-version-copy"><span class="ti-version-label">Phiên bản</span><strong class="ti-version-number">PRO</strong></div></div></div>
+    <div class="ti-sidebar-footer"><small class="pk-capture-notice" title="Nội dung tìm, bộ lọc và lựa chọn trong ứng dụng được ghi nhận để cải thiện tra cứu. Quản trị viên được xem theo quyền.">Ứng dụng có ghi nhận hoạt động tra cứu.</small><span id="partsLearningStatus" role="status" class="pk-capture-status"></span><div class="ti-version-card"><div class="ti-version-copy"><span class="ti-version-label">Phiên bản</span><strong class="ti-version-number">PRO</strong></div></div></div>
 </aside>
 <script src="assets/js/interface-3.js"></script>
 
@@ -667,7 +669,7 @@
 <span class="parts-ai-hint">Gộp cách viết hoa/thường, hiểu tên đồng nghĩa, chọn sẵn đúng loại phụ tùng trong kho xe đã chọn.</span>
 <div class="parts-ai-status" id="partsAiStatus" role="status" aria-live="polite"></div>
 </div>
-<div class="parts-learning-toolbar"><button type="button" class="pl-button" onclick="partsSearchLearning.openHistory()">Lịch sử &amp; kiến thức tìm kiếm</button><span id="partsLearningStatus" role="status" aria-live="polite">Các lần xác nhận tên sẽ được gửi quản trị viên duyệt trước khi dùng chung.</span></div>
+
 <section id="partsBatchComposer" hidden aria-labelledby="partsBatchTitle">
 <div class="parts-batch-composer-head"><div><h3 id="partsBatchTitle">Tìm nhiều phụ tùng bằng AI</h3><p class="parts-batch-help" id="partsBatchHelp">Nhập mỗi tên một dòng hoặc cách nhau bằng dấu phẩy. AI hiểu từng mục theo bộ lọc xe; chọn tên kho phù hợp rồi xem báo giá.</p></div><div class="parts-batch-composer-tools"><span id="partsBatchDraftCount">0/20 phụ tùng</span><button id="btnPartsBatchEdit" type="button" hidden aria-expanded="true" aria-controls="partsBatchEditor" onclick="setPartsBatchComposerCollapsed(false, { focus: true })"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15l-1 6Z"/></svg>Chỉnh sửa lựa chọn</button></div></div>
 <p id="partsBatchAppliedSummary" hidden role="status"></p>
@@ -1296,6 +1298,7 @@
 <section class="ti-learning-shell" id="userManagementSection" aria-label="Quản lý người dùng và phân quyền">
 <iframe class="ti-learning-frame" id="userManagementFrame" title="Quản lý người dùng và phân quyền" data-embedded-key="users"></iframe>
 </section>
+<section id="searchKnowledgeSection" class="pk-page" style="display:none" aria-label="Quản lý lịch sử và kiến thức tìm kiếm"></section>
 <section class="ti-learning-shell" id="feedbackManagementSection" aria-label="Quản lý phản hồi người dùng">
 <iframe class="ti-learning-frame" id="feedbackManagementFrame" title="Quản lý phản hồi người dùng" data-embedded-key="feedbacks"></iframe>
 </section>
@@ -1767,7 +1770,7 @@
 </div>
 <script src="assets/js/document-libraries.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js" defer></script>
-<script type="module" src="assets/js/app-core.mjs?v=20261019-learning-v1"></script>
+<script type="module" src="assets/js/app-core.mjs?v=20261019-passive-v1"></script>
 <script src="assets/js/app-training.js"></script>
 
 <script id="kgptUnifiedPremiumDropdowns" src="assets/js/kgptUnifiedPremiumDropdowns.js"></script>
