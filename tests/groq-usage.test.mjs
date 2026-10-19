@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGroqUsageTracker, groqQuotaTokens, parseGroqReset } from '../assets/js/groq-usage.mjs';
-import { generateGroqContent } from '../assets/js/ai-provider.mjs';
 
 function fakeStorage() {
     const map = new Map();
@@ -127,14 +126,10 @@ test('failed or pending requests are counted as sends with unknown token use', a
     assert.equal(snapshot.unknownTokens, 2);
 });
 
-test('429 responses update remaining quota and retry countdown before throwing', async () => {
+test('429 metadata from backend updates remaining quota and retry countdown', async () => {
     const { tracker, advance } = await fixture();
     const limited = headers(); limited.set('retry-after', '15'); limited.set('x-ratelimit-remaining-tokens', '0');
-    let request;
-    await assert.rejects(generateGroqContent([{ text: 'Trả JSON' }], {}, {
-        apiKey: 'test', onRequest: () => request = tracker.start(), onUsage: event => tracker.finish(request, event),
-        fetchImpl: async () => new Response('{"error":{"message":"limited"}}', { status: 429, headers: limited })
-    }), error => error.status === 429);
+    tracker.finish(tracker.start(),{status:429,headers:limited});
     assert.equal(tracker.snapshot().tokenMinute.remaining, 0);
     assert.ok(tracker.snapshot().retryAt);
     assert.equal(tracker.snapshot().requestMinute.used, 1);
@@ -156,24 +151,16 @@ test('429 without exposed headers survives reload with a bounded one-minute cool
 
 test('recording malformed/truncated successful completions still counts consumed tokens', async () => {
     const { tracker } = await fixture();
-    let request;
-    await assert.rejects(generateGroqContent([{ text: 'JSON' }], {}, {
-        apiKey: 'test', onRequest: () => request = tracker.start(), onUsage: event => tracker.finish(request, event),
-        fetchImpl: async () => new Response(JSON.stringify({ usage, choices: [{ finish_reason: 'length', message: { content: '{' } }] }))
-    }), /chưa đầy đủ/);
+    tracker.finish(tracker.start(),{status:200,usage,headers:new Headers()});
     assert.equal(tracker.snapshot().tokenDay.used, 1200);
 });
 
-test('blocked browser storage and observer errors never stop the AI request', async () => {
+test('blocked browser storage still permits in-memory usage tracking', async () => {
     const storage = { get length() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
     const { tracker } = await fixture({ storage });
     tracker.finish(tracker.start(), { usage, status: 200 });
     assert.equal(tracker.snapshot().tokenDay.used, 1200);
-    const result = await generateGroqContent([{ text: 'JSON' }], {}, {
-        apiKey: 'test', onRequest() { throw new Error('observer failed'); }, onUsage() { throw new Error('observer failed'); },
-        fetchImpl: async () => new Response('{"choices":[{"message":{"content":"{}"}}]}')
-    });
-    assert.equal(result.output, '{}');
+
 });
 
 test('rate headers honor actual limits and safely ignore invalid values', async () => {

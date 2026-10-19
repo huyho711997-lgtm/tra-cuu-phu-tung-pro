@@ -1,0 +1,7 @@
+project_id = "yxwmcpoklxpzlikxojez"
+
+[functions.kgpt-ai]
+verify_jwt = true
+
+[functions.kgpt-ai-part-search]
+verify_jwt = true

@@ -1,8 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
-        import { generateGroqContent } from "./ai-provider.mjs";
-        import { createGroqKeyPool } from "./groq-key-pool.mjs";
+        import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
-        import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+        import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
         const SUPABASE_PROJECT_URL = "https://yxwmcpoklxpzlikxojez.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4d21jcG9rbHhwemxpa3hvamV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1Njk0MDEsImV4cCI6MjA5NjE0NTQwMX0.dmyjtDDo_KTlUFyxQgoCGqEt5Bsq2krEEYg2BCyXeFc";
         const supabase = createClient(SUPABASE_PROJECT_URL, SUPABASE_ANON_KEY, {
@@ -13,6 +12,7 @@
                 storageKey: 'tasco_dlk_supabase_auth'
             }
         });
+        const secureAi = createSecureAiClient({supabase,getOwner:() => auth.currentUser?.uid || ''});
         const db = { provider: 'supabase' };
         let SUPABASE_CURRENT_USER = null;
         function normalizeSupabaseUser(user) {
@@ -175,7 +175,6 @@
             user_profiles: { table: 'user_profiles', pk: 'id' },
             user_logs: { table: 'user_logs', pk: 'id' },
             user_feedbacks: { table: 'user_feedbacks', pk: 'id' },
-            user_api_keys: { table: 'user_api_keys', pk: 'user_id' },
             metadata: { table: 'app_metadata', pk: 'key', metadata: true }
         };
         const FIELD_TO_DB = {
@@ -1654,17 +1653,7 @@
                 const warnings = [];
                 // Tạo sẵn cấu hình API/OCR riêng cho user để Admin cập nhật trong Quản lý user
                 try {
-                    await setDoc(doc(db, USER_API_KEYS_COLLECTION, newUser.uid), {
-                        ocrProvider: 'gemini',
-                        geminiApiKey: '',
-                        ocrSpaceApiKey: '',
-                        ocrLanguage: OCRSPACE_DEFAULT_LANGUAGE,
-                        ocrEngine: OCRSPACE_DEFAULT_ENGINE,
-                        allowSelfEdit: true,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp(),
-                        updatedBy: auth.currentUser?.email || 'system'
-                    }, { merge: true });
+                    await saveQuoteApiSettingsForUid(newUser.uid, QUOTE_DEFAULT_API_SETTINGS);
                 } catch (_) { warnings.push('Chưa lưu được cấu hình OCR riêng; vui lòng cập nhật trong quản lý người dùng.'); }
                 closeModal('modalAddUser');
                 try { await refreshUserList(); }
@@ -1893,8 +1882,10 @@
             el.classList.toggle('ready', ready);
             el.textContent = loadingText || (ready ? 'Đã cấu hình API' : 'Chưa có API key');
         }
+        let EDIT_USER_API_SETTINGS = {}, EDIT_USER_API_CLEAR = [];
         function fillEditUserApiFields(settings = {}) {
             const normalized = normalizeQuoteApiSettings(settings);
+            EDIT_USER_API_SETTINGS = normalized; EDIT_USER_API_CLEAR = [];
             const provider = document.getElementById('editApiProviderSelect');
             const gemini = document.getElementById('editGeminiApiKey');
             const ocr = document.getElementById('editOcrSpaceApiKey');
@@ -1902,8 +1893,8 @@
             const engine = document.getElementById('editOcrSpaceEngineSelect');
             const selfEdit = document.getElementById('editApiSelfEditableSelect');
             if (provider) provider.value = normalized.ocrProvider || 'gemini';
-            if (gemini) gemini.value = normalized.geminiApiKey || '';
-            if (ocr) ocr.value = normalized.ocrSpaceApiKey || '';
+            if (gemini) { gemini.value = ''; gemini.placeholder = normalized.credentials.gemini ? 'Đã lưu · …'+normalized.credentials.gemini.suffix+'. Để trống để giữ key.' : 'Nhập Gemini key mới'; }
+            if (ocr) { ocr.value = ''; ocr.placeholder = normalized.credentials.ocrspace ? 'Đã lưu · …'+normalized.credentials.ocrspace.suffix+'. Để trống để giữ key.' : 'Nhập OCR.Space key mới'; }
             if (lang) lang.value = normalized.ocrLanguage || OCRSPACE_DEFAULT_LANGUAGE;
             if (engine) engine.value = String(normalized.ocrEngine || OCRSPACE_DEFAULT_ENGINE);
             if (selfEdit) selfEdit.value = normalized.allowSelfEdit === false ? 'false' : 'true';
@@ -1911,6 +1902,7 @@
         }
         function collectEditUserApiSettings() {
             return normalizeQuoteApiSettings({
+                ...EDIT_USER_API_SETTINGS, clearKeys:EDIT_USER_API_CLEAR, fromAdmin:true,
                 ocrProvider: document.getElementById('editApiProviderSelect')?.value || 'gemini',
                 geminiApiKey: document.getElementById('editGeminiApiKey')?.value?.trim() || '',
                 ocrSpaceApiKey: document.getElementById('editOcrSpaceApiKey')?.value?.trim() || '',
@@ -1920,6 +1912,7 @@
             });
         }
         window.clearEditUserApiKeys = function() {
+            EDIT_USER_API_CLEAR = ['gemini','groq1','groq2','groq3','ocrspace'];
             const gemini = document.getElementById('editGeminiApiKey');
             const ocr = document.getElementById('editOcrSpaceApiKey');
             if (gemini) gemini.value = '';
@@ -1958,7 +1951,7 @@
             const newFullName = document.getElementById('editFullName').value.trim();
             const newPass = document.getElementById('editUserPass').value.trim();
             const newRole = document.getElementById('editUserRole')?.value || 'user';
-            const apiSettings = collectEditUserApiSettings();
+            let apiSettings = collectEditUserApiSettings();
             if (!newFullName) return customAlert("Vui lòng không để trống ô Họ Tên!");
             if (newPass && newPass.length < 6) return customAlert("Mật khẩu cập nhật tối thiểu 6 ký tự!");
             try {
@@ -1966,7 +1959,7 @@
                     fullName: newFullName,
                     role: newRole
                 });
-                await saveQuoteApiSettingsForUid(editingUserId, apiSettings);
+                apiSettings = await saveQuoteApiSettingsForUid(editingUserId, apiSettings);
                 const editedCacheIndex = ADMIN_USER_CACHE.findIndex(u => u.uid === editingUserId);
                 if (editedCacheIndex >= 0) {
                     ADMIN_USER_CACHE[editedCacheIndex] = {
@@ -2768,343 +2761,268 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             summary.innerText = `Đang tra theo: ${criteria.hang} / ${criteria.hieus[0]} / ${criteria.nam} / ${typeLabels[criteria.type] || 'Tất cả'}`;
         };
         const QUOTE_AI_STORAGE_KEYS = {
-            provider: 'tascoQuoteAiProvider',
-            llmProvider: 'tascoLlmProvider',
-            groqKey: 'tascoGroqKey',
-            groqKey2: 'tascoGroqKey2',
-            groqKey3: 'tascoGroqKey3',
-            groqActiveKey: 'tascoGroqActiveKey',
-            geminiKey: 'tascoGeminiQuoteKey',
-            ocrSpaceKey: 'tascoOcrSpaceQuoteKey',
-            ocrSpaceLang: 'tascoOcrSpaceQuoteLang',
-            ocrSpaceEngine: 'tascoOcrSpaceQuoteEngine'
+            provider:'tascoQuoteAiProvider', llmProvider:'tascoLlmProvider', groqKey:'tascoGroqKey',
+            groqKey2:'tascoGroqKey2', groqKey3:'tascoGroqKey3', groqActiveKey:'tascoGroqActiveKey',
+            geminiKey:'tascoGeminiQuoteKey', ocrSpaceKey:'tascoOcrSpaceQuoteKey',
+            ocrSpaceLang:'tascoOcrSpaceQuoteLang', ocrSpaceEngine:'tascoOcrSpaceQuoteEngine'
         };
-        const USER_API_KEYS_COLLECTION = 'user_api_keys';
         const QUOTE_API_FIELD_MAP = {
-            [QUOTE_AI_STORAGE_KEYS.provider]: 'ocrProvider',
-            [QUOTE_AI_STORAGE_KEYS.geminiKey]: 'geminiApiKey',
-            [QUOTE_AI_STORAGE_KEYS.ocrSpaceKey]: 'ocrSpaceApiKey',
-            [QUOTE_AI_STORAGE_KEYS.ocrSpaceLang]: 'ocrLanguage',
-            [QUOTE_AI_STORAGE_KEYS.ocrSpaceEngine]: 'ocrEngine'
+            [QUOTE_AI_STORAGE_KEYS.provider]:'ocrProvider', [QUOTE_AI_STORAGE_KEYS.llmProvider]:'llmProvider',
+            [QUOTE_AI_STORAGE_KEYS.groqActiveKey]:'groqActiveKey', [QUOTE_AI_STORAGE_KEYS.ocrSpaceLang]:'ocrLanguage',
+            [QUOTE_AI_STORAGE_KEYS.ocrSpaceEngine]:'ocrEngine'
         };
+        const QUOTE_SECRET_FIELD_MAP = {
+            [QUOTE_AI_STORAGE_KEYS.groqKey]:'groq1', [QUOTE_AI_STORAGE_KEYS.groqKey2]:'groq2',
+            [QUOTE_AI_STORAGE_KEYS.groqKey3]:'groq3', [QUOTE_AI_STORAGE_KEYS.geminiKey]:'gemini',
+            [QUOTE_AI_STORAGE_KEYS.ocrSpaceKey]:'ocrspace'
+        };
+        const QUOTE_SECRET_INPUTS = {groq1:'quoteGroqKeyInput',groq2:'quoteGroqKeyInput2',groq3:'quoteGroqKeyInput3',gemini:'quoteGeminiKeyInput',ocrspace:'quoteOcrSpaceKeyInput'};
         const QUOTE_DEFAULT_API_SETTINGS = {
-            ocrProvider: 'gemini',
-            geminiApiKey: '',
-            ocrSpaceApiKey: '',
-            ocrLanguage: OCRSPACE_DEFAULT_LANGUAGE,
-            ocrEngine: OCRSPACE_DEFAULT_ENGINE,
-            allowSelfEdit: true
+            ocrProvider:'gemini', llmProvider:'gemini', groqActiveKey:'1',
+            ocrLanguage:OCRSPACE_DEFAULT_LANGUAGE, ocrEngine:OCRSPACE_DEFAULT_ENGINE,
+            allowSelfEdit:true, credentials:{}
         };
-        let QUOTE_USER_API_SETTINGS = { ...QUOTE_DEFAULT_API_SETTINGS };
-        let QUOTE_API_SETTINGS_LOADED_FOR_UID = null;
-        let QUOTE_API_SETTINGS_DIRTY = false;
+        let QUOTE_USER_API_SETTINGS = {...QUOTE_DEFAULT_API_SETTINGS};
+        let QUOTE_API_SETTINGS_LOADED_FOR_UID = null, QUOTE_API_SETTINGS_LOAD_PENDING = null;
+        let QUOTE_API_SETTINGS_DIRTY = false, QUOTE_API_SETTINGS_ERROR = '', QUOTE_API_MIGRATION_NOTICE = '';
+        let QUOTE_PENDING_KEYS = {}, QUOTE_CLEAR_KEYS = new Set();
         function normalizeQuoteApiSettings(raw = {}) {
-            return {
-                ...QUOTE_DEFAULT_API_SETTINGS,
-                ocrProvider: raw.ocrProvider || raw.provider || raw.aiProvider || QUOTE_DEFAULT_API_SETTINGS.ocrProvider,
-                geminiApiKey: raw.geminiApiKey || raw.geminiKey || '',
-                ocrSpaceApiKey: raw.ocrSpaceApiKey || raw.ocrSpaceKey || '',
-                ocrLanguage: raw.ocrLanguage || raw.ocrSpaceLang || QUOTE_DEFAULT_API_SETTINGS.ocrLanguage,
-                ocrEngine: String(raw.ocrEngine || raw.ocrSpaceEngine || QUOTE_DEFAULT_API_SETTINGS.ocrEngine),
-                allowSelfEdit: raw.allowSelfEdit === false ? false : true,
-                updatedAt: raw.updatedAt || null,
-                updatedBy: raw.updatedBy || ''
-            };
+            return {...QUOTE_DEFAULT_API_SETTINGS,...raw,credentials:raw.credentials || {},
+                geminiApiKey:raw.geminiApiKey || '',ocrSpaceApiKey:raw.ocrSpaceApiKey || '',
+                allowSelfEdit:raw.allowSelfEdit !== false};
+        }
+        function normalizeSecureMetadata(data) {
+            return normalizeQuoteApiSettings({...data.settings,credentials:data.credentials,allowSelfEdit:data.allowSelfEdit});
         }
         function hasConfiguredQuoteApi(settings = {}) {
-            const normalized = normalizeQuoteApiSettings(settings);
-            return Boolean(String(normalized.geminiApiKey || '').trim() || String(normalized.ocrSpaceApiKey || '').trim());
+            return Object.keys(settings.credentials || {}).length > 0 || !!settings.geminiApiKey || !!settings.ocrSpaceApiKey;
         }
-        function getQuoteApiOwnerId() {
-            const uid = auth?.currentUser?.uid || currentUserProfile?.uid || '';
-            if (uid) return uid;
-            const email = auth?.currentUser?.email || currentUserProfile?.email || '';
-            if (email) return email.toLowerCase().trim().replace(/[^a-z0-9@._-]/g, '_');
-            return 'guest';
+        function getQuoteApiOwnerId() { return auth?.currentUser?.uid || 'guest'; }
+        function getQuoteScopedStorageKey(baseKey,uid = '') { return `${baseKey}__${uid || getQuoteApiOwnerId()}`; }
+        function getQuoteUserSetting(baseKey,fallback = '') {
+            if (QUOTE_SECRET_FIELD_MAP[baseKey]) return '';
+            const field = QUOTE_API_FIELD_MAP[baseKey];
+            if (field) return QUOTE_USER_API_SETTINGS[field] ?? fallback;
+            return localStorage.getItem(getQuoteScopedStorageKey(baseKey)) ?? fallback;
         }
-        function getQuoteScopedStorageKey(baseKey, uid = '') {
-            return `${baseKey}__${uid || getQuoteApiOwnerId()}`;
-        }
-        function getQuoteSettingField(baseKey) {
-            return QUOTE_API_FIELD_MAP[baseKey] || '';
-        }
-        function getQuoteUserSetting(baseKey, fallback = '') {
-            const field = getQuoteSettingField(baseKey);
-            if (field && QUOTE_USER_API_SETTINGS && QUOTE_USER_API_SETTINGS[field] !== undefined && QUOTE_USER_API_SETTINGS[field] !== null && String(QUOTE_USER_API_SETTINGS[field]) !== '') {
-                return QUOTE_USER_API_SETTINGS[field];
+        function setQuoteUserSetting(baseKey,value = '') {
+            const normalized = String(value || '').trim(), secret = QUOTE_SECRET_FIELD_MAP[baseKey];
+            if (secret) {
+                if (normalized) { QUOTE_PENDING_KEYS[secret] = normalized; QUOTE_CLEAR_KEYS.delete(secret); }
+                else delete QUOTE_PENDING_KEYS[secret];
+            } else {
+                // Preferences contain no API keys.
+                const field = QUOTE_API_FIELD_MAP[baseKey];
+                if (field) QUOTE_USER_API_SETTINGS = {...QUOTE_USER_API_SETTINGS,[field]:normalized};
+                localStorage.setItem(getQuoteScopedStorageKey(baseKey),normalized);
             }
-            const value = localStorage.getItem(getQuoteScopedStorageKey(baseKey));
-            return value === null || value === undefined ? fallback : value;
-        }
-        function setQuoteUserSetting(baseKey, value = '') {
-            const scopedKey = getQuoteScopedStorageKey(baseKey);
-            const normalized = String(value || '').trim();
-            if (normalized) localStorage.setItem(scopedKey, normalized);
-            else localStorage.removeItem(scopedKey);
-            const field = getQuoteSettingField(baseKey);
-            if (field) QUOTE_USER_API_SETTINGS = { ...QUOTE_USER_API_SETTINGS, [field]: normalized };
             QUOTE_API_SETTINGS_DIRTY = true;
         }
-        function getQuoteApiOwnerLabel() {
-            return currentUserProfile?.email || auth?.currentUser?.email || 'Chưa đăng nhập';
-        }
+        function getQuoteApiOwnerLabel() { return currentUserProfile?.email || auth?.currentUser?.email || 'Chưa đăng nhập'; }
         function updateQuoteApiOwnerHint() {
             const hint = document.getElementById('quoteApiOwnerHint');
             if (!hint) return;
-            const pending = QUOTE_API_SETTINGS_DIRTY;
-            const synced = !pending && QUOTE_API_SETTINGS_LOADED_FOR_UID === getQuoteApiOwnerId();
-            hint.dataset.state = pending ? 'pending' : synced ? 'synced' : 'local';
-            const owner = document.getElementById('quoteApiOwnerName');
-            const status = document.getElementById('quoteApiOwnerStatus');
-            const badge = document.getElementById('quoteApiOwnerBadge');
+            const loaded = QUOTE_API_SETTINGS_LOADED_FOR_UID === getQuoteApiOwnerId();
+            hint.dataset.state = QUOTE_API_SETTINGS_ERROR ? 'error' : QUOTE_API_SETTINGS_DIRTY ? 'pending' : loaded ? 'synced' : 'loading';
+            const owner = document.getElementById('quoteApiOwnerName'),status = document.getElementById('quoteApiOwnerStatus'),badge = document.getElementById('quoteApiOwnerBadge');
             if (owner) owner.textContent = getQuoteApiOwnerLabel();
-            const groqLocal = getLlmProvider() === 'groq';
-            if (status) status.textContent = pending ? 'Có thay đổi chưa lưu. Bấm Lưu cấu hình để cập nhật.'
-                : groqLocal ? 'Groq key và lựa chọn AI được lưu trên trình duyệt này theo tài khoản.'
-                : synced ? 'Cấu hình đã được đồng bộ theo tài khoản.' : 'Đang lưu tạm trên trình duyệt. Bấm Lưu cấu hình để dùng tìm bằng AI.';
-            if (badge) badge.textContent = pending ? 'Chưa lưu' : groqLocal ? 'Trên máy này' : synced ? 'Đã đồng bộ' : 'Lưu tạm';
+            if (status) status.textContent = QUOTE_API_SETTINGS_ERROR || QUOTE_API_MIGRATION_NOTICE || (QUOTE_API_SETTINGS_DIRTY ? 'Có thay đổi chưa lưu. Bấm Lưu cấu hình để cập nhật.'
+                : loaded ? 'API key được lưu mã hóa trên máy chủ theo tài khoản.' : 'Đang tải cấu hình tài khoản…');
+            if (badge) badge.textContent = QUOTE_API_SETTINGS_ERROR ? 'Chưa kết nối' : QUOTE_API_MIGRATION_NOTICE ? 'Chưa chuyển hết' : QUOTE_API_SETTINGS_DIRTY ? 'Chưa lưu' : loaded ? 'Đã bảo vệ' : 'Đang tải';
         }
         function clearQuoteApiInputsForPrivacy() {
-            ['quoteGeminiKeyInput', 'quoteGroqKeyInput', 'quoteGroqKeyInput2', 'quoteGroqKeyInput3', 'quoteOcrSpaceKeyInput'].forEach(id => {
-                const input = document.getElementById(id);
-                if (input) input.value = '';
-            });
-            QUOTE_USER_API_SETTINGS = { ...QUOTE_DEFAULT_API_SETTINGS };
-            QUOTE_API_SETTINGS_LOADED_FOR_UID = null;
-            QUOTE_API_SETTINGS_DIRTY = false;
+            Object.values(QUOTE_SECRET_INPUTS).forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; });
+            ['editGeminiApiKey','editOcrSpaceApiKey'].forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; });
+            QUOTE_PENDING_KEYS = {}; QUOTE_CLEAR_KEYS.clear();
+            QUOTE_USER_API_SETTINGS = {...QUOTE_DEFAULT_API_SETTINGS};
+            QUOTE_API_SETTINGS_LOADED_FOR_UID = null; QUOTE_API_SETTINGS_DIRTY = false; QUOTE_API_SETTINGS_ERROR = '';
+            QUOTE_API_MIGRATION_NOTICE = '';
             window.refreshGroqUsagePanel?.();
         }
         async function fetchQuoteApiSettingsByUid(uid) {
-            if (!uid) return { ...QUOTE_DEFAULT_API_SETTINGS };
-            const snap = await getDoc(doc(db, USER_API_KEYS_COLLECTION, uid));
-            return normalizeQuoteApiSettings(snap.exists() ? snap.data() : {});
+            return normalizeSecureMetadata(await secureAi.read(uid));
         }
-        function mergeQuoteSettingsWithLocalFallback(settings = {}, uid = '') {
-            const normalized = normalizeQuoteApiSettings(settings);
-            const ownerId = uid || getQuoteApiOwnerId();
-            Object.entries(QUOTE_AI_STORAGE_KEYS).forEach(([, baseKey]) => {
-                const field = getQuoteSettingField(baseKey);
-                if (!field) return;
-                if (normalized[field] !== undefined && normalized[field] !== null && String(normalized[field]) !== '') return;
-                const localValue = localStorage.getItem(getQuoteScopedStorageKey(baseKey, ownerId));
-                if (localValue !== null && localValue !== undefined && localValue !== '') normalized[field] = localValue;
-            });
-            return normalized;
-        }
-        let QUOTE_API_SETTINGS_LOAD_PENDING = null;
         async function loadQuoteApiSettingsForCurrentUser(force = false) {
-            const uid = auth?.currentUser?.uid || currentUserProfile?.uid || '';
-            if (!uid) {
-                QUOTE_USER_API_SETTINGS = mergeQuoteSettingsWithLocalFallback({}, 'guest');
-                QUOTE_API_SETTINGS_LOADED_FOR_UID = null;
-                return QUOTE_USER_API_SETTINGS;
-            }
+            const uid = getQuoteApiOwnerId();
+            if (uid === 'guest') return {...QUOTE_DEFAULT_API_SETTINGS};
             if (!force && QUOTE_API_SETTINGS_LOADED_FOR_UID === uid) return QUOTE_USER_API_SETTINGS;
-            // Initialization and a concurrent dialog open share the same account request.
             if (QUOTE_API_SETTINGS_LOAD_PENDING?.uid === uid) return QUOTE_API_SETTINGS_LOAD_PENDING.promise;
-            const request = { uid, promise: null };
+            const request = {uid,promise:null};
             QUOTE_API_SETTINGS_LOAD_PENDING = request;
             request.promise = (async () => {
-                let settings, loaded = false;
                 try {
-                    settings = mergeQuoteSettingsWithLocalFallback(await fetchQuoteApiSettingsByUid(uid), uid);
-                    loaded = true;
+                    let settings = await fetchQuoteApiSettingsByUid(uid);
+                    let migrated = null, migrationNotice = '';
+                    try {
+                        migrated = await migrateLegacyKeys({storage:localStorage,owner:uid,credentials:settings.credentials,
+                            isCurrent:() => getQuoteApiOwnerId() === uid,
+                            save:keys => {
+                                if (!settings.allowSelfEdit && currentUserProfile?.role !== 'admin') throw new Error('SETTINGS_LOCKED');
+                                return secureAi.save(uid,{},keys,[],{onlyIfMissing:true});
+                            }});
+                    } catch (error) {
+                        if (error.name === 'AbortError') throw error;
+                        migrationNotice = 'Một số key cũ vẫn còn trên thiết bị vì chưa chuyển được. Hãy lưu lại key hoặc liên hệ quản trị viên.';
+                    }
+                    if (migrated) settings = normalizeSecureMetadata(migrated);
+                    if (getQuoteApiOwnerId() === uid) {
+                        QUOTE_USER_API_SETTINGS = settings; QUOTE_API_SETTINGS_LOADED_FOR_UID = uid;
+                        QUOTE_API_SETTINGS_DIRTY = false; QUOTE_API_SETTINGS_ERROR = '';
+                        QUOTE_API_MIGRATION_NOTICE = migrationNotice;
+                    }
+                    return settings;
                 } catch (error) {
-                    console.warn('Không đọc được user_api_keys, dùng localStorage tạm:', error);
-                    settings = mergeQuoteSettingsWithLocalFallback({}, uid);
+                    if (getQuoteApiOwnerId() === uid) {
+                        QUOTE_USER_API_SETTINGS = {...QUOTE_DEFAULT_API_SETTINGS}; QUOTE_API_SETTINGS_LOADED_FOR_UID = null;
+                        QUOTE_API_SETTINGS_ERROR = error.message || 'Không kết nối được kho key trên máy chủ.';
+                    }
+                    return {...QUOTE_DEFAULT_API_SETTINGS};
                 }
-                // A late response from a previous account must not overwrite current settings.
-                if (getQuoteApiOwnerId() === uid) {
-                    QUOTE_USER_API_SETTINGS = settings;
-                    QUOTE_API_SETTINGS_LOADED_FOR_UID = loaded ? uid : null;
-                    if (loaded) QUOTE_API_SETTINGS_DIRTY = false;
-                }
-                return settings;
-            })().finally(() => {
-                if (QUOTE_API_SETTINGS_LOAD_PENDING === request) QUOTE_API_SETTINGS_LOAD_PENDING = null;
-            });
+            })().finally(() => { if (QUOTE_API_SETTINGS_LOAD_PENDING === request) QUOTE_API_SETTINGS_LOAD_PENDING = null; });
             return request.promise;
         }
-        async function saveQuoteApiSettingsForUid(uid, settings = {}) {
-            if (!uid) throw new Error('Không xác định được UID người dùng để lưu API key.');
-            const normalized = normalizeQuoteApiSettings(settings);
-            const payload = {
-                ocrProvider: normalized.ocrProvider || 'gemini',
-                geminiApiKey: String(normalized.geminiApiKey || '').trim(),
-                ocrSpaceApiKey: String(normalized.ocrSpaceApiKey || '').trim(),
-                ocrLanguage: normalized.ocrLanguage || OCRSPACE_DEFAULT_LANGUAGE,
-                ocrEngine: String(normalized.ocrEngine || OCRSPACE_DEFAULT_ENGINE),
-                allowSelfEdit: normalized.allowSelfEdit === false ? false : true,
-                updatedAt: serverTimestamp(),
-                updatedBy: currentUserProfile?.email || auth?.currentUser?.email || 'system'
-            };
-            await setDoc(doc(db, USER_API_KEYS_COLLECTION, uid), payload, { merge: true });
-            return payload;
+        async function saveQuoteApiSettingsForUid(uid,settings = {}) {
+            if (!uid || uid === 'guest') throw new Error('Vui lòng đăng nhập để lưu cấu hình.');
+            const patch = {};
+            Object.values(QUOTE_API_FIELD_MAP).forEach(field => { if (settings[field] !== undefined) patch[field] = String(settings[field]); });
+            if (currentUserProfile?.role === 'admin') patch.allowSelfEdit = settings.allowSelfEdit !== false;
+            const own = uid === getQuoteApiOwnerId();
+            const keys = own && !settings.fromAdmin ? {...QUOTE_PENDING_KEYS} : {};
+            if (settings.geminiApiKey?.trim()) keys.gemini = settings.geminiApiKey.trim();
+            if (settings.ocrSpaceApiKey?.trim()) keys.ocrspace = settings.ocrSpaceApiKey.trim();
+            return normalizeSecureMetadata(await secureAi.save(uid,patch,keys,settings.clearKeys || (own ? [...QUOTE_CLEAR_KEYS] : [])));
         }
         async function attachApiSettingsToUsers(users = []) {
-            const baseUsers = users.map(u => ({ ...u, apiSettings: normalizeQuoteApiSettings(u.apiSettings || {}), apiConfigured: false }));
+            const base = users.map(u => ({...u,apiSettings:normalizeQuoteApiSettings(),apiConfigured:false}));
             try {
-                const snap = await getDocs(collection(db, USER_API_KEYS_COLLECTION));
-                const map = new Map();
-                snap.forEach(d => map.set(d.id, normalizeQuoteApiSettings(d.data())));
-                return baseUsers.map(u => {
-                    const settings = map.get(u.uid) || u.apiSettings || {};
-                    return { ...u, apiSettings: settings, apiConfigured: hasConfiguredQuoteApi(settings) };
-                });
-            } catch (error) {
-                console.warn('Không đọc được user_api_keys cho dashboard user:', error);
-                return baseUsers;
-            }
+                const metadata = await secureAi.list(),byId = new Map(metadata.map(m => [m.userId,normalizeSecureMetadata(m)]));
+                return base.map(u => ({...u,apiSettings:byId.get(u.uid) || u.apiSettings,apiConfigured:hasConfiguredQuoteApi(byId.get(u.uid))}));
+            } catch (_) { return base; }
         }
-        function getQuoteAiProvider() {
-            return getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.provider, 'gemini') || 'gemini';
-        }
-        // Groq credentials and the LLM choice are scoped locally to the signed-in account.
-        // The existing Supabase schema and OCR-provider values stay compatible.
-        function getLlmProvider() {
-            return getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.llmProvider, 'gemini') === 'groq' ? 'groq' : 'gemini';
-        }
+        function getQuoteAiProvider() { return getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.provider,'gemini'); }
+        function getLlmProvider() { return getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.llmProvider,'gemini') === 'groq' ? 'groq' : 'gemini'; }
         function getLlmProviderName() { return getLlmProvider() === 'groq' ? 'Groq' : 'Gemini'; }
-        function getGroqKeys() {
-            return ['groqKey', 'groqKey2', 'groqKey3'].map(name => getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS[name], '').trim());
-        }
-        function getGroqKey() {
-            const keys = getGroqKeys(), index = Number(getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.groqActiveKey, '1')) - 1;
-            return keys[index] || keys.find(Boolean) || '';
-        }
-        let GROQ_KEY_POOL_CONTEXT = null;
-        function hasSelectedAiKey() { return getLlmProvider() === 'groq' ? !!getGroqKey() : !!getQuoteGeminiKeys().length; }
+        // These are opaque credential revisions, suitable for local usage counters; never API keys.
+        function getGroqKeys() { return [1,2,3].map(slot => QUOTE_USER_API_SETTINGS.credentials?.['groq'+slot]?.id || ''); }
+        function getGroqKey() { const keys = getGroqKeys(); return keys[Number(QUOTE_USER_API_SETTINGS.groqActiveKey || '1')-1] || keys.find(Boolean) || ''; }
+        function hasSelectedAiKey() { return getLlmProvider() === 'groq' ? !!getGroqKey() : !!QUOTE_USER_API_SETTINGS.credentials?.gemini; }
         window.saveLlmProvider = function() {
             const value = document.getElementById('quoteLlmProviderSelect')?.value;
-            if (!['gemini', 'groq'].includes(value)) return;
+            if (!['gemini','groq'].includes(value)) return;
             const changed = value !== getLlmProvider();
-            setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.llmProvider, value);
+            setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.llmProvider,value);
             if (changed) { window.resetPartsAiSearch?.(); window.resetPartsBatchSearch?.(); }
             updateQuoteAiProviderUI();
         };
         window.saveGroqKey = function() {
-            ['groqKey', 'groqKey2', 'groqKey3'].forEach((name, index) => {
-                const input = document.getElementById('quoteGroqKeyInput' + (index ? index + 1 : ''));
-                if (input) setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS[name], input.value);
+            ['groqKey','groqKey2','groqKey3'].forEach((name,index) => {
+                const input = document.getElementById('quoteGroqKeyInput'+(index?index+1:''));
+                if (input) setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS[name],input.value);
             });
             updateQuoteApiOwnerHint();
-            window.refreshGroqUsagePanel?.();
         };
         window.selectGroqKey = function() {
             const slot = document.getElementById('quoteGroqActiveKeySelect')?.value;
-            if (!['1', '2', '3'].includes(slot) || !getGroqKeys()[Number(slot) - 1]) return;
-            localStorage.setItem(getQuoteScopedStorageKey(QUOTE_AI_STORAGE_KEYS.groqActiveKey), slot);
-            window.refreshGroqUsagePanel?.();
+            if (!['1','2','3'].includes(slot)) return;
+            setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.groqActiveKey,slot);
+            window.refreshGroqUsagePanel?.(); updateQuoteApiOwnerHint();
         };
-        async function callSelectedAiGenerateContent(parts, config = {}, options = {}) {
-            if (getLlmProvider() !== 'groq') return callGeminiGenerateContentWithRetry(parts, config, options);
-            const ownerId = getQuoteApiOwnerId(), keys = getGroqKeys(), signature = JSON.stringify(keys);
-            if (!GROQ_KEY_POOL_CONTEXT || GROQ_KEY_POOL_CONTEXT.ownerId !== ownerId || GROQ_KEY_POOL_CONTEXT.signature !== signature) {
-                GROQ_KEY_POOL_CONTEXT = { ownerId, signature, pool: createGroqKeyPool({ generate: (...args) => generateGroqContent(...args) }) };
-            }
-            const trackers = new Map(), requests = new Map();
-            const isCurrent = () => ownerId === getQuoteApiOwnerId() && getLlmProvider() === 'groq' && signature === JSON.stringify(getGroqKeys());
-            return GROQ_KEY_POOL_CONTEXT.pool.generate(parts, config, { ...options, apiKeys: keys, preferredKey: getGroqKey(), isCurrent,
-                async getRetryAt(apiKey) {
-                    const tracker = await getActiveGroqUsageTracker(apiKey, ownerId).catch(() => null);
-                    trackers.set(apiKey, tracker);
-                    const snapshot = tracker?.snapshot();
-                    return Math.max(snapshot?.retryAt || 0, ...['requestDay', 'tokenMinute'].map(name => {
-                        const metric = snapshot?.[name];
-                        return metric?.source === 'groq' && metric.remaining === 0 ? metric.resetAt : 0;
-                    }));
-                },
-                onKeyChange(apiKey) {
-                    if (!isCurrent()) return;
-                    localStorage.setItem(getQuoteScopedStorageKey(QUOTE_AI_STORAGE_KEYS.groqActiveKey, ownerId), String(keys.indexOf(apiKey) + 1));
-                    window.refreshGroqUsagePanel?.();
-                },
-                onRequest(apiKey) { requests.set(apiKey, trackers.get(apiKey)?.start()); window.refreshGroqUsagePanel?.(); },
-                onUsage(apiKey, metadata) { trackers.get(apiKey)?.finish(requests.get(apiKey), metadata); window.refreshGroqUsagePanel?.(); }
-            });
+        async function callSelectedAiGenerateContent(parts,config = {},options = {}) {
+            const owner = getQuoteApiOwnerId();
+            await loadQuoteApiSettingsForCurrentUser();
+            if (owner !== getQuoteApiOwnerId()) throw new DOMException('Tài khoản đã thay đổi.','AbortError');
+            if (QUOTE_API_SETTINGS_ERROR) throw new Error(QUOTE_API_SETTINGS_ERROR);
+            const provider = getLlmProvider();
+            if (provider !== 'groq') return callGeminiGenerateContentWithRetry(parts,config,options);
+            const recordAttempts = async attempts => {
+                if (owner !== getQuoteApiOwnerId()) return;
+                for (const attempt of attempts || []) {
+                    if (!/^groq[123]$/.test(attempt.slot)) continue;
+                    const tracker = await getActiveGroqUsageTracker(attempt.keyId,owner).catch(() => null);
+                    if (owner !== getQuoteApiOwnerId()) return;
+                    const request = tracker?.start();
+                    tracker?.finish(request,{status:attempt.status,usage:attempt.usage,headers:new Headers(attempt.headers)});
+                }
+                window.refreshGroqUsagePanel?.();
+            };
+            try {
+                const result = await secureAi.generate(parts,config,{...options,provider:'groq',preferredSlot:QUOTE_USER_API_SETTINGS.groqActiveKey});
+                await recordAttempts(result.attempts);
+                if (owner !== getQuoteApiOwnerId()) throw new DOMException('Tài khoản đã thay đổi.','AbortError');
+                if (/^groq[123]$/.test(result.slot)) QUOTE_USER_API_SETTINGS.groqActiveKey = result.slot.slice(-1);
+                return result;
+            } catch (error) { await recordAttempts(error.attempts); throw error; }
         }
-        function getQuoteAiProviderName() {
-            return getQuoteAiProvider() === 'ocrspace' ? 'OCR.Space' : getLlmProviderName();
-        }
+        function getQuoteAiProviderName() { return getQuoteAiProvider() === 'ocrspace' ? 'OCR.Space' : getLlmProviderName(); }
         function getQuoteGeminiModel() {
-            const saved = getQuoteUserSetting(QUOTE_GEMINI_MODEL_PREFERENCE, GEMINI_QUOTE_MODEL);
-            return [GEMINI_QUOTE_MODEL, ...GEMINI_FALLBACK_MODELS].includes(saved) ? saved : GEMINI_QUOTE_MODEL;
+            const saved = getQuoteUserSetting(QUOTE_GEMINI_MODEL_PREFERENCE,GEMINI_QUOTE_MODEL);
+            return [GEMINI_QUOTE_MODEL,...GEMINI_FALLBACK_MODELS].includes(saved) ? saved : GEMINI_QUOTE_MODEL;
         }
-        function getQuoteGeminiModelLabel() {
-            return getQuoteGeminiModel() === 'gemini-3.5-flash-lite' ? 'Gemini 3.5 Flash-Lite' : 'Gemini 3.8 Flash';
-        }
+        function getQuoteGeminiModelLabel() { return getQuoteGeminiModel() === 'gemini-3.5-flash-lite' ? 'Gemini 3.5 Flash-Lite' : 'Gemini 3.8 Flash'; }
         window.saveQuoteGeminiModel = function() {
             const model = document.getElementById('quoteGeminiModelSelect')?.value;
-            if (![GEMINI_QUOTE_MODEL, ...GEMINI_FALLBACK_MODELS].includes(model)) return;
-            // This preference uses existing per-account local storage, without adding database columns.
-            const storageKey = getQuoteScopedStorageKey(QUOTE_GEMINI_MODEL_PREFERENCE);
-            try { localStorage.setItem(storageKey, model); }
-            catch (_) { customAlert('Trình duyệt chưa lưu được lựa chọn model. Hãy kiểm tra quyền lưu dữ liệu của trang.', 'error'); }
-            updateQuoteAiProviderUI();
+            if (![GEMINI_QUOTE_MODEL,...GEMINI_FALLBACK_MODELS].includes(model)) return;
+            setQuoteUserSetting(QUOTE_GEMINI_MODEL_PREFERENCE,model); updateQuoteAiProviderUI();
         };
         function enhanceQuoteSettingsDropdowns() {
-            const modal = document.getElementById('quoteGeminiSettingsModal');
-            const enhancer = window.KGPTPremiumDropdown;
+            const modal = document.getElementById('quoteGeminiSettingsModal'),enhancer = window.KGPTPremiumDropdown;
             if (!modal || modal.classList.contains('hidden') || !enhancer) return;
             modal.querySelectorAll('select.quote-settings-select').forEach(select => {
                 if (modal.classList.contains('parts-ai-mode') && select.closest('.quote-ocr-only')) return;
                 if (select.closest('[hidden],.hidden')) return;
-                let wrapper = select.__kgptPremiumWrapper;
-                if (wrapper) enhancer.sync(select); else wrapper = enhancer.enhance(select);
+                const wrapper = select.__kgptPremiumWrapper ? (enhancer.sync(select),select.__kgptPremiumWrapper) : enhancer.enhance(select);
                 wrapper?.__kgptMenu?.classList.add('kgpt-select-menu-settings');
             });
         }
-        window.saveQuoteAiProvider = function() {
-            const provider = document.getElementById('quoteAiProviderSelect')?.value || 'gemini';
-            setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.provider, provider);
-        };
+        window.saveQuoteAiProvider = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.provider,document.getElementById('quoteAiProviderSelect')?.value || 'gemini'); };
         window.updateQuoteAiProviderUI = function() {
-            const provider = getQuoteAiProvider();
-            const hint = document.getElementById('quoteAiProviderHint');
+            const provider = getQuoteAiProvider(),groq = getLlmProvider() === 'groq';
             updateQuoteApiOwnerHint();
-            document.querySelectorAll('#quoteGeminiSettingsModal .quote-gemini-model-group').forEach(group => { group.hidden = provider !== 'gemini' || getLlmProvider() !== 'gemini'; });
-            const groq = getLlmProvider() === 'groq';
+            document.querySelectorAll('#quoteGeminiSettingsModal .quote-gemini-model-group').forEach(group => { group.hidden = provider !== 'gemini' || groq; });
             document.querySelectorAll('#quoteGeminiSettingsModal .quote-groq-group').forEach(group => { group.hidden = !groq; });
             document.querySelectorAll('#quoteGeminiSettingsModal .quote-gemini-key-group').forEach(group => { group.hidden = groq; });
-            window.refreshGroqUsagePanel?.();
-            enhanceQuoteSettingsDropdowns();
-            if (!hint) return;
-            if (provider === 'ocrspace') {
-                hint.classList.add('warning');
-                hint.textContent = 'OCR.Space nhận diện chữ trong ảnh hoặc PDF. Ngôn ngữ và engine được áp dụng theo lựa chọn của tài khoản.';
-            } else if (groq) {
-                hint.classList.remove('warning');
-                hint.textContent = 'Groq GPT-OSS 120B xử lý văn bản và Excel. Ảnh/PDF cần OCR.Space API key để lấy chữ trước. Tối đa 3 key; tự chuyển key khi bị giới hạn, không tự chuyển nhà cung cấp.';
-            } else {
-                hint.classList.remove('warning');
-                hint.textContent = getQuoteGeminiModelLabel() + ' đọc nội dung báo giá từ ảnh, PDF hoặc văn bản. Khi model tạm thời không khả dụng, hệ thống sẽ thông báo và thử model dự phòng.';
-            }
+            const hint = document.getElementById('quoteAiProviderHint');
+            if (hint) hint.textContent = provider === 'ocrspace' ? 'OCR.Space nhận diện chữ trong ảnh hoặc PDF. Key được sử dụng tại máy chủ.'
+                : groq ? 'Groq GPT-OSS 120B xử lý văn bản. Ảnh/PDF cần OCR.Space; các key dự phòng được quản lý tại máy chủ.'
+                : getQuoteGeminiModelLabel()+' đọc ảnh, PDF và văn bản qua máy chủ.';
+            window.refreshGroqUsagePanel?.(); enhanceQuoteSettingsDropdowns();
         };
-        window.saveQuoteGeminiKey = function() {
-            const key = document.getElementById('quoteGeminiKeyInput')?.value?.trim() || '';
-            setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey, key);
+        window.saveQuoteGeminiKey = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey,document.getElementById('quoteGeminiKeyInput')?.value || ''); updateQuoteApiOwnerHint(); };
+        window.saveQuoteOcrSpaceKey = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceKey,document.getElementById('quoteOcrSpaceKeyInput')?.value || ''); updateQuoteApiOwnerHint(); };
+        window.saveQuoteOcrSpaceLanguage = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceLang,document.getElementById('quoteOcrSpaceLangSelect')?.value || OCRSPACE_DEFAULT_LANGUAGE); };
+        window.saveQuoteOcrSpaceEngine = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceEngine,document.getElementById('quoteOcrSpaceEngineSelect')?.value || OCRSPACE_DEFAULT_ENGINE); };
+        window.clearSavedAiKey = function(name) {
+            if (!QUOTE_SECRET_INPUTS[name]) return;
+            delete QUOTE_PENDING_KEYS[name]; QUOTE_CLEAR_KEYS.add(name); QUOTE_API_SETTINGS_DIRTY = true;
+            const input = document.getElementById(QUOTE_SECRET_INPUTS[name]);
+            if (input) { input.value = ''; input.placeholder = 'Sẽ xóa key khi bấm Lưu cấu hình'; }
             updateQuoteApiOwnerHint();
         };
-        window.saveQuoteOcrSpaceKey = function() {
-            const key = document.getElementById('quoteOcrSpaceKeyInput')?.value?.trim() || '';
-            setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceKey, key);
-        };
-        window.saveQuoteOcrSpaceLanguage = function() {
-            const lang = document.getElementById('quoteOcrSpaceLangSelect')?.value || OCRSPACE_DEFAULT_LANGUAGE;
-            setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceLang, lang);
-        };
-        window.saveQuoteOcrSpaceEngine = function() {
-            const engine = document.getElementById('quoteOcrSpaceEngineSelect')?.value || OCRSPACE_DEFAULT_ENGINE;
-            setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceEngine, engine);
-        };
+        function showSecureKeyFields() {
+            Object.entries(QUOTE_SECRET_INPUTS).forEach(([name,id]) => {
+                const input = document.getElementById(id); if (!input) return;
+                input.value = QUOTE_PENDING_KEYS[name] || '';
+                const credential = QUOTE_USER_API_SETTINGS.credentials?.[name];
+                input.placeholder = QUOTE_CLEAR_KEYS.has(name) ? 'Sẽ xóa khi lưu' : credential ? `Đã lưu · …${credential.suffix}. Để trống để giữ key.` : 'Dán API key để lưu mã hóa trên máy chủ';
+                input.disabled = QUOTE_USER_API_SETTINGS.allowSelfEdit === false && currentUserProfile?.role !== 'admin';
+                let clear = document.getElementById(id+'Clear');
+                if (!clear) {
+                    clear = document.createElement('button'); clear.id = id+'Clear'; clear.type = 'button';
+                    clear.className = 'secure-ai-key-clear'; clear.textContent = 'Xóa key đã lưu';
+                    clear.addEventListener('click',() => clearSavedAiKey(name));
+                    input.closest('.quote-settings-input-wrap')?.after(clear);
+                }
+                if (clear) { clear.hidden = !credential; clear.disabled = input.disabled; }
+            });
+        }
         let QUOTE_SETTINGS_OPEN_REVISION = 0;
         let QUOTE_SETTINGS_RETURN_FOCUS = null;
         function setQuoteSettingsBusy(busy) {
             const modal = document.getElementById('quoteGeminiSettingsModal');
             if (!modal) return;
             modal.setAttribute('aria-busy', String(busy));
-            modal.querySelectorAll('input, select, .quote-settings-primary').forEach(control => {
-                control.disabled = busy;
+            modal.querySelectorAll('input, select, .quote-settings-primary, .secure-ai-key-clear').forEach(control => {
+                control.disabled = busy || !!QUOTE_API_SETTINGS_ERROR || (QUOTE_USER_API_SETTINGS.allowSelfEdit === false && currentUserProfile?.role !== 'admin');
                 if (control.tagName === 'SELECT') window.KGPTPremiumDropdown?.sync(control);
             });
         }
@@ -3112,12 +3030,12 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const values = {
                 quoteAiProviderSelect: getQuoteAiProvider(),
                 quoteLlmProviderSelect: getLlmProvider(),
-                quoteGroqKeyInput: getGroqKeys()[0],
-                quoteGroqKeyInput2: getGroqKeys()[1],
-                quoteGroqKeyInput3: getGroqKeys()[2],
+                quoteGroqKeyInput: '',
+                quoteGroqKeyInput2: '',
+                quoteGroqKeyInput3: '',
                 quoteGeminiModelSelect: getQuoteGeminiModel(),
-                quoteGeminiKeyInput: getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey, ''),
-                quoteOcrSpaceKeyInput: getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceKey, ''),
+                quoteGeminiKeyInput: '',
+                quoteOcrSpaceKeyInput: '',
                 quoteOcrSpaceLangSelect: getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceLang, OCRSPACE_DEFAULT_LANGUAGE) || OCRSPACE_DEFAULT_LANGUAGE,
                 quoteOcrSpaceEngineSelect: getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceEngine, OCRSPACE_DEFAULT_ENGINE) || OCRSPACE_DEFAULT_ENGINE
             };
@@ -3125,6 +3043,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 const input = document.getElementById(id);
                 if (input && input.value !== value) input.value = value;
             });
+            showSecureKeyFields();
             updateQuoteAiProviderUI();
         }
         window.openQuoteGeminiSettings = async function(source = 'quote') {
@@ -3188,29 +3107,28 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             window.KGPTPremiumDropdown?.closeAll();
             const modal = document.getElementById('quoteGeminiSettingsModal');
             modal?.classList.add('hidden');
+            Object.values(QUOTE_SECRET_INPUTS).forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; });
+            QUOTE_PENDING_KEYS = {}; QUOTE_CLEAR_KEYS.clear(); QUOTE_API_SETTINGS_DIRTY = false;
             if (QUOTE_SETTINGS_RETURN_FOCUS?.isConnected) QUOTE_SETTINGS_RETURN_FOCUS.focus({ preventScroll: true });
             QUOTE_SETTINGS_RETURN_FOCUS = null;
         };
         window.saveQuoteGeminiSettings = async function() {
-            saveLlmProvider();
-            saveGroqKey();
-            saveQuoteAiProvider();
-            saveQuoteGeminiKey();
-            saveQuoteOcrSpaceKey();
-            saveQuoteOcrSpaceLanguage();
-            saveQuoteOcrSpaceEngine();
-            const uid = auth?.currentUser?.uid || currentUserProfile?.uid || '';
+            if (QUOTE_API_SETTINGS_ERROR) return customAlert(QUOTE_API_SETTINGS_ERROR,'error');
+            const uid = getQuoteApiOwnerId();
+            if (QUOTE_API_SETTINGS_LOADED_FOR_UID !== uid) return customAlert('Chưa tải được cấu hình. Hãy mở lại Cài đặt AI.','error');
+            saveLlmProvider(); saveGroqKey(); saveQuoteAiProvider(); saveQuoteGeminiKey(); saveQuoteOcrSpaceKey(); saveQuoteOcrSpaceLanguage(); saveQuoteOcrSpaceEngine();
+            setQuoteSettingsBusy(true);
             try {
-                await saveQuoteApiSettingsForUid(uid, QUOTE_USER_API_SETTINGS);
-                QUOTE_API_SETTINGS_LOADED_FOR_UID = uid;
-                QUOTE_API_SETTINGS_DIRTY = false;
-                updateQuoteAiProviderUI();
+                const saved = await saveQuoteApiSettingsForUid(uid,QUOTE_USER_API_SETTINGS);
+                if (uid !== getQuoteApiOwnerId()) return;
+                QUOTE_USER_API_SETTINGS = saved; QUOTE_PENDING_KEYS = {}; QUOTE_CLEAR_KEYS.clear();
+                QUOTE_API_SETTINGS_LOADED_FOR_UID = uid; QUOTE_API_SETTINGS_DIRTY = false;
                 closeQuoteGeminiSettings();
-                customAlert(`Đã lưu cấu hình AI cho ${getQuoteApiOwnerLabel()}. Lựa chọn Gemini/Groq và Groq key được lưu trên trình duyệt này.`, 'success');
+                await loadQuoteApiSettingsForCurrentUser(true);
+                customAlert('Đã lưu cấu hình. API key được bảo vệ trên máy chủ theo tài khoản.','success');
             } catch (error) {
-                console.error('Không lưu được API key vào Firestore:', error);
-                customAlert('Không lưu được API key cho tài khoản: ' + error.message + '\n\nHệ thống vẫn giữ tạm trên trình duyệt hiện tại.', 'error');
-            }
+                if (uid === getQuoteApiOwnerId()) customAlert('Chưa lưu được cấu hình: '+error.message,'error');
+            } finally { setQuoteSettingsBusy(false); }
         };
         async function initQuoteAiSettings() {
             await loadQuoteApiSettingsForCurrentUser(false);
@@ -3682,7 +3600,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             }], { responseMimeType: 'application/json', maxOutputTokens: 1024 }, options);
             ensureCurrent();
             const parsed = extractJsonObjectFromGeminiText(answer.output);
-            if (!Array.isArray(parsed.terms)) throw new Error('Groq trả danh sách từ khóa không hợp lệ. Hãy thử lại.');
+            if (!Array.isArray(parsed.terms)) throw new Error('AI trả danh sách từ khóa không hợp lệ. Hãy thử lại.');
             // Allow letters/numbers only in PostgREST patterns, never raw model filter syntax.
             const terms = [...new Set([criteria.query, ...parsed.terms.filter(term => typeof term === 'string').slice(0, 6)]
                 .map(term => String(term).replace(/[^\p{L}\p{N}\s-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 100)).filter(term => term.length >= 2))];
@@ -3700,7 +3618,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 const { data, error, count } = await builder.or(terms.map(term => 'ten_phu_tung.ilike."%' + term + '%"').join(','))
                     .order('id', { ascending: true }).range(offset, offset + 499).abortSignal(options.signal);
                 ensureCurrent();
-                if (error) throw new Error('Groq đã hiểu tên nhưng chưa đọc được kho phụ tùng. Hãy thử lại.');
+                if (error) throw new Error('AI đã hiểu tên nhưng chưa đọc được kho phụ tùng. Hãy thử lại.');
                 if (!Number.isInteger(count) || count < 0 || count > 15000) throw new Error('Chưa xác nhận được số bản ghi hoặc kho quá lớn. Chọn cụ thể dòng xe và năm sản xuất rồi thử lại.');
                 if (expected !== null && expected !== count) throw new Error('Kho vừa thay đổi. Hãy tìm lại bằng AI.');
                 expected = count;
@@ -3714,7 +3632,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 offset += rows.length;
                 if (offset >= expected) break;
             }
-            return { normalized_name: criteria.query, provider: 'groq', candidates: [...counts].map(([name, record_count]) => ({ name, record_count }))
+            return { normalized_name: criteria.query, provider: getLlmProvider(), candidates: [...counts].map(([name, record_count]) => ({ name, record_count }))
                 .sort((a, b) => Number(partsAiNameKey(b.name) === partsAiNameKey(criteria.query)) - Number(partsAiNameKey(a.name) === partsAiNameKey(criteria.query)) || b.record_count - a.record_count).slice(0, 12) };
         }
 
@@ -7075,9 +6993,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             renderQuoteOcrRows();
             rebuildQuoteExtractedPartsFromEditableRows(true);
         };
-        function getQuoteGeminiKey() {
-            return (document.getElementById('quoteGeminiKeyInput')?.value || getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey, '') || GEMINI_DEFAULT_API_KEY || '').trim();
-        }
+        function getQuoteGeminiKey() { return QUOTE_USER_API_SETTINGS.credentials?.gemini?.id || ''; }
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -7162,17 +7078,14 @@ Tên file: ${fileName}`;
             if (isGeminiKeyLeakedError(message)) {
                 setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey, '');
                 const uid = auth?.currentUser?.uid || currentUserProfile?.uid || '';
-                if (uid) saveQuoteApiSettingsForUid(uid, QUOTE_USER_API_SETTINGS).catch(err => console.warn('Không xóa được Gemini key bị lỗi khỏi Firestore:', err));
+                if (uid) saveQuoteApiSettingsForUid(uid, QUOTE_USER_API_SETTINGS).catch(err => console.warn('Không cập nhật được cấu hình Gemini:', err));
                 const input = document.getElementById('quoteGeminiKeyInput');
                 if (input) input.value = '';
                 setTimeout(() => openQuoteGeminiSettings?.(), 120);
             }
             return buildGeminiKeyErrorMessage(message);
         }
-        function getQuoteGeminiKeys() {
-            const raw = (document.getElementById('quoteGeminiKeyInput')?.value || getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey, '') || GEMINI_DEFAULT_API_KEY || '').trim();
-            return raw.split(/[\n,;]+/).map(k => k.trim()).filter(Boolean);
-        }
+        function getQuoteGeminiKeys() { const id = getQuoteGeminiKey(); return id ? [id] : []; }
         function getGeminiModelCandidates() {
             const seen = new Set();
             return [getQuoteGeminiModel(), GEMINI_QUOTE_MODEL, ...(Array.isArray(GEMINI_FALLBACK_MODELS) ? GEMINI_FALLBACK_MODELS : [])]
@@ -7188,56 +7101,12 @@ Tên file: ${fileName}`;
             return /high demand|overloaded|try again later|temporar|unavailable|quota|rate limit|429|503|504|deadline|timeout|busy/i.test(raw);
         }
         function sleepGemini(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-        async function callGeminiGenerateContentWithRetry(parts, generationConfig = {}, options = {}) {
-            if (options.signal?.aborted) throw Object.assign(new Error('Đã hủy đánh giá.'), { name: 'AbortError' });
-            const keys = getQuoteGeminiKeys();
-            if (!keys.length) throw new Error('Chưa có Gemini API Key. Hãy bấm nút cài đặt Gemini để nhập key mới.');
-            const models = getGeminiModelCandidates();
-            const maxRetriesPerModel = Number(options.maxRetriesPerModel || 2);
-            const statusFn = typeof options.statusFn === 'function' ? options.statusFn : null;
-            let lastError = null;
-            for (const apiKey of keys) {
-                for (const model of models) {
-                    for (let attempt = 1; attempt <= maxRetriesPerModel; attempt++) {
-                        if (options.signal?.aborted) throw Object.assign(new Error('Đã hủy đánh giá.'), { name: 'AbortError' });
-                        try {
-                            if (statusFn && attempt > 1) statusFn(`Gemini đang quá tải, tự thử lại lần ${attempt}/${maxRetriesPerModel} với ${model}...`, null);
-                            if (statusFn && model !== models[0] && attempt === 1) statusFn('Đang dùng model dự phòng: ' + model + '…', null);
-                            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-                            const controller = new AbortController();
-                            const abortExternal = () => controller.abort();
-                            options.signal?.addEventListener('abort', abortExternal, { once: true });
-                            if (options.signal?.aborted) controller.abort();
-                            const timer = setTimeout(() => controller.abort(), Number(options.timeoutMs || 90000));
-                            let response;
-                            try {
-                                response = await fetch(endpoint, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-                                signal: controller.signal,
-                                body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: /^gemini-3\./.test(model) ? { ...generationConfig, temperature: 1 } : generationConfig })
-                            });
-                            } finally { clearTimeout(timer); options.signal?.removeEventListener('abort', abortExternal); }
-                            const payload = await response.json().catch(() => ({}));
-                            if (!response.ok) {
-                                const apiError = new Error(buildGeminiKeyErrorMessage(payload?.error?.message || `Gemini API lỗi HTTP ${response.status}`));
-                                apiError.status = response.status;
-                                throw apiError;
-                            }
-                            const output = payload?.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('\n') || '';
-                            return { output, model };
-                        } catch (error) {
-                            if (options.signal?.aborted) throw Object.assign(new Error('Đã hủy đánh giá.'), { name: 'AbortError' });
-                            lastError = error;
-                            const message = error?.name === 'AbortError' ? 'Gemini xử lý quá thời gian, hệ thống sẽ thử lại.' : (error?.message || String(error));
-                            if (error?.status === 404 || /models?[^\n]*(not found|not supported|not available)|not found[^\n]*models?|not supported for generateContent/i.test(message)) break;
-                            if ((![408,429,500,502,503,504].includes(error?.status) && !isGeminiTransientError(message)) || isGeminiKeyLeakedError(message)) throw error;
-                            if (attempt < maxRetriesPerModel) await sleepGemini(900 * attempt + Math.round(Math.random() * 500));
-                        }
-                    }
-                }
-            }
-            throw new Error('Chưa xử lý được bằng các model Gemini đã chọn. Kiểm tra quyền truy cập model hoặc thử lại sau. Chi tiết: ' + (lastError?.message || lastError || 'không rõ'));
+        async function callGeminiGenerateContentWithRetry(parts,generationConfig = {},options = {}) {
+            const owner = getQuoteApiOwnerId();
+            await loadQuoteApiSettingsForCurrentUser();
+            if (owner !== getQuoteApiOwnerId()) throw new DOMException('Tài khoản đã thay đổi.','AbortError');
+            if (QUOTE_API_SETTINGS_ERROR) throw new Error(QUOTE_API_SETTINGS_ERROR);
+            return secureAi.generate(parts,generationConfig,{...options,provider:'gemini',model:getQuoteGeminiModel()});
         }
         async function callGeminiQuoteExtraction({ file = null, text = '', mode = getQuoteOcrMode() }) {
             if (!hasSelectedAiKey()) throw new Error('Chưa có ' + getLlmProviderName() + ' API key. Mở Cài đặt AI để nhập key.');
@@ -7266,7 +7135,7 @@ ${text}` });
             return extractJsonObjectFromGeminiText(result.output);
         }
         function getQuoteOcrSpaceKey() {
-            return (document.getElementById('quoteOcrSpaceKeyInput')?.value || getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceKey, '') || '').trim();
+            return QUOTE_USER_API_SETTINGS.credentials?.ocrspace?.id || '';
         }
         function getQuoteOcrSpaceLanguage() {
             return (document.getElementById('quoteOcrSpaceLangSelect')?.value || getQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceLang, OCRSPACE_DEFAULT_LANGUAGE) || OCRSPACE_DEFAULT_LANGUAGE).trim();
@@ -7287,42 +7156,14 @@ ${text}` });
             }
             return message || 'OCR.Space lỗi không xác định.';
         }
-        async function callOcrSpaceApi(file, options = {}) {
-            const apiKey = getQuoteOcrSpaceKey();
-            if (!apiKey) throw new Error('Chưa có OCR.Space API Key. Hãy bấm nút cài đặt AI OCR và nhập free key.');
-            const engine = String(options.engine || getQuoteOcrSpaceEngine() || OCRSPACE_DEFAULT_ENGINE);
-            const language = String(options.language || getQuoteOcrSpaceLanguage() || OCRSPACE_DEFAULT_LANGUAGE);
-            const formData = new FormData();
-            formData.append('file', file, file.name || 'quote');
-            formData.append('language', language);
-            formData.append('OCREngine', engine);
-            formData.append('isOverlayRequired', 'false');
-            formData.append('isTable', 'true');
-            formData.append('scale', 'true');
-            formData.append('detectOrientation', 'true');
-            formData.append('isCreateSearchablePdf', 'false');
-            setQuoteStatus(`OCR.Space: đang OCR bằng Engine ${engine}...`, 18);
-            const response = await fetch('https://api.ocr.space/parse/image', {
-                method: 'POST',
-                headers: { apikey: apiKey },
-                body: formData
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok || payload?.IsErroredOnProcessing) {
-                const errors = []
-                    .concat(payload?.ErrorMessage || [])
-                    .concat(payload?.ErrorDetails || [])
-                    .filter(Boolean)
-                    .join(' | ');
-                throw new Error(errors || response.statusText || 'OCR.Space API error');
-            }
-            const parsedText = (payload?.ParsedResults || [])
-                .map(item => item?.ParsedText || '')
-                .filter(Boolean)
-                .join('\n\n--- PAGE BREAK ---\n\n')
-                .trim();
-            if (!parsedText) throw new Error('OCR.Space không đọc được text từ file.');
-            return { text: parsedText, raw: payload, engine, language };
+        async function callOcrSpaceApi(file,options = {}) {
+            const owner = getQuoteApiOwnerId();
+            await loadQuoteApiSettingsForCurrentUser();
+            if (owner !== getQuoteApiOwnerId()) throw new DOMException('Tài khoản đã thay đổi.','AbortError');
+            if (QUOTE_API_SETTINGS_ERROR) throw new Error(QUOTE_API_SETTINGS_ERROR);
+            const engine = String(options.engine || getQuoteOcrSpaceEngine()),language = String(options.language || getQuoteOcrSpaceLanguage());
+            setQuoteStatus('OCR.Space: đang nhận diện chữ qua máy chủ…',18);
+            return secureAi.ocr(file,language,engine,options);
         }
         function cleanOcrSpaceLine(line = '') {
             return String(line || '')
@@ -8174,7 +8015,13 @@ ${text}` });
         setTimeout(initQuoteDropZone, 0);
         // WINDOW OVERLAYS MODALS UTIL
         window.openModal = (id) => document.getElementById(id).classList.remove('hidden');
-        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+        window.closeModal = (id) => {
+            document.getElementById(id).classList.add('hidden');
+            if (id === 'modalEditUser') {
+                ['editGeminiApiKey','editOcrSpaceApiKey'].forEach(inputId => { const input = document.getElementById(inputId); if (input) input.value = ''; });
+                EDIT_USER_API_SETTINGS = {}; EDIT_USER_API_CLEAR = [];
+            }
+        };
         window.customAlert = function(message, type = 'error') {
             const alertText = String(message ?? '');
             const isReportableSystemError = type === 'error' && /(lỗi|không thể|thất bại|error|failed)/i.test(alertText);

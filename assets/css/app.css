@@ -2307,3 +2307,5 @@ html.dark .groq-usage-panel{background:#102036;border-color:#334155;color:#cbd5e
 .parts-related-choice:focus-within{outline:2px solid #93b4fb;outline-offset:-2px}.parts-related-choice.is-disabled{opacity:.6;cursor:wait}
 html.dark .parts-related-choice:hover{background:#243c58}html.dark .parts-related-choice.is-selected{background:#24416a}
 #quoteGeminiSettingsModal .quote-groq-group>.quote-settings-field{margin-bottom:12px}
+
+.secure-ai-key-clear{display:block;margin:6px 0 12px auto;padding:4px 8px;border:0;background:transparent;color:#b42318;font:inherit;font-size:11px;cursor:pointer}.secure-ai-key-clear[hidden]{display:none}.secure-ai-key-clear:disabled{opacity:.45;cursor:default}

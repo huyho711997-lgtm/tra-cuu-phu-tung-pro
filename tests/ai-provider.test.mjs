@@ -2,202 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { generateGroqContent, GROQ_MODEL } from '../assets/js/ai-provider.mjs';
-import { createGroqUsageTracker } from '../assets/js/groq-usage.mjs';
-import { createGroqKeyPool } from '../assets/js/groq-key-pool.mjs';
-
-const success = (content = '{"items":[]}', finish_reason = 'stop') => new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason }] }), { status: 200 });
-const parts = [{ text: 'Trả JSON cho phụ tùng cản trước.' }];
 const core = readFileSync(new URL('../assets/js/app-core.mjs', import.meta.url), 'utf8');
 function block(start, end) { return core.slice(core.indexOf(start), core.indexOf(end, core.indexOf(start))); }
-
-test('Groq sends the selected model, bearer key and JSON mode to Groq only', async () => {
-    let calls = 0;
-    const result = await generateGroqContent(parts, { responseMimeType: 'application/json', maxOutputTokens: 1024 }, {
-        apiKey: ' test-key ', fetchImpl: async (url, options) => {
-            calls++;
-            assert.equal(url, 'https://api.groq.com/openai/v1/chat/completions');
-            assert.equal(options.headers.Authorization, 'Bearer test-key');
-            const body = JSON.parse(options.body);
-            assert.equal(body.model, GROQ_MODEL);
-            assert.equal(body.response_format.type, 'json_object');
-            assert.equal(body.max_completion_tokens, 1024);
-            assert.equal(body.reasoning_effort, 'low');
-            return success();
-        }
-    });
-    assert.equal(calls, 1);
-    assert.equal(result.provider, 'groq');
-    assert.equal(result.output, '{"items":[]}');
-});
-
-test('missing key and binary input fail before network access', async () => {
-    const fetchImpl = () => assert.fail('Unexpected request');
-    await assert.rejects(generateGroqContent(parts, {}, { apiKey: '', fetchImpl }), /Chưa có Groq/);
-    await assert.rejects(generateGroqContent([{ inline_data: {} }], {}, { apiKey: 'key', fetchImpl }), /chỉ nhận văn bản/);
-});
-
-for (const status of [401, 403, 413, 429, 503]) {
-    test(`HTTP ${status} returns an actionable error without retry or raw key disclosure`, async () => {
-        let calls = 0;
-        await assert.rejects(generateGroqContent(parts, {}, { apiKey: 'secret', fetchImpl: async () => {
-            calls++;
-            return new Response(JSON.stringify({ error: { message: 'secret raw upstream message' } }), { status, headers: { 'retry-after': '60' } });
-        } }), error => {
-            assert.equal(error.status, status);
-            assert.equal(error.retryAfter, '60');
-            assert.ok(!error.message.includes('secret'));
-            return true;
-        });
-        assert.equal(calls, 1);
-    });
-}
-
-test('truncated, empty and malformed successful responses are rejected', async () => {
-    for (const response of [success('{"items":', 'length'), success(''), new Response('invalid-json')]) {
-        await assert.rejects(generateGroqContent(parts, {}, { apiKey: 'key', fetchImpl: async () => response }));
-    }
-});
-
-test('external cancellation is preserved and the request is not retried', async () => {
-    const controller = new AbortController();
-    await assert.rejects(generateGroqContent(parts, {}, { apiKey: 'key', signal: controller.signal, fetchImpl: async (_, options) => {
-        controller.abort();
-        assert.equal(options.signal.aborted, true);
-        throw new DOMException('cancelled', 'AbortError');
-    } }), { name: 'AbortError' });
-    await assert.rejects(generateGroqContent(parts, {}, { apiKey: 'key', signal: controller.signal, fetchImpl: () => assert.fail() }), { name: 'AbortError' });
-});
-
-test('timeout and network failures produce clear errors', async () => {
-    await assert.rejects(generateGroqContent(parts, {}, { apiKey: 'key', timeoutMs: 5, fetchImpl: (_, { signal }) => new Promise((_, reject) => {
-        signal.addEventListener('abort', () => reject(new DOMException('timeout', 'AbortError')));
-    }) }), /quá thời gian/);
-    await assert.rejects(generateGroqContent(parts, {}, { apiKey: 'key', fetchImpl: async () => { throw new TypeError('network'); } }), /Không kết nối/);
-});
-
-function settingsHarness() {
-    const values = new Map();
-    const controls = new Map([
-        ['quoteLlmProviderSelect', { value: 'gemini' }], ['quoteGroqKeyInput', { value: '' }],
-        ['quoteGroqKeyInput2', { value: '' }], ['quoteGroqKeyInput3', { value: '' }], ['quoteGroqActiveKeySelect', { value: '1' }],
-        ['quoteGeminiKeyInput', { value: '' }], ['quoteOcrSpaceKeyInput', { value: '' }]
-    ]);
-    const context = vm.createContext({
-        auth: { currentUser: { uid: 'user-a' } }, currentUserProfile: {},
-        OCRSPACE_DEFAULT_LANGUAGE: 'vnm', OCRSPACE_DEFAULT_ENGINE: '2',
-        QUOTE_GEMINI_MODEL_PREFERENCE: 'model', GEMINI_QUOTE_MODEL: 'gemini-test', GEMINI_FALLBACK_MODELS: [],
-        localStorage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) },
-        document: { getElementById: id => controls.get(id) || null, querySelectorAll: () => [] },
-        generateGroqContent: async () => ({ provider: 'groq' }),
-        createGroqKeyPool, DOMException,
-        getActiveGroqUsageTracker: async () => null,
-        callGeminiGenerateContentWithRetry: async () => ({ provider: 'gemini' }), getQuoteGeminiKeys: () => ['gemini-key']
-    });
-    context.window = context;
-    vm.runInContext(block('        const QUOTE_AI_STORAGE_KEYS =', '        let QUOTE_SETTINGS_OPEN_REVISION ='), context);
-    vm.runInContext('globalThis.api = { getLlmProvider, getGroqKey, getGroqKeys, callSelectedAiGenerateContent, clearQuoteApiInputsForPrivacy, getQuoteAiProvider };', context);
-    return { context, controls, values, api: context.api };
-}
-
-test('provider switching routes Gemini and Groq independently and survives reload', async () => {
-    const { context, controls, values, api } = settingsHarness();
-    assert.equal((await api.callSelectedAiGenerateContent(parts)).provider, 'gemini');
-    controls.get('quoteLlmProviderSelect').value = 'groq';
-    context.saveLlmProvider();
-    controls.get('quoteGroqKeyInput').value = 'gsk-test';
-    context.saveGroqKey();
-    assert.equal((await api.callSelectedAiGenerateContent(parts)).provider, 'groq');
-    assert.equal(values.get('tascoLlmProvider__user-a'), 'groq');
-    assert.equal(values.get('tascoGroqKey__user-a'), 'gsk-test');
-    api.clearQuoteApiInputsForPrivacy();
-    assert.equal(controls.get('quoteGroqKeyInput').value, '');
-    assert.equal(api.getLlmProvider(), 'groq');
-    assert.equal(api.getGroqKey(), 'gsk-test');
-    controls.get('quoteLlmProviderSelect').value = 'gemini';
-    context.saveLlmProvider();
-    assert.equal((await api.callSelectedAiGenerateContent(parts)).provider, 'gemini');
-    assert.equal(api.getGroqKey(), 'gsk-test');
-});
-
-test('Groq key and provider are isolated between accounts and clearing a key persists', () => {
-    const { context, controls, api } = settingsHarness();
-    controls.get('quoteLlmProviderSelect').value = 'groq'; context.saveLlmProvider();
-    controls.get('quoteGroqKeyInput').value = 'user-a-key'; context.saveGroqKey();
-    context.auth.currentUser.uid = 'user-b';
-    api.clearQuoteApiInputsForPrivacy();
-    assert.equal(api.getLlmProvider(), 'gemini');
-    assert.equal(api.getGroqKey(), '');
-    context.auth.currentUser.uid = 'user-a';
-    assert.equal(api.getGroqKey(), 'user-a-key');
-    controls.get('quoteGroqKeyInput').value = ''; context.saveGroqKey();
-    assert.equal(api.getGroqKey(), '');
-    assert.equal(api.getQuoteAiProvider(), 'gemini'); // OCR choice is independent.
-});
-
-test('three Groq slots preserve old key, manual preference, reload, privacy and account isolation', () => {
-    const { context, controls, values, api } = settingsHarness();
-    values.set('tascoGroqKey__user-a', 'old-key');
-    assert.equal(api.getGroqKey(), 'old-key');
-    controls.get('quoteGroqKeyInput').value = 'old-key';
-    controls.get('quoteGroqKeyInput2').value = 'second-key';
-    controls.get('quoteGroqKeyInput3').value = 'third-key'; context.saveGroqKey();
-    controls.get('quoteGroqActiveKeySelect').value = '2'; context.selectGroqKey();
-    assert.equal(api.getGroqKey(), 'second-key');
-    assert.deepEqual(Array.from(api.getGroqKeys()), ['old-key','second-key','third-key']);
-    const restored = settingsHarness();
-    for (const [key,value] of values) restored.values.set(key,value);
-    assert.equal(restored.api.getGroqKey(), 'second-key');
-    api.clearQuoteApiInputsForPrivacy();
-    assert.equal(controls.get('quoteGroqKeyInput2').value, '');
-    assert.equal(controls.get('quoteGroqKeyInput3').value, '');
-    context.auth.currentUser.uid = 'user-b';
-    assert.deepEqual(Array.from(api.getGroqKeys()), ['','','']);
-    context.auth.currentUser.uid = 'user-a';
-    controls.get('quoteGroqKeyInput3').value = 'third-key'; context.saveGroqKey();
-    assert.equal(api.getGroqKey(), 'third-key'); // Removed active key falls back to remaining slot.
-});
-
-test('dispatcher falls back, remembers successful slot and records failed/successful usage separately', async () => {
-    const { context, controls, api } = settingsHarness();
-    const first = await createGroqUsageTracker({ ownerId: 'test', apiKey: 'a', storage: null });
-    const second = await createGroqUsageTracker({ ownerId: 'test', apiKey: 'b', storage: null });
-    context.getActiveGroqUsageTracker = async key => key === 'a' ? first : second;
-    const calls = [];
-    context.generateGroqContent = (parts, config, options) => generateGroqContent(parts, config, { ...options,
-        fetchImpl: async () => {
-            calls.push(options.apiKey);
-            return options.apiKey === 'a' ? new Response('{}', { status: 429, headers: { 'retry-after': '20' } })
-                : new Response(JSON.stringify({ usage: { total_tokens: 700 }, choices: [{ message: { content: '{}' } }] }));
-        }
-    });
-    controls.get('quoteGroqKeyInput').value = 'a'; controls.get('quoteGroqKeyInput2').value = 'b'; context.saveGroqKey();
-    controls.get('quoteLlmProviderSelect').value = 'groq'; context.saveLlmProvider();
-    await api.callSelectedAiGenerateContent(parts);
-    assert.deepEqual(calls, ['a','b']);
-    assert.equal(api.getGroqKey(), 'b');
-    assert.equal(first.snapshot().requestDay.used, 1); assert.equal(first.snapshot().unknownTokens, 1);
-    assert.equal(second.snapshot().requestDay.used, 1); assert.equal(second.snapshot().tokenDay.used, 700);
-    await api.callSelectedAiGenerateContent(parts);
-    assert.deepEqual(calls, ['a','b','b']);
-});
-
-test('the application dispatcher records usage on every Groq request and leaves Gemini uncounted', async () => {
-    const { context, controls, api } = settingsHarness();
-    const tracker = await createGroqUsageTracker({ ownerId: 'test', apiKey: 'test', storage: null });
-    context.getActiveGroqUsageTracker = async () => tracker;
-    context.generateGroqContent = (parts, config, options) => generateGroqContent(parts, config, {
-        ...options, fetchImpl: async () => new Response(JSON.stringify({ usage: { total_tokens: 500 }, choices: [{ message: { content: '{}' } }] }))
-    });
-    controls.get('quoteGroqKeyInput').value = 'test'; context.saveGroqKey();
-    controls.get('quoteLlmProviderSelect').value = 'groq'; context.saveLlmProvider();
-    await api.callSelectedAiGenerateContent(parts);
-    assert.equal(tracker.snapshot().requestDay.used, 1);
-    assert.equal(tracker.snapshot().tokenDay.used, 500);
-    controls.get('quoteLlmProviderSelect').value = 'gemini'; context.saveLlmProvider();
-    await api.callSelectedAiGenerateContent(parts);
-    assert.equal(tracker.snapshot().requestDay.used, 1);
-});
 
 function searchHarness({ provider = 'groq', pages, terms = ['cản trước'] } = {}) {
     const calls = [], patterns = [], controller = new AbortController();
@@ -233,7 +39,7 @@ test('Groq warehouse search preserves all vehicle filters and returns only datab
     assert.ok(harness.calls.some(call => call[0] === 'eq' && call[1] === 'chinh_hang'));
 });
 
-test('Gemini search keeps its existing Edge Function and never invokes Groq', async () => {
+test('Gemini search preserves the authenticated warehouse Edge Function', async () => {
     const harness = searchHarness({ provider: 'gemini' });
     await harness.context.requestPartsAiSearch(criteria);
     assert.deepEqual(harness.stats(), { networkCalls: 0, aiCalls: 0 });
@@ -306,7 +112,7 @@ test('Groq media without OCR key fails clearly; text extraction needs no OCR key
     assert.equal(requests.length, 2);
 });
 
-test('Gemini preserves direct PDF/image processing with no OCR.Space requirement', async () => {
+test('Gemini preserves PDF/image input to the secure dispatcher with no OCR.Space requirement', async () => {
     const { context, requests, ocrCalls } = extractionHarness('gemini', '');
     await context.callGeminiQuoteExtraction({ file: { name: 'quote.pdf', type: 'application/pdf' } });
     await context.callGeminiAppraisalExtraction({ file: { name: 'photo.jpg', type: 'image/jpeg' } });

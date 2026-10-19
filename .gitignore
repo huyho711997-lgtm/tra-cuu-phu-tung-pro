@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+.dev.vars*
+supabase/.temp/
+supabase/.branches/
+node_modules/

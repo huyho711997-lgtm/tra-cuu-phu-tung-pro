@@ -13,7 +13,7 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet"/>
 <link rel="stylesheet" href="assets/css/tailwind.min.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/app.css"/>
+<link rel="stylesheet" href="assets/css/app.css?v=20261019-vault"/>
 
 
 
@@ -1443,7 +1443,7 @@
 </div>
 <div class="user-api-mini-note">Lưu ý: với app HTML chạy frontend, user hiện tại vẫn có thể thấy key của chính họ trong DevTools. Muốn ẩn tuyệt đối cần chuyển gọi Gemini/OCR qua backend hoặc Firebase Cloud Functions.</div>
 <div class="user-api-mini-actions">
-<button class="user-api-clear-btn" onclick="clearEditUserApiKeys()" type="button">Xóa key của user này</button>
+<button class="user-api-clear-btn" onclick="clearEditUserApiKeys()" type="button">Xóa toàn bộ key khi lưu</button>
 </div>
 </div>
 </div>
@@ -1690,7 +1690,7 @@
 <select class="quote-settings-select" id="quoteLlmProviderSelect" onchange="saveLlmProvider()">
 <option value="gemini">Gemini</option><option value="groq">Groq · GPT-OSS 120B</option>
 </select></label>
-<p class="quote-settings-model-note">Lựa chọn Gemini/Groq và Groq key được lưu riêng theo tài khoản trên trình duyệt này.</p>
+<p class="quote-settings-model-note">API key được lưu mã hóa trên máy chủ theo tài khoản. Để trống ô nhập để giữ key đã lưu; dùng nút Xóa để gỡ key.</p>
 <div class="quote-groq-group" hidden><label class="quote-settings-field" for="quoteGroqKeyInput"><span>Groq API key 1</span>
 <span class="quote-settings-input-wrap"><input autocomplete="off" spellcheck="false" id="quoteGroqKeyInput" oninput="saveGroqKey()" placeholder="Dán Groq API key của bạn (gsk_...)" type="password"/></span>
 </label>
@@ -1755,7 +1755,7 @@
 </div>
 <div class="quote-ai-provider-hint quote-ocr-only" id="quoteAiProviderHint"></div>
 </div>
-    <details class="parts-ai-settings-note quote-settings-info"><summary><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></svg><span>Thông tin sử dụng AI</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></summary><div>Nhà cung cấp đã chọn áp dụng cho tìm tên phụ tùng, đánh giá giá và phân tích báo giá. Groq dùng GPT-OSS 120B; ảnh/PDF cần thêm OCR.Space API key. Hạn mức miễn phí do từng nhà cung cấp quy định. Groq key chỉ được lưu trên trình duyệt theo tài khoản, không đồng bộ lên máy khác.</div></details>
+    <details class="parts-ai-settings-note quote-settings-info"><summary><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></svg><span>Thông tin sử dụng AI</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></summary><div>Nhà cung cấp đã chọn áp dụng cho tìm tên phụ tùng, đánh giá giá và phân tích báo giá. Groq dùng GPT-OSS 120B; ảnh/PDF cần thêm OCR.Space API key. Hạn mức miễn phí do từng nhà cung cấp quy định. API key được lưu mã hóa theo tài khoản và được sử dụng tại máy chủ. Các thiết bị dùng chung cấu hình sau khi đăng nhập.</div></details>
   </div>
   <div class="quote-settings-actions">
     <span class="quote-settings-footer-note"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></svg><span>Cấu hình theo tài khoản</span></span>
@@ -1765,7 +1765,7 @@
 </div>
 <script src="assets/js/document-libraries.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js" defer></script>
-<script type="module" src="assets/js/app-core.mjs"></script>
+<script type="module" src="assets/js/app-core.mjs?v=20261019-vault"></script>
 <script src="assets/js/app-training.js"></script>
 
 <script id="kgptUnifiedPremiumDropdowns" src="assets/js/kgptUnifiedPremiumDropdowns.js"></script>
