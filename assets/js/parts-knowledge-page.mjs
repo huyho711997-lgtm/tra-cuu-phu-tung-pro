@@ -217,7 +217,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         const actor=owner,view=state;
         rows=[...new Map(rows.filter(row=>!view.busyRows.has(row.id)&&row.status!==status).map(row=>[row.id,row])).values()];if(!rows.length)return;
         let token=writeToken;
-        if(!token){token={operations:0,controls:[...host.querySelectorAll('.pk-header button,.pk-tabs button,.pk-filters button,.pk-filters input,.pk-filters select,.pk-pagination button,.pk-next-step button')].map(control=>[control,control.disabled])};writeToken=token;token.controls.forEach(([control])=>{control.disabled=true;});}
+        if(!token){token={operations:0,controls:[...host.querySelectorAll('.pk-header button,.pk-navigation button,.pk-navigation select,.pk-filters button,.pk-filters input,.pk-filters select,.pk-pagination button,.pk-next-step button')].map(control=>[control,control.disabled])};writeToken=token;token.controls.forEach(([control])=>{control.disabled=true;});}
         token.operations++;view.setKnowledgeBusy?.(rows.map(row=>row.id),status);view.status.textContent='Đang lưu '+formatNumber(view.busyRows.size)+' gợi ý…';
         const current=()=>writeToken===token&&allowed()&&owner===actor&&state===view;let saved=0,failed=0;
         for(let index=0;index<rows.length&&current();index+=3){
@@ -315,19 +315,28 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         const workspace=node('section',undefined,'pk-workspace'),panelHead=node('header',undefined,'pk-panel-head'),panelCopy=node('div'),panelTitle=node('h2','Tổng quan tìm kiếm'),panelSubtitle=node('p','Các nội dung được tra cứu và mức độ sử dụng.','pk-panel-subtitle'),total=badge('Đang tải…','blue');panelCopy.append(panelTitle,panelSubtitle);panelHead.append(panelCopy,total);
         tabs.setAttribute('aria-label','Danh mục lịch sử và kiến thức');
         const modes=[['overview','Tổng quan'],['sessions','Phiên tra cứu'],['events','Thao tác'],['pending','Gợi ý chờ duyệt'],['approved','Đã duyệt'],['disabled','Ngừng áp dụng'],['rejected','Từ chối']];
+        const groups=[['overview','Tổng quan','search',['overview']],['history','Lịch sử','clock',['sessions','events']],['knowledge','Kiến thức','file',['pending','approved','disabled','rejected']]];
+        const remembered={overview:'overview',history:'sessions',knowledge:'pending'};
+        const navigation=node('div',undefined,'pk-navigation'),modeLabel=node('label',undefined,'pk-mode-picker'),modeCaption=node('span','Hiển thị'),modeSelect=node('select');
+        modeLabel.hidden=true;modeLabel.append(modeCaption,modeSelect);navigation.append(tabs,modeLabel);
+        modeSelect.addEventListener('change',()=>selectMode(modeSelect.value));
         function selectMode(key){
             if(!allowed()||!state||writeToken)return;
             const title=modes.find(([mode])=>mode===key)?.[1];if(!title)return;
+            const group=groups.find(([, , ,keys])=>keys.includes(key));remembered[group[0]]=key;
             state.mode=key;state.page=0;state.offset=0;
             panelTitle.textContent=key==='overview'?'Tổng quan tìm kiếm':key==='sessions'?'Lịch sử phiên tra cứu':key==='events'?'Nhật ký thao tác':'Kiến thức · '+title;
             panelSubtitle.textContent=key==='overview'?'Các nội dung được tra cứu và mức độ sử dụng.':key==='sessions'?'Yêu cầu tìm kiếm, phạm vi xe và kết quả của từng phiên.':key==='events'?'Các thao tác được ghi nhận trong quá trình tra cứu.':'Kiểm tra bằng chứng và quản lý kiến thức dùng chung.';
-            tabs.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===key)));load();
+            tabs.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.group===group[0])));
+            modeLabel.hidden=group[0]==='overview';modeCaption.textContent=group[0]==='knowledge'?'Trạng thái':'Hiển thị';modeSelect.setAttribute('aria-label',group[0]==='knowledge'?'Trạng thái kiến thức':'Loại lịch sử');
+            modeSelect.replaceChildren();for(const [value,text] of modes.filter(([mode])=>group[3].includes(mode))){const option=node('option',value==='pending'?'Chờ duyệt':text);option.value=value;modeSelect.append(option);}modeSelect.value=key;
+            load();
         }
-        const nextStep=node('div',undefined,'pk-next-step'),nextText=node('div'),nextTitle=node('strong','Kiểm tra gợi ý để bổ sung kiến thức','pk-next-title'),nextCopy=node('p','Chỉ tên đã duyệt mới được dùng lại khi trùng từ khóa, phạm vi xe và vẫn còn trong kho.','pk-next-copy'),nextButton=btn('Mở gợi ý chờ duyệt',()=>{selectMode('pending');workspace.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});tabs.querySelector('[data-mode="pending"]')?.focus({preventScroll:true});},true,'check');nextText.append(nextTitle,nextCopy);nextStep.append(nextText,nextButton);
+        const nextStep=node('div',undefined,'pk-next-step'),nextText=node('div'),nextTitle=node('strong','Kiểm tra gợi ý để bổ sung kiến thức','pk-next-title'),nextCopy=node('p','Chỉ tên đã duyệt mới được dùng lại khi trùng từ khóa, phạm vi xe và vẫn còn trong kho.','pk-next-copy'),nextButton=btn('Mở gợi ý chờ duyệt',()=>{selectMode('pending');workspace.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});tabs.querySelector('[data-group="knowledge"]')?.focus({preventScroll:true});},true,'check');nextText.append(nextTitle,nextCopy);nextStep.append(nextText,nextButton);
         const notification=node('aside',undefined,'pk-toast'),toastIcon=node('span',undefined,'pk-toast-icon'),toastText=node('span',undefined,'pk-toast-text'),toastClose=iconButton('Đóng thông báo',()=>{notification.hidden=true;},'close');notification.hidden=true;notification.setAttribute('aria-live','polite');notification.setAttribute('aria-atomic','true');notification.append(toastIcon,toastText,toastClose);
         state={mode:'overview',page:0,offset:0,loading:false,metricsRevision:0,appliedFilters:null,applyKnowledgeChange:null,setKnowledgeBusy:null,setKnowledgeError:null,busyRows:new Map(),toast:notification,toastIcon,toastText,toastTimer:null,fields,metrics,content,pagination,status,total,nextTitle,nextCopy,nextButton,rows:[],count:0,export:exportButton};
-        for(const [key,title] of modes){const tab=btn(title,()=>selectMode(key));tab.dataset.mode=key;tab.setAttribute('aria-pressed',String(key==='overview'));tabs.append(tab);}
-        hero.append(header,metrics,nextStep);workspace.append(panelHead,tabs,filtersBox,status,content,pagination);host.append(hero,workspace,notification);
+        for(const [key,title,glyph] of groups){const tab=btn(title,()=>selectMode(remembered[key]),false,glyph);tab.dataset.group=key;tab.setAttribute('aria-pressed',String(key==='overview'));tabs.append(tab);}
+        hero.append(header,metrics,nextStep);workspace.append(panelHead,navigation,filtersBox,status,content,pagination);host.append(hero,workspace,notification);
         const actor=owner;
         const {data}=await supabase.from('user_profiles').select('id,full_name,email').order('full_name',{ascending:true}).limit(1000).abortSignal(AbortSignal.timeout(12000));
         if(!allowed()||owner!==actor)return;
