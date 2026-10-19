@@ -44,7 +44,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         if(!allowed()||!state)return;
         let f;try{f=filters();}catch(error){state.status.textContent=error.message;return;}
         controller?.abort();controller=new AbortController();const signal=controller.signal,ticket=++version,view=state;
-        view.status.textContent='Đang tải dữ liệu…';view.content.replaceChildren();view.pagination.replaceChildren();view.export.disabled=true;view.metrics.replaceChildren();
+        view.status.textContent='Đang tải dữ liệu…';view.total.textContent='Đang tải…';view.content.replaceChildren();view.pagination.replaceChildren();view.export.disabled=true;view.metrics.replaceChildren();
         const current=()=>allowed()&&ticket===version&&state===view;
         const stats=supabase.rpc('kgpt_parts_search_overview',{p_from:f.from,p_to:f.to,p_query:f.q,p_user:f.user || null,p_source:f.source || null}).abortSignal(signal);
         let query;
@@ -69,6 +69,14 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         const rows=results[1].status==='fulfilled'?results[1].value:{error:true};
         if(!overview.error){
             for(const [key,title,glyph,tone] of [['sessions','Phiên tra cứu','search','blue'],['applied','Phiên đã mở giá','open','violet'],['not_found','Không có kết quả','empty','rose'],['pending','Gợi ý chờ duyệt','clock','amber'],['approved','Kiến thức đã duyệt','check','green']]){const card=node('article',undefined,'pk-metric'),symbol=node('span',undefined,'pk-metric-icon'),copy=node('div');card.dataset.tone=tone;symbol.append(icon(glyph));copy.append(node('strong',formatNumber(overview.data?.[key])),node('span',title));card.append(symbol,copy);view.metrics.append(card);}
+            const pending=Number(overview.data?.pending || 0);
+            view.nextTitle.textContent=pending>0?'Bước tiếp theo: kiểm tra '+formatNumber(pending)+' gợi ý trong bộ lọc':'Chưa có gợi ý chờ duyệt trong bộ lọc';
+            view.nextCopy.textContent=pending>0?'Mở từng gợi ý, xem nguồn, đối chiếu tên kho và phạm vi xe rồi duyệt tên đúng. Chỉ kiến thức đã duyệt mới được dùng lại.':'Hệ thống tạo gợi ý khi người dùng mở kết quả tra cứu có hãng và dòng xe. Bạn có thể đổi bộ lọc để xem các gợi ý khác.';
+            setButtonLabel(view.nextButton,'Mở gợi ý chờ duyệt'+(pending>0?' ('+formatNumber(pending)+')':''));
+        }else{
+            view.nextTitle.textContent='Kiểm tra gợi ý để bổ sung kiến thức';
+            view.nextCopy.textContent='Chưa tải được số lượng gợi ý. Bạn vẫn có thể mở danh sách chờ duyệt để kiểm tra.';
+            setButtonLabel(view.nextButton,'Mở gợi ý chờ duyệt');
         }
         if(rows.error){view.status.textContent='Chưa tải được dữ liệu. Kiểm tra kết nối và bấm Làm mới.';return;}
         view.rows=rows.data || [];view.count=rows.count || 0;
@@ -78,7 +86,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         else if(view.mode==='sessions')renderSessions(view,view.rows);
         else if(view.mode==='events')renderEvents(view,view.rows);
         else renderKnowledge(view,view.rows);
-        if(!view.rows.length)view.content.append(node('div','Không có dữ liệu phù hợp với bộ lọc.','pk-empty'));
+        if(!view.rows.length)view.content.append(node('div',view.mode==='pending'?'Chưa có gợi ý chờ duyệt trong bộ lọc. Gợi ý được tạo khi người dùng mở kết quả tra cứu có hãng và dòng xe.':view.mode==='approved'?'Chưa có kiến thức đã duyệt trong bộ lọc. Mở Gợi ý chờ duyệt để kiểm tra và duyệt tên đúng.':'Không có dữ liệu phù hợp với bộ lọc.','pk-empty'));
         if(view.mode!=='overview'){
             view.pagination.append(node('span',formatNumber(view.count)+' bản ghi · Trang '+(view.page+1)));
             const prev=btn('Trang trước',()=>{view.page--;load();});prev.disabled=view.page===0;
@@ -88,7 +96,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         view.status.textContent=(overview.error?'Chưa tải được chỉ số tổng hợp. ':'')+'Cập nhật lúc '+new Date().toLocaleTimeString('vi-VN')+'. Chỉ số tổng hợp dựa trên phiên tạo trong khoảng ngày đã chọn.';
     }
     function renderOverview(view,rows){
-        view.content.append(node('p','Phân tích tối đa 500 phiên gần nhất trong bộ lọc. Thao tác chọn và mở giá là tín hiệu sử dụng, chưa xác nhận đúng loại phụ tùng.','pk-note'));
+        view.content.append(node('p','Dùng bảng này để phát hiện từ khóa cần bổ sung kiến thức, ưu tiên các lượt chưa có kết quả hoặc gặp lỗi. Tổng hợp tối đa 500 phiên mới nhất trong bộ lọc.','pk-note'));
         const terms=new Map();for(const row of rows){const key=row.original_query.normalize('NFC').toLowerCase(),item=terms.get(key)||{query:row.original_query,total:0,missing:0,selected:0};item.total++;if(['not_found','error'].includes(row.outcome))item.missing++;if(row.selected_names?.length)item.selected++;terms.set(key,item);}
         view.content.append(table(['Nội dung tìm kiếm','Số phiên','Chưa có kết quả / gặp lỗi','Phiên có lựa chọn'],[...terms.values()].sort((a,b)=>b.missing-a.missing||b.total-a.total).slice(0,50).map(item=>[item.query,String(item.total),String(item.missing),String(item.selected)])));
     }
@@ -107,7 +115,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         })));
     }
     function renderKnowledge(view,rows){
-        view.content.append(node('p','Gợi ý ghi nhận tự động chỉ được áp dụng sau khi quản trị viên kiểm tra và duyệt.','pk-note'));
+        view.content.append(node('p',view.mode==='pending'?'Với mỗi gợi ý: xem Nguồn & lịch sử → Duyệt / chỉnh sửa → kiểm tra tên và phạm vi xe → nhập căn cứ → Duyệt & áp dụng. Thao tác mở giá chưa chứng minh đúng phụ tùng.':view.mode==='approved'?'Các tên gọi này được dùng lại trong tra cứu bằng AI khi trùng từ khóa và toàn bộ bộ lọc xe, đồng thời tên còn trong kho.':'Các kiến thức tại đây không được dùng trong tra cứu. Bạn có thể mở nguồn và chỉnh sửa để xem xét lại.','pk-note'));
         view.content.append(table(['Tên gọi → tên kho','Phạm vi xe','Nguồn bằng chứng','Cập nhật','Thao tác'],rows.map(row=>{
             const name=node('div');name.append(node('strong',row.alias+' → '+row.canonical_name),node('small',row.note || 'Chưa có ghi chú'));
             const evidence=node('div');evidence.append(badge(observed(row),row.evidence_type==='observed'?'amber':'blue'),node('small',userName(row.created_by)));
@@ -178,7 +186,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         if(host===root&&owner===getOwner()&&state){await load();return;}
         clear();host=root;owner=getOwner();if(!host)return;
         const hero=node('section',undefined,'pk-hero'),header=node('header',undefined,'pk-header'),copy=node('div'),actions=node('div',undefined,'pk-row-actions');
-        copy.append(node('p','TRUNG TÂM KIẾN THỨC','pk-eyebrow'),node('h1','Lịch sử & kiến thức tìm kiếm'),node('p','Quản lý dữ liệu sử dụng, kiểm tra bằng chứng và duyệt kiến thức dùng chung.','pk-subtitle'));
+        copy.append(node('p','TRUNG TÂM KIẾN THỨC','pk-eyebrow'),node('h1','Lịch sử & kiến thức tìm kiếm'),node('p','Xem người dùng tìm gì và duyệt tên gọi đúng để dùng lại cho những lần tra cứu sau.','pk-subtitle'));
         const exportButton=btn('Xuất dữ liệu trang',exportPage,false,'download'),refresh=btn('Làm mới',load,true,'refresh');actions.append(exportButton,refresh);header.append(copy,actions);
         const filtersBox=node('form',undefined,'pk-filters'),fields={};
         function field(key,title,type,choices){const label=node('label',title),input=node(choices?'select':'input');if(type)input.type=type;if(choices)for(const [value,text] of choices){const option=node('option',text);option.value=value;input.append(option);}label.append(input);filtersBox.append(label);fields[key]=input;return input;}
@@ -189,12 +197,23 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         const metrics=node('div',undefined,'pk-metrics'),tabs=node('nav',undefined,'pk-tabs'),content=node('div',undefined,'pk-content'),pagination=node('footer',undefined,'pk-pagination'),status=node('p','','pk-status');status.setAttribute('role','status');
         const workspace=node('section',undefined,'pk-workspace'),panelHead=node('header',undefined,'pk-panel-head'),panelCopy=node('div'),panelTitle=node('h2','Tổng quan tìm kiếm'),panelSubtitle=node('p','Các nội dung được tra cứu và mức độ sử dụng.','pk-panel-subtitle'),total=badge('Đang tải…','blue');panelCopy.append(panelTitle,panelSubtitle);panelHead.append(panelCopy,total);
         tabs.setAttribute('aria-label','Danh mục lịch sử và kiến thức');
-        state={mode:'overview',page:0,fields,metrics,content,pagination,status,total,rows:[],count:0,export:exportButton};
-        for(const [key,title] of [['overview','Tổng quan'],['sessions','Phiên tra cứu'],['events','Thao tác'],['pending','Chờ duyệt'],['approved','Đã duyệt'],['disabled','Ngừng áp dụng'],['rejected','Từ chối']]){
-            const tab=btn(title,()=>{state.mode=key;state.page=0;panelTitle.textContent=key==='overview'?'Tổng quan tìm kiếm':key==='sessions'?'Lịch sử phiên tra cứu':key==='events'?'Nhật ký thao tác':'Kiến thức · '+title;panelSubtitle.textContent=key==='overview'?'Các nội dung được tra cứu và mức độ sử dụng.':key==='sessions'?'Yêu cầu tìm kiếm, phạm vi xe và kết quả của từng phiên.':key==='events'?'Các thao tác được ghi nhận trong quá trình tra cứu.':'Kiểm tra bằng chứng và quản lý kiến thức dùng chung.';tabs.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===tab)));load();});tab.setAttribute('aria-pressed',String(key==='overview'));tabs.append(tab);
+        const modes=[['overview','Tổng quan'],['sessions','Phiên tra cứu'],['events','Thao tác'],['pending','Gợi ý chờ duyệt'],['approved','Đã duyệt'],['disabled','Ngừng áp dụng'],['rejected','Từ chối']];
+        function selectMode(key){
+            if(!allowed()||!state)return;
+            const title=modes.find(([mode])=>mode===key)?.[1];if(!title)return;
+            state.mode=key;state.page=0;
+            panelTitle.textContent=key==='overview'?'Tổng quan tìm kiếm':key==='sessions'?'Lịch sử phiên tra cứu':key==='events'?'Nhật ký thao tác':'Kiến thức · '+title;
+            panelSubtitle.textContent=key==='overview'?'Các nội dung được tra cứu và mức độ sử dụng.':key==='sessions'?'Yêu cầu tìm kiếm, phạm vi xe và kết quả của từng phiên.':key==='events'?'Các thao tác được ghi nhận trong quá trình tra cứu.':'Kiểm tra bằng chứng và quản lý kiến thức dùng chung.';
+            tabs.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===key)));load();
         }
+        const nextStep=node('div',undefined,'pk-next-step'),nextText=node('div'),nextTitle=node('strong','Kiểm tra gợi ý để bổ sung kiến thức','pk-next-title'),nextCopy=node('p','Chỉ tên đã duyệt mới được dùng lại khi trùng từ khóa, phạm vi xe và vẫn còn trong kho.','pk-next-copy'),nextButton=btn('Mở gợi ý chờ duyệt',()=>{selectMode('pending');workspace.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});tabs.querySelector('[data-mode="pending"]')?.focus({preventScroll:true});},true,'check');nextText.append(nextTitle,nextCopy);nextStep.append(nextText,nextButton);
+        state={mode:'overview',page:0,fields,metrics,content,pagination,status,total,nextTitle,nextCopy,nextButton,rows:[],count:0,export:exportButton};
+        for(const [key,title] of modes){const tab=btn(title,()=>selectMode(key));tab.dataset.mode=key;tab.setAttribute('aria-pressed',String(key==='overview'));tabs.append(tab);}
+        const help=node('details',undefined,'pk-help'),steps=node('ol',undefined,'pk-help-steps');help.append(node('summary','Trang này hoạt động thế nào? Xem ví dụ'));
+        for(const [title,description] of [['1. Tự động ghi nhận','Lưu từ khóa, bộ lọc xe, tên gợi ý và tên người dùng đã mở. Tab Phiên tra cứu và Thao tác giúp xem lại nguồn.'],['2. Bạn kiểm tra và duyệt','Mở Gợi ý chờ duyệt, xem Nguồn & lịch sử, chọn Duyệt / chỉnh sửa. Kiểm tra tên kho, hãng, dòng, năm, loại hàng rồi nhập căn cứ duyệt.'],['3. Dùng lại khi tìm bằng AI','Khi trùng từ khóa và toàn bộ bộ lọc xe, hệ thống đối chiếu tên đã duyệt với kho. Không có kiến thức phù hợp thì tiếp tục gọi AI.']]){const item=node('li');item.append(node('strong',title),node('p',description));steps.append(item);}
+        help.append(steps,node('p','Ví dụ: người dùng tìm “cản trước”, mở tên “CẢN TRƯỚC” trong kho. Hệ thống tạo gợi ý tên gọi → tên kho. Sau khi bạn kiểm tra và duyệt đúng phạm vi xe, lần tìm bằng AI với “cản trước” và cùng bộ lọc sẽ dùng lại tên này nếu vẫn có trong kho. Mở giá chỉ là tín hiệu sử dụng; bạn cần kiểm tra đúng phụ tùng trước khi duyệt.','pk-help-example'));
         const notice=node('p',undefined,'pk-notice');notice.append(icon('shield'),node('span','Tự động ghi nhận trong phạm vi tra cứu: nội dung tìm, bộ lọc xe, lựa chọn và thao tác mở kết quả. Dữ liệu các tài khoản chỉ dành cho quản trị viên.'));
-        hero.append(header,metrics,notice);workspace.append(panelHead,tabs,filtersBox,status,content,pagination);host.append(hero,workspace);
+        hero.append(header,metrics,nextStep,help,notice);workspace.append(panelHead,tabs,filtersBox,status,content,pagination);host.append(hero,workspace);
         const actor=owner;
         const {data}=await supabase.from('user_profiles').select('id,full_name,email').order('full_name',{ascending:true}).limit(1000).abortSignal(AbortSignal.timeout(12000));
         if(!allowed()||owner!==actor)return;

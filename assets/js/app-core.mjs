@@ -1,5 +1,5 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
-        import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-ui-v2";
+        import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-ui-v3";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";

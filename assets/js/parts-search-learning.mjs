@@ -1,5 +1,5 @@
 import {sameKnowledgeScope,normalizePartName} from './parts-search-intelligence.mjs?v=20261019-passive-v1';
-import {createPartsKnowledgePage} from './parts-knowledge-page.mjs?v=20261019-knowledge-ui-v2';
+import {createPartsKnowledgePage} from './parts-knowledge-page.mjs?v=20261019-knowledge-ui-v3';
 const scope=c=>({brand:String(c.brand || ''),models:[...new Set(c.models || [])].map(String).sort(),years:[...new Set((c.years || []).map(Number))].sort((a,b)=>a-b),kind:c.kind || 'all'});
 const namesOf=list=>[...new Set((list || []).filter(n=>typeof n==='string'&&n.trim().length>=2&&n.length<=180).map(n=>n.trim()))].slice(0,40);
 export function createPartsSearchLearning({supabase,getOwner,isAdmin,canSearch}){

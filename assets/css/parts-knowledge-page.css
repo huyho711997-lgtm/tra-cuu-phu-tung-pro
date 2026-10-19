@@ -1,7 +1,7 @@
 /* Shared admin-page proportions, scoped to the search knowledge workspace. */
 #searchKnowledgeSection.pk-page {
   --pk-ink:#101828; --pk-muted:#748197; --pk-line:#e2e8f0; --pk-surface:#fff;
-  box-sizing:border-box; width:100%; max-width:1650px; margin:0 auto; padding:20px;
+  box-sizing:border-box; width:100%; max-width:none; min-width:0; margin:0; padding:16px;
   color:var(--pk-ink); background:#f3f6fb; border:1px solid #dbe5f1; border-radius:20px;
   box-shadow:0 26px 58px -42px rgba(15,23,42,.58);
 }
@@ -46,7 +46,18 @@
 .pk-page .pk-metric[data-tone=green] .pk-metric-icon { background:#e9f8f0; color:#15976a; }
 .pk-page .pk-notice { display:flex; align-items:flex-start; gap:7px; margin:16px 0 0; font-size:11px; line-height:1.7; color:#7a8ba4; }
 .pk-page .pk-notice svg { width:14px; height:14px; flex-shrink:0; margin-top:2px; color:#6688bc; }
-.pk-page .pk-workspace { margin-top:18px; border:1px solid #dfe6f0; border-radius:19px; background:var(--pk-surface); box-shadow:0 22px 55px -35px rgba(15,23,42,.4); }
+.pk-page .pk-next-step { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:16px; padding:14px 16px; border:1px solid #dce7fb; border-radius:12px; background:#edf4ff; }
+.pk-page .pk-next-title { display:block; font-size:12px; line-height:1.6; font-weight:800; color:#274c8c; }
+.pk-page .pk-next-copy { margin:3px 0 0; font-size:11.5px; line-height:1.65; color:#607899; }
+.pk-page .pk-help { margin-top:13px; font-size:12px; color:#607899; }
+.pk-page .pk-help summary { width:fit-content; cursor:pointer; font-size:11.5px; font-weight:700; color:#436ab0; padding:4px 0; }
+.pk-page .pk-help summary:focus-visible { outline:3px solid #93bbff; outline-offset:3px; border-radius:4px; }
+.pk-page .pk-help-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:12px 0; padding:0; list-style:none; }
+.pk-page .pk-help-steps li { padding:13px 15px; border:1px solid #dee6f1; border-radius:12px; background:var(--pk-surface); }
+.pk-page .pk-help-steps strong { display:block; font-size:12px; color:var(--pk-ink); margin-bottom:5px; }
+.pk-page .pk-help-steps p, .pk-page .pk-help-example { margin:0; font-size:11.5px; line-height:1.8; }
+.pk-page .pk-help-example { padding:12px 15px; border-left:3px solid #93b6f1; background:rgba(255,255,255,.6); border-radius:0 8px 8px 0; }
+.pk-page .pk-workspace { margin-top:18px; scroll-margin-top:90px; border:1px solid #dfe6f0; border-radius:19px; background:var(--pk-surface); box-shadow:0 22px 55px -35px rgba(15,23,42,.4); }
 .pk-page .pk-panel-head { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:19px 20px; border-bottom:1px solid var(--pk-line); }
 .pk-page .pk-panel-head h2 { font-size:17px; line-height:1.4; font-weight:800; margin:0; letter-spacing:-.02em; }
 .pk-page .pk-panel-subtitle { margin:4px 0 0; font-size:11.5px; color:#8b96a7; }
@@ -97,6 +108,12 @@
 .dark .pk-page .pk-panel-head, .dark .pk-page .pk-tabs, .dark .pk-page .pk-filters, .dark .pk-page .pk-pagination, .dark .pk-table-wrap td { border-color:#2b3b53; }
 .dark .pk-table-wrap tbody tr:hover { background:#1a2b43; }
 .dark .pk-note { background:#193153; border-color:#304e79; color:#adc5e9; }
+.dark .pk-page .pk-next-step { background:#193153; border-color:#304e79; }
+.dark .pk-page .pk-next-title { color:#c8ddff; }
+.dark .pk-page .pk-next-copy, .dark .pk-page .pk-help { color:#a2b3ca; }
+.dark .pk-page .pk-help summary { color:#aacbff; }
+.dark .pk-page .pk-help-steps li { border-color:#2e415d; }
+.dark .pk-page .pk-help-example { background:#142238; border-color:#476ca6; }
 .dark .pk-avatar { background:#234373; color:#bdd6ff; }
 @media(max-width:1350px) {
   .pk-page .pk-filters { grid-template-columns:repeat(3,minmax(0,1fr)); }
@@ -125,6 +142,8 @@
   .pk-page .pk-pagination { flex-wrap:wrap; padding:14px 16px; }
   .pk-page .pk-pagination>span { flex-basis:100%; }
   .pk-page .pk-status { padding:11px 16px; }
+  .pk-page .pk-next-step { align-items:flex-start; flex-direction:column; gap:10px; }
+  .pk-page .pk-help-steps { grid-template-columns:1fr; gap:8px; }
 }
 .pk-capture-notice { display:block; max-width:100%; font-size:9px; line-height:1.5; color:#a3b5cc; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; }
 .pk-capture-status { display:block; font-size:9px; color:#d6ad6c; line-height:1.5; }
