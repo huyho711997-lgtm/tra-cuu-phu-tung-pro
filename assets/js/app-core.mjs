@@ -1,6 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints } from "./vehicle-quick-input.mjs?v=20261107-quick-v1";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -3375,6 +3376,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         window.clearFilters = function() {
             window.resetPartsBatchSearch?.();
             window.resetPartsAiSearch?.();
+            window.clearVehicleQuick?.();
             selectHang(''); clearAllNam(); selectType('all');
             document.getElementById('searchInput').value = '';
             document.getElementById('exactPartName').value = '0';
@@ -3971,6 +3973,226 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             } finally { if (ticket === PARTS_AI_REVISION) setPartsAiBusy(false); }
         };
         // PARTS_AI_SEARCH_END
+
+        // VEHICLE_QUICK_INPUT_BEGIN
+        // Một ô nhập: "Mazda CX5 2019 cản trước" -> tự chọn hãng/dòng/đời/loại hàng rồi tra cứu; thiếu thông tin thì hỏi lại.
+        let VQ_REVISION = 0;
+        let VQ_SESSION = null;
+        const VQ_KIND_LABELS = { all: 'Tất cả loại hàng', genuine: 'Chính hãng', aftermarket: 'Hàng ngoài' };
+        function vqEl(tag, className = '', text = '') {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text) node.textContent = text;
+            return node;
+        }
+        function setVehicleQuickStatus(message = '', tone = '') {
+            const node = document.getElementById('vehicleQuickStatus');
+            if (node) { node.textContent = message; node.dataset.tone = tone; }
+        }
+        function setVehicleQuickBusy(busy) {
+            const button = document.getElementById('btnVehicleQuick');
+            if (!button) return;
+            button.disabled = busy;
+            button.setAttribute('aria-busy', String(busy));
+            const label = button.querySelector('span');
+            if (label) label.textContent = busy ? 'Đang phân tích...' : 'Phân tích & tìm';
+        }
+        window.resetVehicleQuick = function() {
+            ++VQ_REVISION;
+            VQ_SESSION?.controller?.abort();
+            VQ_SESSION = null;
+            const panel = document.getElementById('vehicleQuickPanel');
+            if (panel) { panel.replaceChildren(); panel.hidden = true; }
+            setVehicleQuickBusy(false);
+            setVehicleQuickStatus('');
+        };
+        window.clearVehicleQuick = function() {
+            window.resetVehicleQuick();
+            const input = document.getElementById('vehicleQuickText');
+            if (input) input.value = '';
+        };
+        async function requestVehicleQuickAi(text, brand, signal) {
+            await loadQuoteApiSettingsForCurrentUser();
+            if (signal.aborted || !hasSelectedAiKey()) return null;
+            const answer = await callSelectedAiGenerateContent([{ text: buildVehicleQuickAiPrompt(text, CAY_GIA_PHA, brand) }],
+                { responseMimeType: 'application/json', maxOutputTokens: 512 }, { signal });
+            // Kết quả AI chỉ được dùng khi khớp đúng hãng/dòng/năm có trong kho.
+            return sanitizeVehicleAiHints(extractJsonObjectFromGeminiText(answer.output), CAY_GIA_PHA);
+        }
+        window.runVehicleQuickInput = async function() {
+            const text = String(document.getElementById('vehicleQuickText')?.value || '').trim();
+            if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) {
+                setVehicleQuickStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', 'error'); return;
+            }
+            if (text.length < 2) { setVehicleQuickStatus('Nhập hãng, dòng xe, đời xe và phụ tùng cần tìm. VD: Mazda CX5 2019 cản trước.', 'error'); document.getElementById('vehicleQuickText')?.focus(); return; }
+            if (!Object.keys(CAY_GIA_PHA || {}).length) { setVehicleQuickStatus('Danh sách hãng và dòng xe đang tải. Hãy thử lại sau ít giây.', 'error'); return; }
+            window.resetVehicleQuick();
+            VQ_SESSION = { text, overrides: {}, aiTried: false, controller: new AbortController() };
+            await advanceVehicleQuick(VQ_REVISION);
+        };
+        async function advanceVehicleQuick(ticket) {
+            const session = VQ_SESSION;
+            if (!session || ticket !== VQ_REVISION) return;
+            let plan = parseVehicleQuickInput(session.text, CAY_GIA_PHA, session.overrides);
+            if (plan.empty) { setVehicleQuickStatus('Chưa có dữ liệu xe để phân tích.', 'error'); return; }
+            if (plan.needsAi && !session.aiTried) {
+                session.aiTried = true;
+                setVehicleQuickBusy(true);
+                setVehicleQuickStatus('Chưa nhận ra đủ hãng/dòng xe, AI đang phân tích câu nhập...');
+                let hints = null;
+                try { hints = await requestVehicleQuickAi(session.text, plan.brand, session.controller.signal); }
+                catch (error) { if (ticket !== VQ_REVISION || error?.name === 'AbortError') return; }
+                finally { if (ticket === VQ_REVISION) setVehicleQuickBusy(false); }
+                if (ticket !== VQ_REVISION) return;
+                // Luôn đặt hints (kể cả rỗng) để không gọi AI lặp lại.
+                session.overrides = { ...session.overrides, hints: hints || { brand: '', models: [], years: [], kind: '', part: '' } };
+                plan = parseVehicleQuickInput(session.text, CAY_GIA_PHA, session.overrides);
+                setVehicleQuickStatus('');
+            }
+            session.plan = plan;
+            if (plan.ready) { applyVehicleQuickPlan(plan, ticket); return; }
+            renderVehicleQuickPanel(plan, ticket);
+        }
+        function answerVehicleQuick(ticket, question, values, skipped = false, extra = null) {
+            const session = VQ_SESSION;
+            if (!session || ticket !== VQ_REVISION) return;
+            const overrides = { ...session.overrides };
+            if (typeof extra?.part === 'string') overrides.part = extra.part;
+            if (question.id === 'brand') { overrides.brand = values[0]; delete overrides.models; delete overrides.years; delete overrides.yearsSkipped; }
+            else if (question.id === 'model') { overrides.models = values; delete overrides.years; delete overrides.yearsSkipped; }
+            else if (question.id === 'year') {
+                if (skipped || !values.length) { overrides.years = []; overrides.yearsSkipped = true; }
+                else { overrides.years = values.map(Number); delete overrides.yearsSkipped; }
+            }
+            session.overrides = overrides;
+            advanceVehicleQuick(ticket);
+        }
+        function renderVehicleQuickQuestion(question, ticket, getExtra = () => null) {
+            const block = vqEl('div', 'vq-question');
+            block.appendChild(vqEl('h4', '', question.prompt));
+            const buttons = question.options.map(option => {
+                const button = vqEl('button', 'vq-option', option.label);
+                button.type = 'button';
+                button.setAttribute('aria-pressed', String(!!option.preselected));
+                return button;
+            });
+            if (question.options.length > 12) {
+                const filter = vqEl('input', 'vq-filter');
+                filter.type = 'search'; filter.placeholder = 'Lọc nhanh...'; filter.autocomplete = 'off';
+                filter.setAttribute('aria-label', 'Lọc danh sách lựa chọn');
+                filter.addEventListener('input', () => {
+                    const needle = normalizePartsBatchTerm(filter.value);
+                    buttons.forEach((button, index) => { button.hidden = !!needle && !normalizePartsBatchTerm(question.options[index].label).includes(needle); });
+                });
+                block.appendChild(filter);
+            }
+            const list = vqEl('div', 'vq-options');
+            list.setAttribute('role', 'group'); list.setAttribute('aria-label', question.prompt);
+            buttons.forEach(button => list.appendChild(button));
+            block.appendChild(list);
+            const selectedValues = () => question.options.filter((_, index) => buttons[index].getAttribute('aria-pressed') === 'true').map(option => option.value);
+            if (!question.multi) {
+                buttons.forEach((button, index) => button.addEventListener('click', () => answerVehicleQuick(ticket, question, [question.options[index].value], false, getExtra())));
+                return block;
+            }
+            const actions = vqEl('div', 'vq-actions');
+            const confirm = vqEl('button', 'vq-confirm', 'Xác nhận lựa chọn');
+            confirm.type = 'button';
+            const syncConfirm = () => { confirm.disabled = !selectedValues().length; };
+            buttons.forEach(button => button.addEventListener('click', () => {
+                button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true')); syncConfirm();
+            }));
+            confirm.addEventListener('click', () => answerVehicleQuick(ticket, question, selectedValues(), false, getExtra()));
+            actions.appendChild(confirm);
+            if (question.skip) {
+                const skip = vqEl('button', 'vq-skip', question.skip.label);
+                skip.type = 'button';
+                skip.addEventListener('click', () => answerVehicleQuick(ticket, question, [], true, getExtra()));
+                actions.appendChild(skip);
+            }
+            block.appendChild(actions);
+            syncConfirm();
+            return block;
+        }
+        function renderVehicleQuickPanel(plan, ticket) {
+            const panel = document.getElementById('vehicleQuickPanel');
+            if (!panel) return;
+            panel.replaceChildren();
+            const asking = id => plan.questions.some(question => question.id === id);
+            const chips = [
+                ['Hãng xe', plan.brand, !plan.brand],
+                ['Dòng xe', plan.models.join(', '), !plan.models.length],
+                ['Đời xe', plan.years.join(', ') || (asking('year') ? '' : 'Tất cả năm'), asking('year')],
+                ['Loại hàng', VQ_KIND_LABELS[plan.kind] || VQ_KIND_LABELS.all, false],
+                ['Phụ tùng', plan.parts.join(', '), !plan.parts.length]
+            ];
+            const row = vqEl('div', 'vq-chips');
+            chips.forEach(([label, value, missing]) => {
+                const chip = vqEl('div', 'vq-chip');
+                chip.dataset.missing = String(!!missing && !value);
+                chip.append(vqEl('small', '', label), vqEl('strong', '', value || (label === 'Phụ tùng' ? 'Chưa nhập' : 'Chưa rõ')));
+                row.appendChild(chip);
+            });
+            panel.appendChild(row);
+            plan.notes.forEach(note => panel.appendChild(vqEl('p', 'vq-note', note)));
+            // Không nhận ra tên dòng xe: chữ lạ đó đang bị tính vào tên phụ tùng, cho người dùng sửa trước khi chọn dòng xe.
+            let partInput = null;
+            if (plan.questions.some(question => question.id === 'model') && !plan.modelOptions.length && plan.part) {
+                const field = vqEl('div', 'vq-question');
+                field.appendChild(vqEl('h4', '', 'Tên phụ tùng cần tìm (xóa chữ nào là tên xe nếu có):'));
+                partInput = vqEl('input', 'vq-filter');
+                partInput.type = 'text'; partInput.value = plan.part; partInput.maxLength = 180; partInput.autocomplete = 'off';
+                partInput.setAttribute('aria-label', 'Tên phụ tùng cần tìm');
+                partInput.style.maxWidth = '420px';
+                field.appendChild(partInput);
+                panel.appendChild(field);
+            }
+            const getExtra = () => partInput ? { part: partInput.value } : null;
+            plan.questions.forEach(question => panel.appendChild(renderVehicleQuickQuestion(question, ticket, getExtra)));
+            panel.hidden = false;
+            setVehicleQuickStatus('Cần thêm thông tin để chọn đúng xe trước khi tra cứu.');
+            panel.querySelector('.vq-option')?.focus({ preventScroll: true });
+        }
+        function applyVehicleQuickPlan(plan, ticket) {
+            if (ticket !== VQ_REVISION) return;
+            try {
+                if (plan.parts.length <= 1 && PARTS_BATCH_MODE) window.setPartsBatchMode(false, { render: false, focus: false });
+                window.resetPartsAiSearch?.();
+                // Chọn bộ lọc đúng theo thứ tự phụ thuộc của giao diện: hãng -> dòng xe -> năm SX -> loại hàng.
+                selectHang(plan.brand);
+                document.querySelectorAll('input[name="hieu_xe"]').forEach(cb => { cb.checked = plan.models.includes(cb.value); });
+                onHieuXeChange();
+                if (plan.years.length) {
+                    document.querySelectorAll('input[name="nam_sx"]').forEach(cb => { cb.checked = plan.years.includes(Number(cb.value)); });
+                    onNamSXChange();
+                }
+                selectType(plan.kind);
+                const panel = document.getElementById('vehicleQuickPanel');
+                if (panel) { panel.replaceChildren(); panel.hidden = true; }
+                const vehicle = [plan.brand, plan.models.join(', '), plan.years.length ? 'đời ' + plan.years.join(', ') : 'tất cả năm'].join(' · ');
+                const input = document.getElementById('searchInput');
+                if (plan.parts.length > 1) {
+                    window.setPartsBatchMode(true, { focus: false, render: false });
+                    const area = document.getElementById('partsBatchInput');
+                    if (area) area.value = plan.parts.join('\n');
+                    window.updatePartsBatchDraft();
+                    setVehicleQuickStatus('Đã chọn ' + vehicle + '. Đang phân tích ' + plan.parts.length + ' phụ tùng bằng AI.', 'ok');
+                    window.runPartsBatchSearch();
+                } else if (plan.part) {
+                    if (input) input.value = plan.part;
+                    toggleClearBtn();
+                    setVehicleQuickStatus('Đã chọn ' + vehicle + ' · ' + plan.part + (plan.notes.length ? ' · ' + plan.notes.join(' ') : ''), 'ok');
+                    window.searchData();
+                } else {
+                    setVehicleQuickStatus('Đã chọn ' + vehicle + '. Nhập tên phụ tùng ở ô bên dưới rồi bấm tìm.', 'ok');
+                    input?.focus();
+                }
+            } catch (error) {
+                console.error('Lỗi áp dụng nhập nhanh:', error);
+                setVehicleQuickStatus('Chưa áp dụng được bộ lọc xe. Hãy chọn thủ công ở các ô bên dưới.', 'error');
+            }
+        }
+        // VEHICLE_QUICK_INPUT_END
 
         // THỰC THI TRA CỨU PHỤ TÙNG DATA
         let PARTS_DATA_SEARCH_REVISION = 0;

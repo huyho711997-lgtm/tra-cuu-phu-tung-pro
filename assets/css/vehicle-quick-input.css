@@ -1,0 +1,60 @@
+/* Ô nhập nhanh: hãng + dòng + đời xe + phụ tùng trong một câu */
+.vq-quick{position:relative;z-index:10;margin:0 0 18px;padding:14px 16px;border:1px solid #cfe0fb;border-radius:14px;background:linear-gradient(135deg,#f5f9ff,#eef4ff);box-shadow:0 10px 26px -22px rgba(37,99,235,.7)}
+.vq-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.vq-label{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;font:800 11px 'Plus Jakarta Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#2563eb}
+.vq-label svg{width:15px;height:15px}
+.vq-field{position:relative;flex:1 1 320px;min-width:0}
+.vq-field input{width:100%;height:46px;padding:0 14px;border:1px solid #bcd2f7;border-radius:11px;background:#fff;color:#1e293b;font:700 13px 'Plus Jakarta Sans',sans-serif;box-shadow:0 5px 14px -13px rgba(15,23,42,.48);transition:border-color .15s,box-shadow .15s}
+.vq-field input::placeholder{color:#8aa0c0;font-weight:600}
+.vq-field input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+.vq-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;height:46px;padding:0 18px;border:1px solid rgba(37,99,235,.8);border-radius:11px;background:linear-gradient(145deg,#3b82f6,#2563eb 58%,#1d4ed8);color:#fff;font:800 12px 'Plus Jakarta Sans',sans-serif;cursor:pointer;box-shadow:0 12px 24px -14px rgba(37,99,235,.9),inset 0 1px 0 rgba(255,255,255,.28)}
+.vq-btn:hover{filter:brightness(1.06)}
+.vq-btn:disabled{opacity:.65;cursor:progress}
+.vq-btn svg{width:15px;height:15px}
+.vq-status{margin-top:8px;color:#526581;font-size:12px;line-height:1.6;min-height:0}
+.vq-status:empty{display:none}
+.vq-status[data-tone="error"]{color:#b45309}
+.vq-status[data-tone="ok"]{color:#15803d}
+.vq-panel{margin-top:12px;padding:14px;border:1px solid #d6e4fb;border-radius:12px;background:#fff}
+.vq-panel[hidden]{display:none}
+.vq-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.vq-chip{display:inline-flex;flex-direction:column;gap:1px;min-width:92px;padding:7px 11px;border:1px solid #dbe6f7;border-radius:10px;background:#f8fbff}
+.vq-chip small{font:800 9.5px 'Plus Jakarta Sans',sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#7b8fae}
+.vq-chip strong{font:800 12.5px 'Plus Jakarta Sans',sans-serif;color:#1e293b;word-break:break-word}
+.vq-chip[data-missing="true"]{border-style:dashed;background:#fffbeb;border-color:#f3d28a}
+.vq-chip[data-missing="true"] strong{color:#b45309}
+.vq-question{padding-top:12px;border-top:1px dashed #d6e4fb}
+.vq-question:first-of-type{border-top:0;padding-top:0}
+.vq-question h4{margin:0 0 8px;font:800 13px 'Plus Jakarta Sans',sans-serif;color:#1e3a6e;line-height:1.5}
+.vq-filter{width:100%;max-width:280px;height:36px;margin-bottom:8px;padding:0 11px;border:1px solid #d3e0f5;border-radius:9px;background:#fff;color:#1e293b;font:600 12px 'Plus Jakarta Sans',sans-serif}
+.vq-filter:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.vq-options{display:flex;flex-wrap:wrap;gap:7px;max-height:176px;overflow-y:auto;padding:2px}
+.vq-option{min-height:34px;padding:6px 13px;border:1px solid #cddcf4;border-radius:999px;background:#fff;color:#27466d;font:700 12px 'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:all .12s}
+.vq-option:hover{background:#eaf1fc;border-color:#9fbdf0}
+.vq-option[aria-pressed="true"]{background:#2563eb;border-color:#2563eb;color:#fff}
+.vq-option[hidden]{display:none}
+.vq-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.vq-confirm,.vq-skip{min-height:36px;padding:7px 15px;border-radius:9px;font:800 12px 'Plus Jakarta Sans',sans-serif;cursor:pointer}
+.vq-confirm{border:1px solid #2563eb;background:#2563eb;color:#fff}
+.vq-confirm:disabled{opacity:.45;cursor:not-allowed}
+.vq-skip{border:1px solid #cddcf4;background:#fff;color:#27466d}
+.vq-skip:hover{background:#eaf1fc}
+.vq-note{margin:0 0 10px;color:#92611a;font-size:12px;line-height:1.6}
+html.dark .vq-quick,.dark .vq-quick{border-color:#27456f;background:linear-gradient(135deg,#13243d,#16294a)}
+html.dark .vq-label,.dark .vq-label{color:#93c5fd}
+html.dark .vq-field input,.dark .vq-field input{border-color:#334155;background:#1e293b;color:#f8fafc}
+html.dark .vq-status,.dark .vq-status{color:#a0b4cf}
+html.dark .vq-status[data-tone="error"],.dark .vq-status[data-tone="error"]{color:#fbbf24}
+html.dark .vq-status[data-tone="ok"],.dark .vq-status[data-tone="ok"]{color:#4ade80}
+html.dark .vq-panel,.dark .vq-panel{border-color:#27456f;background:#101c30}
+html.dark .vq-chip,.dark .vq-chip{border-color:#334155;background:#16253a}
+html.dark .vq-chip strong,.dark .vq-chip strong{color:#e2e8f0}
+html.dark .vq-chip[data-missing="true"],.dark .vq-chip[data-missing="true"]{border-color:#92611a;background:#2a2112}
+html.dark .vq-chip[data-missing="true"] strong,.dark .vq-chip[data-missing="true"] strong{color:#fbbf24}
+html.dark .vq-question,.dark .vq-question{border-color:#27456f}
+html.dark .vq-question h4,.dark .vq-question h4{color:#bfdbfe}
+html.dark .vq-filter,.dark .vq-filter,html.dark .vq-option,.dark .vq-option,html.dark .vq-skip,.dark .vq-skip{border-color:#334155;background:#1e293b;color:#e2e8f0}
+html.dark .vq-option[aria-pressed="true"],.dark .vq-option[aria-pressed="true"]{border-color:#3b82f6;background:#2563eb;color:#fff}
+html.dark .vq-note,.dark .vq-note{color:#fbbf24}
+@media (max-width:640px){.vq-btn{width:100%}.vq-label{width:100%}}
+@media (prefers-reduced-motion:reduce){.vq-field input,.vq-option{transition:none}}
