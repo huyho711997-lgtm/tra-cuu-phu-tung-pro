@@ -1,7 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
-        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples } from "./vehicle-quick-input.mjs?v=20261107-quick-v2";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples } from "./vehicle-quick-input.mjs?v=20261107-quick-v4";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -4088,7 +4088,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 setVehicleQuickStatus('');
             }
             session.plan = plan;
-            if (plan.ready) { applyVehicleQuickPlan(plan, ticket); return; }
+            if (plan.ready) { await applyVehicleQuickPlan(plan, ticket); return; }
             renderVehicleQuickPanel(plan, ticket);
         }
         function answerVehicleQuick(ticket, question, values, skipped = false, extra = null) {
@@ -4191,7 +4191,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             setVehicleQuickStatus('Cần thêm thông tin để chọn đúng xe trước khi tra cứu.');
             panel.querySelector('.vq-option')?.focus({ preventScroll: true });
         }
-        function applyVehicleQuickPlan(plan, ticket) {
+        async function applyVehicleQuickPlan(plan, ticket) {
             if (ticket !== VQ_REVISION) return;
             try {
                 if (plan.parts.length <= 1 && PARTS_BATCH_MODE) window.setPartsBatchMode(false, { render: false, focus: false });
@@ -4223,8 +4223,32 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 } else if (plan.part) {
                     if (input) input.value = plan.part;
                     toggleClearBtn();
-                    showVehicleQuickResult(plan, plan.notes.join(' '));
-                    window.searchData();
+                    const notes = plan.notes.join(' ');
+                    let aiReady = false;
+                    try {
+                        await loadQuoteApiSettingsForCurrentUser();
+                        aiReady = hasSelectedAiKey() && plan.part.length >= 2 && plan.part.length <= 180;
+                    } catch (_) { aiReady = false; }
+                    if (ticket !== VQ_REVISION) return;
+                    if (aiReady) {
+                        // AI lọc sẵn các tên hạng mục trong kho của xe đã chọn để người dùng tick chọn ngay.
+                        showVehicleQuickResult(plan, (notes + ' AI đang lọc tên hạng mục trong kho, chọn ở danh sách bên dưới.').trim());
+                        await window.runPartsAiSearch();
+                        if (ticket !== VQ_REVISION) return;
+                        const results = document.getElementById('partsAiResults');
+                        if (results && !results.hidden && results.childElementCount) {
+                            results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            showVehicleQuickResult(plan, (notes + ' Chọn tên hạng mục AI đã lọc bên dưới.').trim());
+                        } else {
+                            // AI lỗi hoặc không có gợi ý: quay về tìm thường để không mất kết quả.
+                            window.resetPartsAiSearch?.();
+                            showVehicleQuickResult(plan, (notes + ' AI chưa có gợi ý, đã tìm thường.').trim());
+                            window.searchData();
+                        }
+                    } else {
+                        showVehicleQuickResult(plan, notes);
+                        window.searchData();
+                    }
                 } else {
                     showVehicleQuickResult(plan, 'Nhập tên phụ tùng ở ô bên dưới rồi bấm tìm.');
                     input?.focus();
