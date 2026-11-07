@@ -1,7 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
-        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints } from "./vehicle-quick-input.mjs?v=20261107-quick-v1";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples } from "./vehicle-quick-input.mjs?v=20261107-quick-v2";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -2360,6 +2360,7 @@
             fillNamSXDropdown(NAM_ALL);
             renderQuoteVehicleSelectors();
             requestVehiclePartCounts(document.getElementById('filterHang')?.value || '');
+            window.refreshVehicleQuickExamples?.();
         }
         function isVehicleGenealogyEmpty(data = {}) {
             const cay = data?.cay_gia_pha_xe || {};
@@ -3997,6 +3998,43 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const label = button.querySelector('span');
             if (label) label.textContent = busy ? 'Đang phân tích...' : 'Phân tích & tìm';
         }
+        // Kết quả áp dụng hiển thị dạng chip (thay cho một dòng chữ dài).
+        function showVehicleQuickResult(plan, tail = '') {
+            const node = document.getElementById('vehicleQuickStatus');
+            if (!node) return;
+            node.replaceChildren();
+            node.dataset.tone = 'ok';
+            const lead = vqEl('span', 'vq-result-lead');
+            lead.append(vqEl('span', 'vq-check', '✓'), document.createTextNode('Đã áp dụng'));
+            node.appendChild(lead);
+            const chips = [['Hãng', plan.brand], ['Dòng xe', plan.models.join(', ')], ['Đời', plan.years.join(', ') || 'Tất cả năm'],
+                ['Loại', plan.kind === 'all' ? '' : VQ_KIND_LABELS[plan.kind]], ['Phụ tùng', plan.parts.join(', ')]];
+            chips.forEach(([label, value]) => {
+                if (!value) return;
+                const chip = vqEl('span', 'vq-result-chip');
+                chip.append(vqEl('small', '', label), vqEl('strong', '', value));
+                node.appendChild(chip);
+            });
+            if (tail) node.appendChild(vqEl('span', 'vq-result-tail', tail));
+        }
+        window.refreshVehicleQuickExamples = function() {
+            const box = document.getElementById('vehicleQuickExamples');
+            if (!box) return;
+            box.replaceChildren();
+            const examples = buildVehicleQuickExamples(CAY_GIA_PHA, 3);
+            if (examples.length) box.appendChild(vqEl('span', 'vq-examples-label', 'Thử nhanh'));
+            examples.forEach(text => {
+                const button = vqEl('button', 'vq-example', text);
+                button.type = 'button';
+                button.addEventListener('click', () => {
+                    const input = document.getElementById('vehicleQuickText');
+                    if (input) input.value = text;
+                    window.runVehicleQuickInput();
+                });
+                box.appendChild(button);
+            });
+            box.hidden = !examples.length;
+        };
         window.resetVehicleQuick = function() {
             ++VQ_REVISION;
             VQ_SESSION?.controller?.abort();
@@ -4163,28 +4201,32 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 document.querySelectorAll('input[name="hieu_xe"]').forEach(cb => { cb.checked = plan.models.includes(cb.value); });
                 onHieuXeChange();
                 if (plan.years.length) {
-                    document.querySelectorAll('input[name="nam_sx"]').forEach(cb => { cb.checked = plan.years.includes(Number(cb.value)); });
+                    const seenYears = new Set();
+                    document.querySelectorAll('input[name="nam_sx"]').forEach(cb => {
+                        const year = Number(cb.value), want = plan.years.includes(year) && !seenYears.has(year);
+                        if (want) seenYears.add(year);
+                        cb.checked = want;
+                    });
                     onNamSXChange();
                 }
                 selectType(plan.kind);
                 const panel = document.getElementById('vehicleQuickPanel');
                 if (panel) { panel.replaceChildren(); panel.hidden = true; }
-                const vehicle = [plan.brand, plan.models.join(', '), plan.years.length ? 'đời ' + plan.years.join(', ') : 'tất cả năm'].join(' · ');
                 const input = document.getElementById('searchInput');
                 if (plan.parts.length > 1) {
                     window.setPartsBatchMode(true, { focus: false, render: false });
                     const area = document.getElementById('partsBatchInput');
                     if (area) area.value = plan.parts.join('\n');
                     window.updatePartsBatchDraft();
-                    setVehicleQuickStatus('Đã chọn ' + vehicle + '. Đang phân tích ' + plan.parts.length + ' phụ tùng bằng AI.', 'ok');
+                    showVehicleQuickResult(plan, 'Đang phân tích ' + plan.parts.length + ' phụ tùng bằng AI...');
                     window.runPartsBatchSearch();
                 } else if (plan.part) {
                     if (input) input.value = plan.part;
                     toggleClearBtn();
-                    setVehicleQuickStatus('Đã chọn ' + vehicle + ' · ' + plan.part + (plan.notes.length ? ' · ' + plan.notes.join(' ') : ''), 'ok');
+                    showVehicleQuickResult(plan, plan.notes.join(' '));
                     window.searchData();
                 } else {
-                    setVehicleQuickStatus('Đã chọn ' + vehicle + '. Nhập tên phụ tùng ở ô bên dưới rồi bấm tìm.', 'ok');
+                    showVehicleQuickResult(plan, 'Nhập tên phụ tùng ở ô bên dưới rồi bấm tìm.');
                     input?.focus();
                 }
             } catch (error) {

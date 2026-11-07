@@ -278,3 +278,21 @@ export function sanitizeVehicleAiHints(raw, tree, now = new Date().getFullYear()
     out.part = typeof raw.part === 'string' ? raw.part.replace(/\s+/g, ' ').trim().slice(0, 180) : '';
     return out;
 }
+
+// Ví dụ bấm nhanh lấy từ chính dữ liệu kho: chỉ giữ câu mà bộ phân tích hiểu trọn vẹn (không phải hỏi lại).
+export function buildVehicleQuickExamples(tree, limit = 3, parts = ['cản trước', 'đèn pha trái', 'gương chiếu hậu'], now = new Date().getFullYear()) {
+    const brands = Object.keys(tree || {}).sort((a, b) => Object.keys(tree[b] || {}).length - Object.keys(tree[a] || {}).length || a.localeCompare(b, 'vi'));
+    const titled = name => name.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase());
+    const examples = [];
+    for (const brand of brands) {
+        if (examples.length >= limit) break;
+        const models = Object.keys(tree[brand] || {}).sort((a, b) => yearsOf(tree, brand, b).length - yearsOf(tree, brand, a).length || a.localeCompare(b, 'vi'));
+        for (const model of models.slice(0, 12)) {
+            const years = yearsOf(tree, brand, model);
+            const text = [titled(brand), model, years.length ? Math.max(...years) : '', parts[examples.length % parts.length]].filter(Boolean).join(' ');
+            const plan = parseVehicleQuickInput(text, tree, {now});
+            if (plan.ready && plan.brand === brand && plan.models.length === 1 && plan.models[0] === model) { examples.push(text); break; }
+        }
+    }
+    return examples;
+}

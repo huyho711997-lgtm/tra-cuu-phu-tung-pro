@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseVehicleQuickInput as parse, sanitizeVehicleAiHints as sanitize, buildVehicleCatalogText, buildVehicleQuickAiPrompt} from '../assets/js/vehicle-quick-input.mjs';
+import {parseVehicleQuickInput as parse, sanitizeVehicleAiHints as sanitize, buildVehicleCatalogText, buildVehicleQuickAiPrompt, buildVehicleQuickExamples} from '../assets/js/vehicle-quick-input.mjs';
 
 const tree = {
     MAZDA: {'CX-5': [2022, 2019, 2018], 'CX-8': [2021, 2020], MAZDA3: [2020, 2019], MAZDA6: [2018]},
@@ -203,4 +203,20 @@ test('người dùng sửa lại tên phụ tùng khi chọn dòng xe (bỏ ch�
     assert.deepEqual(edited.parts, ['đèn pha', 'gương trái']);
     assert.equal(edited.ready, true);
     assert.deepEqual(run('mazda xyz 2020 đèn pha', {models: ['CX-8'], part: '   '}).parts, []);
+});
+
+test('ví dụ bấm nhanh lấy từ dữ liệu kho và luôn được hiểu trọn vẹn không phải hỏi lại', () => {
+    const examples = buildVehicleQuickExamples(tree, 3, undefined, NOW);
+    assert.equal(examples.length, 3);
+    for (const text of examples) {
+        const plan = run(text);
+        assert.equal(plan.ready, true, text);
+        assert.equal(plan.questions.length, 0, text);
+    }
+    // TOYOTA có nhiều dòng nhất nhưng VIOS bị trùng tiền tố với VIOS 1.5G nên phải bị bỏ qua.
+    assert.ok(examples[0].startsWith('Toyota '), examples[0]);
+    assert.ok(!/Vios (2020|2019|2018)/i.test(examples[0]), examples[0]);
+    assert.ok(examples.some(text => /^Mercedes-Benz /.test(text)) || examples.some(text => /^Mazda /.test(text)));
+    assert.deepEqual(buildVehicleQuickExamples({}, 3, undefined, NOW), []);
+    assert.deepEqual(buildVehicleQuickExamples(null), []);
 });
