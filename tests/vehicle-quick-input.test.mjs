@@ -220,3 +220,15 @@ test('ví dụ bấm nhanh lấy từ dữ liệu kho và luôn được hiểu 
     assert.deepEqual(buildVehicleQuickExamples({}, 3, undefined, NOW), []);
     assert.deepEqual(buildVehicleQuickExamples(null), []);
 });
+
+import {normalizeRegistrationFields, buildRegistrationAiPrompt} from '../assets/js/vehicle-quick-input.mjs';
+test('đăng kiểm: chuẩn hoá trường AI trả về', () => {
+    const f = normalizeRegistrationFields({bien_so: '47a-123.45', nhan_hieu: ' vinfast ', ten_thuong_mai: 'VF5 PLUS', so_loai: 'X', nam_san_xuat: 'Năm 2024', so_khung: 'rl4abc'}, 2026);
+    assert.equal(f.text, 'vinfast VF5 PLUS 2024'); assert.equal(f.plate, '47A-123.45'); assert.equal(f.vin, 'RL4ABC'); assert.equal(f.found, true);
+});
+test('đăng kiểm: năm vô lý bị bỏ, thiếu tên thương mại thì dùng số loại, dữ liệu rác không lỗi', () => {
+    assert.equal(normalizeRegistrationFields({nhan_hieu: 'TOYOTA', so_loai: 'CAMRY 2.5Q', nam_san_xuat: '2099'}, 2026).text, 'TOYOTA CAMRY 2.5Q');
+    assert.equal(normalizeRegistrationFields(null).found, false);
+    assert.equal(normalizeRegistrationFields({nhan_hieu: {x: 1}, nam_san_xuat: ['2020']}).found, false);
+    assert.ok(buildRegistrationAiPrompt().includes('nhan_hieu'));
+});

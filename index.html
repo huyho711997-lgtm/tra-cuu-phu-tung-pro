@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="assets/css/app.css?v=20261019-vault"/>
 <link rel="stylesheet" href="assets/css/parts-knowledge-page.css?v=20261019-knowledge-unified-v1"/>
-<link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261107-quick-v4"/>
+<link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261107-quick-v5"/>
 
 
 
@@ -564,7 +564,7 @@
 </div>
 <button class="vq-btn" id="btnVehicleQuick" type="button" onclick="runVehicleQuickInput()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" stroke-linejoin="round" stroke-linecap="round"/></svg><span>Phân tích &amp; tìm</span></button>
 </div>
-<div class="vq-meta"><span class="vq-help">Tự nhận hãng, dòng, đời xe và loại hàng; thiếu gì sẽ hỏi lại.</span><span class="vq-examples" id="vehicleQuickExamples" hidden></span></div>
+<div class="vq-meta"><button class="vq-reg" id="btnVehicleReg" type="button" onclick="openVehicleRegistrationPicker()" title="Tải ảnh hoặc PDF giấy đăng kiểm / đăng ký xe để tự điền hãng, dòng, đời xe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" stroke-linejoin="round"/><path d="M14 3v5h5M9 13h6M9 17h4" stroke-linecap="round"/></svg><span>Quét giấy đăng kiểm</span></button><input type="file" id="vehicleRegFile" accept="image/*,application/pdf" hidden onchange="runVehicleRegistration(this.files[0])"><span class="vq-help">Tự nhận hãng, dòng, đời xe và loại hàng; thiếu gì sẽ hỏi lại.</span><span class="vq-examples" id="vehicleQuickExamples" hidden></span></div>
 <div class="vq-status" id="vehicleQuickStatus" role="status" aria-live="polite"></div>
 <div class="vq-panel" id="vehicleQuickPanel" hidden aria-live="polite"></div>
 </section>
@@ -1785,7 +1785,7 @@
 </div>
 <script src="assets/js/document-libraries.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js" defer></script>
-<script type="module" src="assets/js/app-core.mjs?v=20261107-quick-v4"></script>
+<script type="module" src="assets/js/app-core.mjs?v=20261107-quick-v5"></script>
 <script src="assets/js/app-training.js"></script>
 
 <script id="kgptUnifiedPremiumDropdowns" src="assets/js/kgptUnifiedPremiumDropdowns.js"></script>

@@ -32,6 +32,17 @@
 .vq-quick .vq-btn[aria-busy="true"] svg{animation:vqPulse 1s ease-in-out infinite}
 @keyframes vqPulse{50%{opacity:.35;transform:scale(.86)}}
 
+/* Nút quét giấy đăng kiểm */
+.vq-quick .vq-reg{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 11px;border:1px solid #b9d0f5;border-radius:999px;background:#fff;color:#1d4ed8;
+    font:800 11.5px 'Plus Jakarta Sans',sans-serif;cursor:pointer;box-shadow:0 6px 14px -11px rgba(37,99,235,.7);transition:border-color .16s,background .16s,transform .16s}
+.vq-quick .vq-reg svg{width:14px;height:14px;flex:0 0 auto}
+.vq-quick .vq-reg:hover:not(:disabled){border-color:#3b82f6;background:#eff6ff;transform:translateY(-1px)}
+.vq-quick .vq-reg:focus-visible{outline:3px solid rgba(37,99,235,.3);outline-offset:1px}
+.vq-quick .vq-reg:disabled{opacity:.75;cursor:progress}
+.vq-quick .vq-reg[aria-busy="true"] svg{animation:vqPulse 1s ease-in-out infinite}
+html.dark .vq-quick .vq-reg,.dark .vq-quick .vq-reg{border-color:#3a5c8f;background:rgba(30,41,59,.8);color:#bfdbfe}
+@media (max-width:720px){.vq-quick .vq-reg{width:100%;justify-content:center;height:36px}}
+
 /* Dòng gợi ý + ví dụ bấm nhanh (lấy từ dữ liệu thật của kho) */
 .vq-quick .vq-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-top:12px}
 .vq-quick .vq-help{color:var(--vq-muted);font-size:11.5px;line-height:1.5}

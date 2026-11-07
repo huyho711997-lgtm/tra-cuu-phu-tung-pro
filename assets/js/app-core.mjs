@@ -1,7 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
-        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples } from "./vehicle-quick-input.mjs?v=20261107-quick-v4";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v5";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -4045,6 +4045,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             setVehicleQuickStatus('');
         };
         window.clearVehicleQuick = function() {
+            VQ_REG_CONTROLLER?.abort();
             window.resetVehicleQuick();
             const input = document.getElementById('vehicleQuickText');
             if (input) input.value = '';
@@ -4258,6 +4259,68 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 setVehicleQuickStatus('Chưa áp dụng được bộ lọc xe. Hãy chọn thủ công ở các ô bên dưới.', 'error');
             }
         }
+        // Quét giấy đăng kiểm/đăng ký xe bằng AI -> điền câu nhập nhanh -> chạy bộ phân tích có sẵn (hỏi lại nếu thiếu).
+        const VQ_REG_MAX_BYTES = 8 * 1024 * 1024;
+        let VQ_REG_CONTROLLER = null;
+        function setVehicleRegBusy(busy) {
+            const button = document.getElementById('btnVehicleReg');
+            if (!button) return;
+            button.disabled = busy;
+            button.setAttribute('aria-busy', String(busy));
+            const label = button.querySelector('span');
+            if (label) label.textContent = busy ? 'Đang đọc giấy...' : 'Quét giấy đăng kiểm';
+        }
+        window.openVehicleRegistrationPicker = function() {
+            if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) {
+                setVehicleQuickStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', 'error'); return;
+            }
+            document.getElementById('vehicleRegFile')?.click();
+        };
+        window.runVehicleRegistration = async function(file) {
+            const picker = document.getElementById('vehicleRegFile');
+            if (picker) picker.value = '';
+            if (!file) return;
+            const name = String(file.name || '').toLowerCase();
+            const isPdf = file.type === 'application/pdf' || name.endsWith('.pdf');
+            if (!isPdf && !String(file.type || '').startsWith('image/')) { setVehicleQuickStatus('Chỉ nhận ảnh (JPG, PNG...) hoặc PDF giấy đăng kiểm.', 'error'); return; }
+            if (file.size > VQ_REG_MAX_BYTES) { setVehicleQuickStatus('File quá lớn (tối đa 8MB). Hãy chụp/nén nhỏ hơn.', 'error'); return; }
+            if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) { setVehicleQuickStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', 'error'); return; }
+            if (!Object.keys(CAY_GIA_PHA || {}).length) { setVehicleQuickStatus('Danh sách hãng và dòng xe đang tải. Hãy thử lại sau ít giây.', 'error'); return; }
+            VQ_REG_CONTROLLER?.abort();
+            const controller = VQ_REG_CONTROLLER = new AbortController();
+            window.resetVehicleQuick();
+            setVehicleRegBusy(true);
+            setVehicleQuickStatus('AI đang đọc giấy đăng kiểm...');
+            try {
+                await loadQuoteApiSettingsForCurrentUser();
+                if (!hasSelectedAiKey()) throw new Error('Chưa có ' + getLlmProviderName() + ' API key. Mở Cài đặt AI để nhập key.');
+                const parts = [{ text: buildRegistrationAiPrompt() }];
+                if (getLlmProvider() === 'groq') {
+                    if (!getQuoteOcrSpaceKey()) throw new Error('Groq cần OCR.Space API key để đọc ảnh/PDF. Nhập key trong Cài đặt AI hoặc chuyển sang Gemini.');
+                    parts.push({ text: '\nNỘI DUNG GIẤY (OCR):\n' + String((await callOcrSpaceApi(file)).text || '').slice(0, 6000) });
+                } else {
+                    parts.push({ inline_data: { mime_type: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'), data: await fileToBase64(file) } });
+                }
+                const answer = await callSelectedAiGenerateContent(parts, { responseMimeType: 'application/json', maxOutputTokens: 512, temperature: 0 },
+                    { signal: controller.signal, timeoutMs: 60000, maxRetriesPerModel: 1 });
+                if (controller !== VQ_REG_CONTROLLER) return;
+                const fields = normalizeRegistrationFields(extractJsonObjectFromGeminiText(answer.output));
+                if (!fields.found) { setVehicleQuickStatus('Không đọc được hãng/dòng xe từ giấy này. Hãy chụp rõ hơn hoặc nhập tay.', 'error'); return; }
+                const input = document.getElementById('vehicleQuickText');
+                const typed = String(input?.value || '').trim();
+                // Giữ lại phụ tùng đã gõ sẵn; phần hãng/dòng/đời trong câu cũ được thay bằng thông tin trên giấy.
+                const typedPlan = typed ? parseVehicleQuickInput(typed, CAY_GIA_PHA) : null;
+                const typedPart = !typed ? '' : typedPlan?.brand ? (typedPlan.parts || []).join(', ') : typed;
+                if (input) input.value = [fields.text, typedPart].filter(Boolean).join(' ').slice(0, 300);
+                const info = [fields.plate, [fields.brand, fields.model].filter(Boolean).join(' '), fields.year || ''].filter(Boolean).join(' · ');
+                setVehicleQuickStatus('Đọc được: ' + info + '. Đang đối chiếu với kho...');
+                setVehicleRegBusy(false);
+                await window.runVehicleQuickInput();
+            } catch (error) {
+                if (error?.name === 'AbortError' || controller !== VQ_REG_CONTROLLER) return;
+                setVehicleQuickStatus(error?.message || 'Không đọc được giấy đăng kiểm bằng AI. Hãy thử lại hoặc nhập tay.', 'error');
+            } finally { if (controller === VQ_REG_CONTROLLER) { setVehicleRegBusy(false); VQ_REG_CONTROLLER = null; } }
+        };
         // VEHICLE_QUICK_INPUT_END
 
         // THỰC THI TRA CỨU PHỤ TÙNG DATA

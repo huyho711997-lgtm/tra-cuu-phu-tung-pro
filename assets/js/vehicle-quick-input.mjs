@@ -296,3 +296,33 @@ export function buildVehicleQuickExamples(tree, limit = 3, parts = ['cản trư�
     }
     return examples;
 }
+
+// ---- Nhận diện xe từ giấy đăng kiểm / đăng ký xe -------------------------------------------------
+export function buildRegistrationAiPrompt() {
+    return [
+        'Bạn đọc ảnh/PDF giấy chứng nhận kiểm định (đăng kiểm) hoặc giấy đăng ký xe ô tô của Việt Nam.',
+        'Chỉ trích xuất thông tin có trên giấy, không đoán. Trường nào không thấy thì để chuỗi rỗng.',
+        'Trả về DUY NHẤT một JSON: {"bien_so":"","nhan_hieu":"","ten_thuong_mai":"","so_loai":"","nam_san_xuat":"","so_khung":"","so_may":"","mau_son":""}.',
+        '- nhan_hieu: hãng xe (Brand/Nhãn hiệu), ví dụ TOYOTA, HYUNDAI, VINFAST.',
+        '- ten_thuong_mai: tên dòng xe (Commercial name / Tên thương mại) nếu có.',
+        '- so_loai: số loại / Model code nếu có (ví dụ VF5 PLUS, CAMRY 2.5Q).',
+        '- nam_san_xuat: năm sản xuất gồm 4 chữ số (Năm sản xuất / Manufactured year).',
+        '- bien_so, so_khung, so_may: chép nguyên văn.'
+    ].join('\n');
+}
+
+const cleanText = (value, max) => (typeof value === 'string' || typeof value === 'number' ? String(value) : '')
+    .replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+
+export function normalizeRegistrationFields(raw, now = new Date().getFullYear()) {
+    const data = raw && typeof raw === 'object' ? raw : {};
+    const brand = cleanText(data.nhan_hieu, 40), tradeName = cleanText(data.ten_thuong_mai, 60), modelCode = cleanText(data.so_loai, 60);
+    const yearMatch = cleanText(data.nam_san_xuat, 12).match(/(?:19|20)\d{2}/);
+    const year = yearMatch && Number(yearMatch[0]) >= 1980 && Number(yearMatch[0]) <= now + 1 ? Number(yearMatch[0]) : 0;
+    const fields = {brand, model: tradeName || modelCode, modelCode, year,
+        plate: cleanText(data.bien_so, 20).toUpperCase(), vin: cleanText(data.so_khung, 30).toUpperCase()};
+    // Câu nhập nhanh để đưa qua bộ phân tích có sẵn (nó sẽ hỏi lại khi dòng xe/đời xe chưa rõ).
+    fields.text = [fields.brand, fields.model, fields.year || ''].filter(Boolean).join(' ').trim();
+    fields.found = !!(fields.brand || fields.model);
+    return fields;
+}
