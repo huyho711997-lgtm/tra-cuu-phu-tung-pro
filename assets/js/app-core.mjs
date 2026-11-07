@@ -1,7 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
-        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v7";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v8";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -4349,6 +4349,26 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             box.append(media, body);
             box.hidden = false;
         }
+        // Thu nhỏ ảnh chụp từ điện thoại (thường vài MB) trước khi gửi AI để nhanh hơn và không vượt giới hạn dung lượng của backend.
+        async function prepareVehicleRegImage(file) {
+            const original = async () => ({ mime: file.type || 'image/jpeg', data: await fileToBase64(file) });
+            if (!String(file.type || '').startsWith('image/') || typeof createImageBitmap !== 'function') return original();
+            let bitmap = null;
+            try {
+                bitmap = await createImageBitmap(file);
+                const longSide = Math.max(bitmap.width, bitmap.height);
+                if (longSide <= 1600 && file.size <= 1024 * 1024) return original();
+                const scale = Math.min(1, 1600 / longSide);
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                const context = canvas.getContext('2d');
+                context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+                return blob && blob.size > 0 ? { mime: 'image/jpeg', data: await fileToBase64(blob) } : original();
+            } catch (_) { return original(); }
+            finally { try { bitmap?.close?.(); } catch (_) {} }
+        }
         window.openVehicleRegistrationPicker = function() {
             if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) {
                 setVehicleQuickStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', 'error'); return;
@@ -4372,15 +4392,23 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             try { VQ_REG_URL = URL.createObjectURL(file); } catch (_) { VQ_REG_URL = ''; }
             renderVehicleRegPreview(file, isPdf, null, 'Gemini đang đọc giấy...');
             setVehicleRegBusy(true);
-            setVehicleQuickStatus('Gemini đang đọc giấy đăng kiểm...');
+            // Backend AI không tự ngắt: tự đặt hạn 60s và hiện số giây để người dùng biết đang chạy, không bị treo vô hạn.
+            const startedAt = Date.now();
+            let timedOut = false;
+            const paintWaiting = () => { if (controller === VQ_REG_CONTROLLER && !timedOut) setVehicleQuickStatus('Gemini đang đọc giấy đăng kiểm... ' + Math.round((Date.now() - startedAt) / 1000) + 's'); };
+            paintWaiting();
+            const ticker = setInterval(paintWaiting, 1000);
+            const deadline = setTimeout(() => { timedOut = true; controller.abort(); }, 60000);
             try {
                 await loadQuoteApiSettingsForCurrentUser();
                 // Quét giấy đăng kiểm luôn dùng Gemini (đọc ảnh/PDF trực tiếp), bất kể AI đang chọn cho các tính năng khác.
                 if (!QUOTE_USER_API_SETTINGS.credentials?.gemini) throw new Error('Quét giấy đăng kiểm cần Gemini API key. Mở Cài đặt AI để nhập key Gemini.');
-                const parts = [{ text: buildRegistrationAiPrompt() },
-                    { inline_data: { mime_type: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'), data: await fileToBase64(file) } }];
-                const answer = await callGeminiGenerateContentWithRetry(parts, { responseMimeType: 'application/json', maxOutputTokens: 512, temperature: 0 },
-                    { signal: controller.signal, timeoutMs: 60000, maxRetriesPerModel: 1 });
+                const media = isPdf ? { mime: 'application/pdf', data: await fileToBase64(file) } : await prepareVehicleRegImage(file);
+                if (controller.signal.aborted) throw new DOMException('Đã hủy.', 'AbortError');
+                const parts = [{ text: buildRegistrationAiPrompt() }, { inline_data: { mime_type: media.mime, data: media.data } }];
+                const answer = await callGeminiGenerateContentWithRetry(parts, { responseMimeType: 'application/json', maxOutputTokens: 1024, temperature: 0 },
+                    { signal: controller.signal, maxRetriesPerModel: 1 });
+                clearInterval(ticker); clearTimeout(deadline);
                 if (controller !== VQ_REG_CONTROLLER) return;
                 const fields = normalizeRegistrationFields(extractJsonObjectFromGeminiText(answer.output));
                 if (!fields.found) {
@@ -4399,10 +4427,15 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 setVehicleRegBusy(false);
                 await window.runVehicleQuickInput();
             } catch (error) {
-                if (error?.name === 'AbortError' || controller !== VQ_REG_CONTROLLER) return;
+                if (controller !== VQ_REG_CONTROLLER) return;
+                if (timedOut) {
+                    renderVehicleRegPreview(file, isPdf, null, 'Gemini phản hồi quá lâu (60 giây).');
+                    setVehicleQuickStatus('Gemini phản hồi quá lâu. Hãy bấm quét lại, hoặc nhập tay hãng, dòng, đời xe ở ô trên.', 'error'); return;
+                }
+                if (error?.name === 'AbortError') return;
                 renderVehicleRegPreview(file, isPdf, null, 'Chưa đọc được giấy này bằng AI.');
                 setVehicleQuickStatus(typeof handleGeminiApiError === 'function' && !/Gemini API key/.test(error?.message || '') ? handleGeminiApiError(error) : (error?.message || 'Không đọc được giấy đăng kiểm bằng AI. Hãy thử lại hoặc nhập tay.'), 'error');
-            } finally { if (controller === VQ_REG_CONTROLLER) { setVehicleRegBusy(false); VQ_REG_CONTROLLER = null; } }
+            } finally { clearInterval(ticker); clearTimeout(deadline); if (controller === VQ_REG_CONTROLLER) { setVehicleRegBusy(false); VQ_REG_CONTROLLER = null; } }
         };
         // VEHICLE_QUICK_INPUT_END
 
