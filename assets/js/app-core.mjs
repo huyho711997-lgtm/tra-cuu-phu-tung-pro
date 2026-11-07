@@ -1,7 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
-        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v5";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v6";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -4290,18 +4290,14 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const controller = VQ_REG_CONTROLLER = new AbortController();
             window.resetVehicleQuick();
             setVehicleRegBusy(true);
-            setVehicleQuickStatus('AI đang đọc giấy đăng kiểm...');
+            setVehicleQuickStatus('Gemini đang đọc giấy đăng kiểm...');
             try {
                 await loadQuoteApiSettingsForCurrentUser();
-                if (!hasSelectedAiKey()) throw new Error('Chưa có ' + getLlmProviderName() + ' API key. Mở Cài đặt AI để nhập key.');
-                const parts = [{ text: buildRegistrationAiPrompt() }];
-                if (getLlmProvider() === 'groq') {
-                    if (!getQuoteOcrSpaceKey()) throw new Error('Groq cần OCR.Space API key để đọc ảnh/PDF. Nhập key trong Cài đặt AI hoặc chuyển sang Gemini.');
-                    parts.push({ text: '\nNỘI DUNG GIẤY (OCR):\n' + String((await callOcrSpaceApi(file)).text || '').slice(0, 6000) });
-                } else {
-                    parts.push({ inline_data: { mime_type: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'), data: await fileToBase64(file) } });
-                }
-                const answer = await callSelectedAiGenerateContent(parts, { responseMimeType: 'application/json', maxOutputTokens: 512, temperature: 0 },
+                // Quét giấy đăng kiểm luôn dùng Gemini (đọc ảnh/PDF trực tiếp), bất kể AI đang chọn cho các tính năng khác.
+                if (!QUOTE_USER_API_SETTINGS.credentials?.gemini) throw new Error('Quét giấy đăng kiểm cần Gemini API key. Mở Cài đặt AI để nhập key Gemini.');
+                const parts = [{ text: buildRegistrationAiPrompt() },
+                    { inline_data: { mime_type: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'), data: await fileToBase64(file) } }];
+                const answer = await callGeminiGenerateContentWithRetry(parts, { responseMimeType: 'application/json', maxOutputTokens: 512, temperature: 0 },
                     { signal: controller.signal, timeoutMs: 60000, maxRetriesPerModel: 1 });
                 if (controller !== VQ_REG_CONTROLLER) return;
                 const fields = normalizeRegistrationFields(extractJsonObjectFromGeminiText(answer.output));
@@ -4318,7 +4314,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 await window.runVehicleQuickInput();
             } catch (error) {
                 if (error?.name === 'AbortError' || controller !== VQ_REG_CONTROLLER) return;
-                setVehicleQuickStatus(error?.message || 'Không đọc được giấy đăng kiểm bằng AI. Hãy thử lại hoặc nhập tay.', 'error');
+                setVehicleQuickStatus(typeof handleGeminiApiError === 'function' && !/Gemini API key/.test(error?.message || '') ? handleGeminiApiError(error) : (error?.message || 'Không đọc được giấy đăng kiểm bằng AI. Hãy thử lại hoặc nhập tay.'), 'error');
             } finally { if (controller === VQ_REG_CONTROLLER) { setVehicleRegBusy(false); VQ_REG_CONTROLLER = null; } }
         };
         // VEHICLE_QUICK_INPUT_END
