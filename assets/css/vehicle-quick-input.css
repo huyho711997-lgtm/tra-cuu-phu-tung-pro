@@ -128,3 +128,40 @@ html.dark .vq-quick .vq-note,.dark .vq-quick .vq-note{background:#2a2112;color:#
 @media (prefers-reduced-motion:reduce){
     .vq-quick *{transition:none!important;animation:none!important}
 }
+
+/* Số lượng phụ tùng trên chip chọn dòng xe / đời xe */
+.vq-quick .vq-option{display:inline-flex;align-items:center;gap:8px}
+.vq-quick .vq-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 7px;border-radius:999px;background:#e8f0ff;color:#2f5590;font-size:10.5px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.vq-quick .vq-count[data-state="loading"]{opacity:.55}
+.vq-quick .vq-count[data-state="empty"],.vq-quick .vq-count[data-state="error"]{background:#f1f5f9;color:#94a3b8}
+.vq-quick .vq-option[aria-pressed="true"] .vq-count{background:rgba(255,255,255,.24);color:#fff}
+html.dark .vq-quick .vq-count,.dark .vq-quick .vq-count{background:#27406b;color:#bfdbfe}
+html.dark .vq-quick .vq-count[data-state="empty"],.dark .vq-quick .vq-count[data-state="empty"],html.dark .vq-quick .vq-count[data-state="error"],.dark .vq-quick .vq-count[data-state="error"]{background:#334155;color:#94a3b8}
+
+/* Xem lại giấy đăng kiểm đã quét */
+.vq-quick .vq-reg-preview{display:flex;gap:16px;align-items:flex-start;margin-top:14px;padding:14px;border:1px solid #cfe0fb;border-radius:14px;background:#fff;box-shadow:0 10px 24px -20px rgba(37,99,235,.7)}
+.vq-quick .vq-reg-preview[hidden]{display:none}
+.vq-quick .vq-reg-thumb{position:relative;flex:0 0 auto;width:200px;height:132px;padding:0;border:1px solid #c3d6f6;border-radius:11px;overflow:hidden;background:#f1f5fb;cursor:zoom-in}
+.vq-quick .vq-reg-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.vq-quick .vq-reg-zoom{position:absolute;right:7px;bottom:7px;padding:3px 9px;border-radius:999px;background:rgba(15,23,42,.72);color:#fff;font:700 10px 'Plus Jakarta Sans',sans-serif}
+.vq-quick .vq-reg-thumb.is-pdf{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:#b91c1c;background:#fef2f2;border-color:#fecaca}
+.vq-quick .vq-reg-thumb.is-pdf strong{font:900 26px 'Plus Jakarta Sans',sans-serif}
+.vq-quick .vq-reg-thumb.is-pdf span{font:700 11px 'Plus Jakarta Sans',sans-serif}
+.vq-quick .vq-reg-info{flex:1 1 auto;min-width:0}
+.vq-quick .vq-reg-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.vq-quick .vq-reg-head strong{color:var(--vq-ink);font-size:13px;font-weight:800}
+.vq-quick .vq-reg-file{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--vq-muted);font-size:11px}
+.vq-quick .vq-reg-hide{height:26px;padding:0 11px;border:1px solid #d5e1f5;border-radius:999px;background:#fff;color:#5a6f93;font:700 11px 'Plus Jakarta Sans',sans-serif;cursor:pointer}
+.vq-quick .vq-reg-hide:hover{background:#f1f5fb}
+.vq-quick .vq-reg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px;margin:10px 0 0}
+.vq-quick .vq-reg-grid dt{color:#7a90b3;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.vq-quick .vq-reg-grid dd{margin:2px 0 0;color:var(--vq-ink);font-size:12.5px;font-weight:800;word-break:break-word}
+.vq-quick .vq-reg-tip{margin:10px 0 0;color:var(--vq-muted);font-size:11.5px;line-height:1.5}
+html.dark .vq-quick .vq-reg-preview,.dark .vq-quick .vq-reg-preview{border-color:#2c4670;background:#0f1b30}
+html.dark .vq-quick .vq-reg-head strong,.dark .vq-quick .vq-reg-head strong,html.dark .vq-quick .vq-reg-grid dd,.dark .vq-quick .vq-reg-grid dd{color:#e2e8f0}
+html.dark .vq-quick .vq-reg-hide,.dark .vq-quick .vq-reg-hide{border-color:#334155;background:#1e293b;color:#cbd5e1}
+@media (max-width:720px){.vq-quick .vq-reg-preview{flex-direction:column}.vq-quick .vq-reg-thumb{width:100%;height:170px}}
+.vq-lightbox{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(8,15,30,.82);cursor:zoom-out}
+.vq-lightbox img{max-width:100%;max-height:100%;border-radius:10px;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.5);cursor:default}
+.vq-lightbox .vq-lightbox-close{position:absolute;top:16px;right:20px;width:40px;height:40px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;font-size:26px;line-height:1;cursor:pointer}
+.vq-lightbox .vq-lightbox-close:hover{background:rgba(255,255,255,.3)}

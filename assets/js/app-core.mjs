@@ -1,7 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
-        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v6";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v7";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -4046,6 +4046,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         };
         window.clearVehicleQuick = function() {
             VQ_REG_CONTROLLER?.abort();
+            revokeVehicleRegPreview();
             window.resetVehicleQuick();
             const input = document.getElementById('vehicleQuickText');
             if (input) input.value = '';
@@ -4106,15 +4107,37 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             session.overrides = overrides;
             advanceVehicleQuick(ticket);
         }
-        function renderVehicleQuickQuestion(question, ticket, getExtra = () => null) {
+        function paintVehicleQuickCounts(question, plan, buttons, ticket) {
+            const kind = question.id === 'model' ? 'Hieu' : 'Nam';
+            const paint = failed => buttons.forEach((button, index) => {
+                const badge = button.querySelector('.vq-count');
+                if (!badge) return;
+                const count = failed ? null : TascoFilterCounts.getCount(kind, question.options[index].value, { hang: plan.brand, models: plan.models, years: [] });
+                badge.textContent = count === null ? (failed ? '—' : '···') : formatNumberVN(count);
+                badge.dataset.state = count === null ? (failed ? 'error' : 'loading') : count === 0 ? 'empty' : 'ready';
+                if (count !== null) badge.title = formatNumberVN(count) + ' bản ghi phụ tùng trong kho';
+            });
+            paint(false);
+            Promise.resolve(TascoFilterCounts.ensure(plan.brand)).then(record => {
+                if (ticket !== VQ_REVISION) return;
+                paint(!record);
+            }).catch(() => { if (ticket === VQ_REVISION) paint(true); });
+        }
+        function renderVehicleQuickQuestion(question, ticket, getExtra = () => null, plan = null) {
             const block = vqEl('div', 'vq-question');
             block.appendChild(vqEl('h4', '', question.prompt));
+            // Số bản ghi phụ tùng trong kho của từng dòng xe / đời xe (dùng lại số liệu của bộ lọc chính).
+            const showCounts = !!plan?.brand && CAY_GIA_PHA[plan.brand] && typeof TascoFilterCounts !== 'undefined'
+                && (question.id === 'model' || (question.id === 'year' && plan.models.length > 0));
             const buttons = question.options.map(option => {
-                const button = vqEl('button', 'vq-option', option.label);
+                const button = vqEl('button', 'vq-option');
                 button.type = 'button';
                 button.setAttribute('aria-pressed', String(!!option.preselected));
+                button.appendChild(vqEl('span', 'vq-opt-label', option.label));
+                if (showCounts) { const badge = vqEl('span', 'vq-count', '···'); badge.title = 'Số bản ghi phụ tùng đang có trong kho'; button.appendChild(badge); }
                 return button;
             });
+            if (showCounts) paintVehicleQuickCounts(question, plan, buttons, ticket);
             if (question.options.length > 12) {
                 const filter = vqEl('input', 'vq-filter');
                 filter.type = 'search'; filter.placeholder = 'Lọc nhanh...'; filter.autocomplete = 'off';
@@ -4187,7 +4210,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 panel.appendChild(field);
             }
             const getExtra = () => partInput ? { part: partInput.value } : null;
-            plan.questions.forEach(question => panel.appendChild(renderVehicleQuickQuestion(question, ticket, getExtra)));
+            plan.questions.forEach(question => panel.appendChild(renderVehicleQuickQuestion(question, ticket, getExtra, plan)));
             panel.hidden = false;
             setVehicleQuickStatus('Cần thêm thông tin để chọn đúng xe trước khi tra cứu.');
             panel.querySelector('.vq-option')?.focus({ preventScroll: true });
@@ -4270,6 +4293,62 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const label = button.querySelector('span');
             if (label) label.textContent = busy ? 'Đang đọc giấy...' : 'Quét giấy đăng kiểm';
         }
+
+        // Xem lại ảnh/PDF giấy đã quét cạnh thông tin AI đọc được để người dùng đối chiếu.
+        let VQ_REG_URL = '';
+        function revokeVehicleRegPreview() {
+            if (VQ_REG_URL) { try { URL.revokeObjectURL(VQ_REG_URL); } catch (_) {} VQ_REG_URL = ''; }
+            const box = document.getElementById('vehicleRegPreview');
+            if (box) { box.replaceChildren(); box.hidden = true; }
+            document.getElementById('vqLightbox')?.remove();
+        }
+        function openVehicleRegLightbox(url) {
+            document.getElementById('vqLightbox')?.remove();
+            const overlay = vqEl('div', 'vq-lightbox');
+            overlay.id = 'vqLightbox'; overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-label', 'Ảnh giấy đăng kiểm');
+            const image = vqEl('img'); image.src = url; image.alt = 'Ảnh giấy đăng kiểm đã quét';
+            const close = vqEl('button', 'vq-lightbox-close', '×'); close.type = 'button'; close.setAttribute('aria-label', 'Đóng');
+            const dismiss = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+            const onKey = event => { if (event.key === 'Escape') dismiss(); };
+            overlay.addEventListener('click', event => { if (event.target !== image) dismiss(); });
+            document.addEventListener('keydown', onKey);
+            overlay.append(image, close);
+            document.body.appendChild(overlay);
+            close.focus();
+        }
+        function renderVehicleRegPreview(file, isPdf, fields = null, message = '') {
+            const box = document.getElementById('vehicleRegPreview');
+            if (!box || !VQ_REG_URL) return;
+            const url = VQ_REG_URL;
+            box.replaceChildren();
+            const media = vqEl('button', 'vq-reg-thumb'); media.type = 'button';
+            if (isPdf) {
+                media.classList.add('is-pdf');
+                media.append(vqEl('strong', '', 'PDF'), vqEl('span', '', 'Bấm để mở'));
+                media.addEventListener('click', () => window.open(url, '_blank', 'noopener'));
+            } else {
+                const image = vqEl('img'); image.src = url; image.alt = 'Ảnh giấy đăng kiểm đã quét';
+                media.append(image, vqEl('span', 'vq-reg-zoom', 'Phóng to'));
+                media.addEventListener('click', () => openVehicleRegLightbox(url));
+            }
+            media.title = isPdf ? 'Mở PDF trong tab mới' : 'Bấm để xem ảnh lớn';
+            const body = vqEl('div', 'vq-reg-info');
+            const head = vqEl('div', 'vq-reg-head');
+            head.append(vqEl('strong', '', 'Giấy đăng kiểm đã quét'), vqEl('span', 'vq-reg-file', String(file.name || '').slice(0, 60)));
+            const hide = vqEl('button', 'vq-reg-hide', 'Ẩn'); hide.type = 'button'; hide.addEventListener('click', revokeVehicleRegPreview);
+            head.appendChild(hide);
+            body.appendChild(head);
+            if (fields) {
+                const grid = vqEl('dl', 'vq-reg-grid');
+                [['Biển số', fields.plate], ['Nhãn hiệu', fields.brand], ['Dòng xe / tên thương mại', fields.model],
+                    ['Số loại', fields.modelCode && fields.modelCode !== fields.model ? fields.modelCode : ''], ['Năm sản xuất', fields.year || ''], ['Số khung', fields.vin]]
+                    .forEach(([label, value]) => { const item = vqEl('div'); item.append(vqEl('dt', '', label), vqEl('dd', '', value || '—')); grid.appendChild(item); });
+                body.appendChild(grid);
+                body.appendChild(vqEl('p', 'vq-reg-tip', 'Đối chiếu thông tin trên với ảnh. Sai thì sửa trong ô nhập nhanh rồi bấm Phân tích & tìm.'));
+            } else body.appendChild(vqEl('p', 'vq-reg-tip', message || 'Đang đọc giấy...'));
+            box.append(media, body);
+            box.hidden = false;
+        }
         window.openVehicleRegistrationPicker = function() {
             if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) {
                 setVehicleQuickStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', 'error'); return;
@@ -4289,6 +4368,9 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             VQ_REG_CONTROLLER?.abort();
             const controller = VQ_REG_CONTROLLER = new AbortController();
             window.resetVehicleQuick();
+            revokeVehicleRegPreview();
+            try { VQ_REG_URL = URL.createObjectURL(file); } catch (_) { VQ_REG_URL = ''; }
+            renderVehicleRegPreview(file, isPdf, null, 'Gemini đang đọc giấy...');
             setVehicleRegBusy(true);
             setVehicleQuickStatus('Gemini đang đọc giấy đăng kiểm...');
             try {
@@ -4301,7 +4383,11 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     { signal: controller.signal, timeoutMs: 60000, maxRetriesPerModel: 1 });
                 if (controller !== VQ_REG_CONTROLLER) return;
                 const fields = normalizeRegistrationFields(extractJsonObjectFromGeminiText(answer.output));
-                if (!fields.found) { setVehicleQuickStatus('Không đọc được hãng/dòng xe từ giấy này. Hãy chụp rõ hơn hoặc nhập tay.', 'error'); return; }
+                if (!fields.found) {
+                    renderVehicleRegPreview(file, isPdf, null, 'Không đọc được hãng/dòng xe trên giấy này.');
+                    setVehicleQuickStatus('Không đọc được hãng/dòng xe từ giấy này. Hãy chụp rõ hơn hoặc nhập tay.', 'error'); return;
+                }
+                renderVehicleRegPreview(file, isPdf, fields);
                 const input = document.getElementById('vehicleQuickText');
                 const typed = String(input?.value || '').trim();
                 // Giữ lại phụ tùng đã gõ sẵn; phần hãng/dòng/đời trong câu cũ được thay bằng thông tin trên giấy.
@@ -4314,6 +4400,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 await window.runVehicleQuickInput();
             } catch (error) {
                 if (error?.name === 'AbortError' || controller !== VQ_REG_CONTROLLER) return;
+                renderVehicleRegPreview(file, isPdf, null, 'Chưa đọc được giấy này bằng AI.');
                 setVehicleQuickStatus(typeof handleGeminiApiError === 'function' && !/Gemini API key/.test(error?.message || '') ? handleGeminiApiError(error) : (error?.message || 'Không đọc được giấy đăng kiểm bằng AI. Hãy thử lại hoặc nhập tay.'), 'error');
             } finally { if (controller === VQ_REG_CONTROLLER) { setVehicleRegBusy(false); VQ_REG_CONTROLLER = null; } }
         };
