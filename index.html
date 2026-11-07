@@ -7,7 +7,6 @@
 <title>KHO GIÁ PHỤ TÙNG - Hệ Thống Tra Cứu Giá Phụ Tùng</title>
 <link rel="stylesheet" href="assets/css/search-tools.css"/>
 <link rel="stylesheet" href="assets/css/parts-search-learning.css?v=20261019-passive-v1"/>
-<link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261107-quick-v1"/>
 
 
 
@@ -17,6 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="assets/css/app.css?v=20261019-vault"/>
 <link rel="stylesheet" href="assets/css/parts-knowledge-page.css?v=20261019-knowledge-unified-v1"/>
+<link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261107-quick-v2"/>
 
 
 
@@ -555,11 +555,16 @@
 </div>
 </div>
 <section class="vq-quick" id="vehicleQuickInput" aria-labelledby="vqTitle">
+<span class="vq-tag" id="vqTitle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z" stroke-linejoin="round"/></svg>NHẬP NHANH</span>
 <div class="vq-row">
-<label class="vq-label" id="vqTitle" for="vehicleQuickText"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z" stroke-linejoin="round"/></svg>Nhập nhanh</label>
-<div class="vq-field"><input id="vehicleQuickText" type="text" autocomplete="off" maxlength="300" placeholder="Hãng, dòng xe, đời xe và phụ tùng trong một ô. VD: Mazda CX5 2019 cản trước" oninput="resetVehicleQuick()" onkeydown="if(event.key==='Enter'){event.preventDefault();runVehicleQuickInput();}"/></div>
-<button class="vq-btn" id="btnVehicleQuick" type="button" onclick="runVehicleQuickInput()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m21 21-4.5-4.5M19 10.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0Z" stroke-linecap="round"/></svg><span>Phân tích &amp; tìm</span></button>
+<div class="vq-field">
+<svg class="vq-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5" stroke-linecap="round"/></svg>
+<input id="vehicleQuickText" type="text" aria-label="Nhập nhanh hãng, dòng xe, đời xe và phụ tùng" autocomplete="off" maxlength="300" placeholder="Gõ một câu, ví dụ: Mazda CX5 2019 cản trước" oninput="resetVehicleQuick()" onkeydown="if(event.key==='Enter'){event.preventDefault();runVehicleQuickInput();}"/>
+<kbd class="vq-kbd" aria-hidden="true">Enter ↵</kbd>
 </div>
+<button class="vq-btn" id="btnVehicleQuick" type="button" onclick="runVehicleQuickInput()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" stroke-linejoin="round" stroke-linecap="round"/></svg><span>Phân tích &amp; tìm</span></button>
+</div>
+<div class="vq-meta"><span class="vq-help">Tự nhận hãng, dòng, đời xe và loại hàng; thiếu gì sẽ hỏi lại.</span><span class="vq-examples" id="vehicleQuickExamples" hidden></span></div>
 <div class="vq-status" id="vehicleQuickStatus" role="status" aria-live="polite"></div>
 <div class="vq-panel" id="vehicleQuickPanel" hidden aria-live="polite"></div>
 </section>
@@ -1780,7 +1785,7 @@
 </div>
 <script src="assets/js/document-libraries.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js" defer></script>
-<script type="module" src="assets/js/app-core.mjs?v=20261107-quick-v1"></script>
+<script type="module" src="assets/js/app-core.mjs?v=20261107-quick-v2"></script>
 <script src="assets/js/app-training.js"></script>
 
 <script id="kgptUnifiedPremiumDropdowns" src="assets/js/kgptUnifiedPremiumDropdowns.js"></script>
