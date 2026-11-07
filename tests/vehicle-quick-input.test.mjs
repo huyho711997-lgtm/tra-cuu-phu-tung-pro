@@ -232,3 +232,30 @@ test('đăng kiểm: năm vô lý bị bỏ, thiếu tên thương mại thì d�
     assert.equal(normalizeRegistrationFields({nhan_hieu: {x: 1}, nam_san_xuat: ['2020']}).found, false);
     assert.ok(buildRegistrationAiPrompt().includes('nhan_hieu'));
 });
+
+import {rankSimilarModels} from '../assets/js/vehicle-quick-input.mjs';
+const VF = {VINFAST: {'VINFAST VF5 PLUS S5EJ06': [2026], 'VINFAST VF5': [2023, 2024], 'VINFAST VF8 PLUS': [2024], 'VINFAST LIMO GREEN': [2025]}, TOYOTA: {VIOS: [2020], CAMRY: [2020]}};
+test('dòng gần đúng: số loại trên giấy lệch vài ký tự vẫn ra dòng gần nhất, xếp theo độ giống', () => {
+    const ranked = rankSimilarModels(VF, 'VINFAST', 'VF 5 PLUS S5EJ01');
+    assert.equal(ranked[0].model, 'VINFAST VF5 PLUS S5EJ06');
+    assert.ok(ranked.some(item => item.model === 'VINFAST VF5'));
+    assert.deepEqual(rankSimilarModels(VF, 'VINFAST', 'zzzz'), []);
+    assert.deepEqual(rankSimilarModels(VF, 'KHONGCO', 'vf5'), []);
+});
+test('dòng gần đúng: câu hỏi dòng xe thêm các dòng gần đúng; số loại không bị tính vào tên phụ tùng', () => {
+    const plan = parse('VINFAST VF 5 PLUS S5EJ01 2024', VF, {modelQuery: 'VF 5 PLUS S5EJ01', part: ''});
+    const question = plan.questions.find(q => q.id === 'model');
+    assert.ok(question.options.some(o => o.value === 'VINFAST VF5' && o.similar === true));
+    assert.deepEqual(plan.parts, []);
+    assert.match(question.prompt, /gần đúng/);
+});
+test('dòng gần đúng: không khớp dòng nào -> dòng giống nhất xếp lên đầu, vẫn còn đủ các dòng khác', () => {
+    const plan = parse('vinfast limoo 2025', VF, {modelQuery: 'LIMOO GREEN'});
+    const options = plan.questions[0].options.map(o => o.value);
+    assert.equal(options[0], 'VINFAST LIMO GREEN');
+    assert.equal(new Set(options).size, Object.keys(VF.VINFAST).length);
+});
+test('dòng gần đúng: chữ lạ trong tên phụ tùng không sinh gợi ý sai', () => {
+    const plan = parse('toyota xyz cản trước', VF);
+    assert.deepEqual(plan.similarOptions, []);
+});

@@ -153,11 +153,41 @@ function extractParts(words) {
 const yearsOf = (tree, brand, model) => (tree?.[brand]?.[model] || []).map(Number).filter(Number.isFinite);
 const sortedModels = (tree, brand) => Object.keys(tree?.[brand] || {}).sort((a, b) => a.localeCompare(b, 'vi'));
 
+// Xếp hạng các dòng xe trong kho gần giống với chuỗi tên xe (khi không khớp chính xác, ví dụ số loại trên giấy đăng kiểm
+// "VF 5 PLUS S5EJ01" so với "VF5 PLUS S5EJ06"). Bỏ tên hãng ở hai phía, so khớp theo cặp ký tự (Dice) + tiền tố chung.
+const bigrams = value => { const out = new Map(); for (let i = 0; i < value.length - 1; i++) { const gram = value.slice(i, i + 2); out.set(gram, (out.get(gram) || 0) + 1); } return out; };
+function modelSimilarity(a, b) {
+    if (!a || !b) return 0;
+    if (a === b) return 1;
+    let prefix = 0;
+    while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
+    const prefixScore = prefix / Math.max(a.length, b.length);
+    let dice = 0;
+    if (a.length > 1 && b.length > 1) {
+        const left = bigrams(a), right = bigrams(b);
+        let common = 0;
+        for (const [gram, count] of left) common += Math.min(count, right.get(gram) || 0);
+        dice = (2 * common) / ((a.length - 1) + (b.length - 1));
+    } else dice = a.includes(b) || b.includes(a) ? 0.5 : 0;
+    const contains = (a.includes(b) || b.includes(a)) && Math.min(a.length, b.length) >= 3 ? 0.15 : 0;
+    return Math.min(1, 0.6 * dice + 0.4 * prefixScore + contains);
+}
+export function rankSimilarModels(tree, brand, query, limit = 8, minScore = 0.3) {
+    if (!tree?.[brand]) return [];
+    const brandTokens = new Set(tokensOf(brand));
+    const strip = value => tokensOf(value).filter(token => !brandTokens.has(token)).join('');
+    const needle = strip(query);
+    if (needle.length < 2) return [];
+    return Object.keys(tree[brand]).map(model => ({model, score: modelSimilarity(needle, strip(model))}))
+        .filter(item => item.score >= minScore)
+        .sort((x, y) => y.score - x.score || x.model.localeCompare(y.model, 'vi')).slice(0, limit);
+}
+
 export function parseVehicleQuickInput(text, tree, overrides = {}) {
     const now = overrides.now || new Date().getFullYear();
     const hints = overrides.hints || null;
     const state = {text: String(text || '').trim(), brand: '', brandOptions: [], models: [], modelOptions: [], years: [], availableYears: [],
-        kind: 'all', part: '', parts: [], notes: [], questions: [], ready: false, needsAi: false, usedHints: false};
+        kind: 'all', part: '', parts: [], notes: [], questions: [], similarOptions: [], ready: false, needsAi: false, usedHints: false};
     let hintedModels = false;
     if (!state.text || !tree || !Object.keys(tree).length) return {...state, empty: !state.text};
     const index = buildIndex(tree), words = toWords(state.text);
@@ -215,10 +245,22 @@ export function parseVehicleQuickInput(text, tree, overrides = {}) {
             prompt: state.brandOptions.length ? 'Có nhiều hãng xe phù hợp. Bạn muốn tra hãng nào?' : 'Chưa nhận ra hãng xe. Chọn hãng xe cần tra cứu:',
             options: (state.brandOptions.length ? state.brandOptions : index.brands.slice().sort((a, b) => a.localeCompare(b, 'vi'))).map(value => ({value, label: value}))});
     } else if (!state.models.length) {
-        const options = state.modelOptions.length ? state.modelOptions : sortedModels(tree, state.brand).map(model => ({model, exact: false}));
-        state.questions.push({id: 'model', multi: true,
-            prompt: state.modelOptions.length ? 'Có nhiều dòng xe ' + state.brand + ' phù hợp. Chọn dòng xe cần tra:' : 'Chưa nhận ra dòng xe ' + state.brand + '. Chọn dòng xe cần tra:',
-            options: options.map(option => ({value: option.model, label: option.model, preselected: !!option.exact && state.modelOptions.length > 0}))});
+        // Dòng gần đúng: theo tên dòng người dùng gõ / đọc từ giấy; không có thì thử bằng phần chữ chưa nhận diện.
+        const phrases = groups.filter(group => group.entries.some(entry => entry.brand === state.brand)).map(group => group.phrase);
+        const explicit = typeof overrides.modelQuery === 'string' || phrases.length > 0;
+        const query = typeof overrides.modelQuery === 'string' ? overrides.modelQuery : (phrases.length ? phrases.join(' ') : parts.join(' '));
+        const taken = new Set(state.modelOptions.map(option => option.model));
+        // Chữ chưa nhận diện có thể là tên phụ tùng nên chỉ nhận khi giống rất rõ.
+        state.similarOptions = rankSimilarModels(tree, state.brand, query, 8, explicit ? 0.3 : 0.55).filter(item => !taken.has(item.model)).map(item => ({model: item.model, exact: false, similar: true}));
+        const near = new Set(state.similarOptions.map(option => option.model));
+        const options = state.modelOptions.length ? [...state.modelOptions, ...state.similarOptions]
+            : [...state.similarOptions, ...sortedModels(tree, state.brand).filter(model => !near.has(model)).map(model => ({model, exact: false}))];
+        const prompt = state.modelOptions.length
+            ? 'Có nhiều dòng xe ' + state.brand + ' phù hợp' + (state.similarOptions.length ? ', kèm các dòng gần đúng trong kho' : '') + '. Chọn dòng xe cần tra:'
+            : state.similarOptions.length ? 'Kho chưa có dòng xe khớp hoàn toàn. Các dòng ' + state.brand + ' gần đúng được xếp lên đầu, chọn dòng xe cần tra:'
+                : 'Chưa nhận ra dòng xe ' + state.brand + '. Chọn dòng xe cần tra:';
+        state.questions.push({id: 'model', multi: true, prompt,
+            options: options.map(option => ({value: option.model, label: option.model, similar: !!option.similar, preselected: !!option.exact && state.modelOptions.length > 0}))});
     } else {
         state.availableYears = unique(state.models.flatMap(model => yearsOf(tree, state.brand, model))).sort((a, b) => b - a);
         const yearQuestion = prompt => ({id: 'year', multi: true, optional: true, prompt,

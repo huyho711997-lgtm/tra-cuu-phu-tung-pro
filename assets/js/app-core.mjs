@@ -1,7 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
-        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v8";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v9";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -4059,7 +4059,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             // Kết quả AI chỉ được dùng khi khớp đúng hãng/dòng/năm có trong kho.
             return sanitizeVehicleAiHints(extractJsonObjectFromGeminiText(answer.output), CAY_GIA_PHA);
         }
-        window.runVehicleQuickInput = async function() {
+        window.runVehicleQuickInput = function() { return startVehicleQuick({}); };
+        async function startVehicleQuick(initialOverrides = {}) {
             const text = String(document.getElementById('vehicleQuickText')?.value || '').trim();
             if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) {
                 setVehicleQuickStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', 'error'); return;
@@ -4067,9 +4068,9 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             if (text.length < 2) { setVehicleQuickStatus('Nhập hãng, dòng xe, đời xe và phụ tùng cần tìm. VD: Mazda CX5 2019 cản trước.', 'error'); document.getElementById('vehicleQuickText')?.focus(); return; }
             if (!Object.keys(CAY_GIA_PHA || {}).length) { setVehicleQuickStatus('Danh sách hãng và dòng xe đang tải. Hãy thử lại sau ít giây.', 'error'); return; }
             window.resetVehicleQuick();
-            VQ_SESSION = { text, overrides: {}, aiTried: false, controller: new AbortController() };
+            VQ_SESSION = { text, overrides: { ...initialOverrides }, aiTried: false, controller: new AbortController() };
             await advanceVehicleQuick(VQ_REVISION);
-        };
+        }
         async function advanceVehicleQuick(ticket) {
             const session = VQ_SESSION;
             if (!session || ticket !== VQ_REVISION) return;
@@ -4134,6 +4135,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 button.type = 'button';
                 button.setAttribute('aria-pressed', String(!!option.preselected));
                 button.appendChild(vqEl('span', 'vq-opt-label', option.label));
+                if (option.similar) { const near = vqEl('span', 'vq-near', 'gần đúng'); near.title = 'Không khớp hoàn toàn với tên xe đã nhập, nhưng gần giống dòng này trong kho'; button.appendChild(near); }
                 if (showCounts) { const badge = vqEl('span', 'vq-count', '···'); badge.title = 'Số bản ghi phụ tùng đang có trong kho'; button.appendChild(badge); }
                 return button;
             });
@@ -4425,7 +4427,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 const info = [fields.plate, [fields.brand, fields.model].filter(Boolean).join(' '), fields.year || ''].filter(Boolean).join(' · ');
                 setVehicleQuickStatus('Đọc được: ' + info + '. Đang đối chiếu với kho...');
                 setVehicleRegBusy(false);
-                await window.runVehicleQuickInput();
+                // Số loại trên giấy (VD S5EJ01) không phải tên phụ tùng: truyền riêng để tìm dòng gần đúng, phụ tùng chỉ lấy phần người dùng đã gõ.
+                await startVehicleQuick({ modelQuery: [fields.model, fields.modelCode].filter(Boolean).join(' '), part: typedPart });
             } catch (error) {
                 if (controller !== VQ_REG_CONTROLLER) return;
                 if (timedOut) {

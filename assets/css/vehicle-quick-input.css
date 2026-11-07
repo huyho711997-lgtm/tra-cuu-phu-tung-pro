@@ -165,3 +165,8 @@ html.dark .vq-quick .vq-reg-hide,.dark .vq-quick .vq-reg-hide{border-color:#3341
 .vq-lightbox img{max-width:100%;max-height:100%;border-radius:10px;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.5);cursor:default}
 .vq-lightbox .vq-lightbox-close{position:absolute;top:16px;right:20px;width:40px;height:40px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;font-size:26px;line-height:1;cursor:pointer}
 .vq-lightbox .vq-lightbox-close:hover{background:rgba(255,255,255,.3)}
+
+/* Nhãn "gần đúng" trên chip dòng xe */
+.vq-quick .vq-near{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;background:#fff4d6;color:#a35a00;font-size:9.5px;font-weight:800;letter-spacing:.02em;line-height:1}
+.vq-quick .vq-option[aria-pressed="true"] .vq-near{background:rgba(255,255,255,.26);color:#fff}
+html.dark .vq-quick .vq-near,.dark .vq-quick .vq-near{background:#3a2c0e;color:#fcd34d}
