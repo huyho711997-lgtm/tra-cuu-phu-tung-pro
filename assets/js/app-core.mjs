@@ -1,5 +1,5 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
-        import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
+        import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261108-overview-pagination";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs?v=20261108-key-manage";
         import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, buildRegistrationTextPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261108-reg-fast";
         import { buildQuotePartsAiPrompt, buildQuotePartsTextPrompt, joinQuoteOcrTexts, mergeQuotePartItems } from "./quote-parts-ocr.mjs?v=20261108-quote-fast";

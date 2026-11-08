@@ -1,9 +1,11 @@
 const labels={started:'Đã bắt đầu',clarifying:'Bổ sung theo luồng cũ',ready:'Có kết quả',selected:'Có lựa chọn',not_found:'Không có kết quả',error:'Gặp lỗi',abandoned:'Đã hủy',pending:'Chờ duyệt',approved:'Đã duyệt',rejected:'Từ chối',disabled:'Ngừng áp dụng'};
 import {autoReviewKnowledgeRows,knowledgeReviewHint} from './knowledge-automation.mjs';
+import {aggregateOverview,overviewPage} from './parts-knowledge-overview.mjs';
 const eventLabels={search_started:'Bắt đầu tra cứu',results_ready:'Nhận kết quả',selection_changed:'Thay đổi lựa chọn',results_applied:'Mở kết quả giá',search_failed:'Tra cứu gặp lỗi'};
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const icons={search:'m21 21-4.4-4.4M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0',file:'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5',open:'M15 3h6v6 M10 14 21 3 M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6',empty:'M9 9l6 6 M15 9l-6 6 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',clock:'M12 8v4l3 2 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',check:'m8 12 3 3 5-6 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',refresh:'M20 7v5h-5 M4 17v-5h5 M6 7a7 7 0 0 1 12-2l2 3 M4 16l2 3a7 7 0 0 0 12-2',download:'M12 3v12 m-5-5 5 5 5-5 M4 16v4h16v-4',filter:'M4 7h16 M7 12h10 M10 17h4',shield:'M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z m-4 9 3 3 5-6'};
 Object.assign(icons,{edit:'m16 3 5 5 M4 16 16 4a3 3 0 0 1 4 4L8 20l-5 1z',close:'m6 6 12 12 M18 6 6 18',arrow:'M4 12h16 m-6-6 6 6-6 6'});
+Object.assign(icons,{chevronLeft:'m15 18-6-6 6-6',chevronRight:'m9 18 6-6-6-6'});
 function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),path=document.createElementNS(svg.namespaceURI,'path');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.8');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');path.setAttribute('d',icons[name] || icons.file);svg.append(path);return svg;}
 function setButtonLabel(button,text){const label=button.querySelector('.pk-button-label');if(label)label.textContent=text;else button.textContent=text;}
 const btn=(text,action,primary=false,glyph)=>{const n=node('button',undefined,'pl-button pk-button'+(primary?' pk-button-primary':''));n.type='button';if(glyph)n.append(icon(glyph));n.append(node('span',text,'pk-button-label'));n.addEventListener('click',action);return n;};
@@ -63,7 +65,19 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         setButtonLabel(view.nextButton,'Mở gợi ý chờ duyệt'+(pending>0?' ('+formatNumber(pending)+')':''));
     }
     function renderPagination(view){
-        view.pagination.replaceChildren();if(view.mode==='overview')return;
+        view.pagination.replaceChildren();
+        if(view.mode==='overview'){
+            const page=overviewPage(view.overviewTerms,view.page,view.overviewPageSize);view.page=page.page;
+            const summary=node('span',page.total?'Hiển thị '+formatNumber(page.start+1)+'–'+formatNumber(page.start+page.items.length)+' trên '+formatNumber(page.total)+' nội dung':'Không có nội dung phù hợp','pk-page-summary');summary.setAttribute('aria-live','polite');
+            const tools=node('div',undefined,'pk-page-tools'),pages=node('nav',undefined,'pk-page-numbers');pages.setAttribute('aria-label','Phân trang tổng quan tìm kiếm');
+            function go(target){if(view.loading||writeToken||target===view.page)return;view.page=target;view.content.replaceChildren();renderOverview(view,view.rows);renderPagination(view);view.pagination.querySelector('[aria-current="page"]')?.focus({preventScroll:true});}
+            const arrow=(name,glyph,target,disabled)=>{const button=iconButton(name,()=>go(target),glyph);button.classList.add('pk-page-arrow');button.disabled=disabled;return button;};
+            pages.append(arrow('Trang trước','chevronLeft',page.page-1,page.page===0));
+            const indexes=[...new Set([0,page.page-1,page.page,page.page+1,page.pages-1].filter(i=>i>=0&&i<page.pages))].sort((a,b)=>a-b);
+            let previous=-1;for(const index of indexes){if(index>previous+1)pages.append(node('span','…','pk-page-ellipsis'));const button=btn(String(index+1),()=>go(index));button.classList.add('pk-page-number');button.setAttribute('aria-label','Trang '+(index+1));if(index===page.page)button.setAttribute('aria-current','page');pages.append(button);previous=index;}
+            pages.append(arrow('Trang sau','chevronRight',page.page+1,page.page===page.pages-1));
+            const sizeLabel=node('label',undefined,'pk-page-size'),select=node('select');select.setAttribute('aria-label','Số nội dung trên mỗi trang');for(const value of [10,20,50]){const option=node('option',String(value));option.value=String(value);select.append(option);}select.value=String(view.overviewPageSize);select.addEventListener('change',()=>{view.overviewPageSize=Number(select.value);view.page=0;view.content.replaceChildren();renderOverview(view,view.rows);renderPagination(view);view.pagination.querySelector('select')?.focus({preventScroll:true});});sizeLabel.append(node('span','Hiển thị'),select,node('span','dòng'));tools.append(pages,sizeLabel);view.pagination.append(summary,tools);return;
+        }
         const knowledge=isKnowledge(view),remaining=knowledge?view.rows.filter(row=>row.status===view.mode).length:view.rows.length,processed=view.rows.length-remaining;
         view.pagination.append(node('span',formatNumber(view.count)+' bản ghi'+(knowledge?(processed?' · '+formatNumber(processed)+' dòng đã xử lý trên trang':''):' · Trang '+(view.page+1))));
         const prev=btn('Trang trước',()=>{if(writeToken)return;if(knowledge)view.offset=Math.max(0,view.offset-25);view.page=Math.max(0,view.page-1);load();});prev.disabled=!!writeToken||(knowledge?view.offset===0:view.page===0);
@@ -83,7 +97,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         if(!allowed()||!state||writeToken)return;
         let f;try{f=filters();}catch(error){state.status.textContent=error.message;return;}
         controller?.abort();controller=new AbortController();const signal=controller.signal,ticket=++version,view=state;
-        view.loading=true;view.status.textContent='Đang tải dữ liệu…';view.total.textContent='Đang tải…';view.content.style.minHeight=view.content.getBoundingClientRect().height+'px';view.content.classList.add('is-loading');view.content.setAttribute('inert','');view.pagination.querySelectorAll('button').forEach(button=>{button.disabled=true;});view.export.disabled=true;
+        view.loading=true;view.status.textContent='Đang tải dữ liệu…';view.total.textContent='Đang tải…';view.content.style.minHeight=view.content.getBoundingClientRect().height+'px';view.content.classList.add('is-loading');view.content.setAttribute('inert','');view.pagination.querySelectorAll('button,select').forEach(button=>{button.disabled=true;});view.export.disabled=true;
         view.appliedFilters=f;view.metricsRevision++;view.applyKnowledgeChange=null;const hero=view.metrics.closest('.pk-hero');if(hero)hero.style.minHeight='';
         const current=()=>allowed()&&ticket===version&&state===view;
         const stats=supabase.rpc('kgpt_parts_search_overview',{p_from:f.from,p_to:f.to,p_query:f.q,p_user:f.user || null,p_source:f.source || null}).abortSignal(signal);
@@ -140,9 +154,9 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
     }
     function renderOverview(view,rows){
         view.content.append(node('p','Dùng bảng này để phát hiện từ khóa cần bổ sung kiến thức, ưu tiên các lượt chưa có kết quả hoặc gặp lỗi. Tổng hợp tối đa 500 phiên mới nhất trong bộ lọc.','pk-note'));
-        const terms=new Map();for(const row of rows){const key=row.original_query.normalize('NFC').toLowerCase(),item=terms.get(key)||{query:row.original_query,total:0,missing:0,selected:0};item.total++;if(['not_found','error'].includes(row.outcome))item.missing++;if(row.selected_names?.length)item.selected++;terms.set(key,item);}
+        view.overviewTerms=aggregateOverview(rows);const page=overviewPage(view.overviewTerms,view.page,view.overviewPageSize);view.page=page.page;
         const count=(value,tone)=>{const cell=node('span',formatNumber(value),'pk-overview-count');cell.dataset.tone=value?tone:'zero';return cell;};
-        const overviewTable=table(['Nội dung tìm kiếm','Số phiên','Chưa có kết quả / gặp lỗi','Phiên có lựa chọn'],[...terms.values()].sort((a,b)=>b.missing-a.missing||b.total-a.total).slice(0,50).map(item=>[node('strong',item.query,'pk-overview-query'),count(item.total,'blue'),count(item.missing,'rose'),count(item.selected,'green')]));
+        const overviewTable=table(['Nội dung tìm kiếm','Số phiên','Chưa có kết quả / gặp lỗi','Phiên có lựa chọn'],page.items.map(item=>[node('strong',item.query,'pk-overview-query'),count(item.total,'blue'),count(item.missing,'rose'),count(item.selected,'green')]));
         overviewTable.classList.add('pk-overview-table');view.content.append(overviewTable);
     }
     function renderSessions(view,rows){
@@ -298,7 +312,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         const escape=value=>{let s=String(value ?? '');if(/^[\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
         const headers=state.mode==='events'?['Thời gian','Tài khoản','Thao tác','Tìm kiếm','Tên kho']:['overview','sessions'].includes(state.mode)?['Thời gian','Tài khoản','Tìm kiếm','Phạm vi','Kết quả','Đã chọn']:['Thời gian','Tên gọi','Tên kho','Phạm vi','Nguồn','Trạng thái','Ghi chú'];
         const url=URL.createObjectURL(new Blob(['\uFEFF'+[headers,...rows].map(row=>row.map(escape).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
-        const link=node('a');link.href=url;link.download='kien-thuc-tim-kiem-trang-'+(state.page+1)+'.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const link=node('a');link.href=url;link.download=state.mode==='overview'?'kien-thuc-tim-kiem-mau-phien.csv':'kien-thuc-tim-kiem-trang-'+(state.page+1)+'.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
     }
     async function show(root){
         if(!getOwner()||!isAdmin()){clear();return;}
@@ -336,7 +350,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         }
         const nextStep=node('div',undefined,'pk-next-step'),nextText=node('div'),nextTitle=node('strong','Kiểm tra gợi ý để bổ sung kiến thức','pk-next-title'),nextCopy=node('p','Chỉ tên đã duyệt mới được dùng lại khi trùng từ khóa, phạm vi xe và vẫn còn trong kho.','pk-next-copy'),nextButton=btn('Mở gợi ý chờ duyệt',()=>{selectMode('pending');workspace.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});tabs.querySelector('[data-group="knowledge"]')?.focus({preventScroll:true});},true,'check');nextText.append(nextTitle,nextCopy);nextStep.append(nextText,nextButton);
         const notification=node('aside',undefined,'pk-toast'),toastIcon=node('span',undefined,'pk-toast-icon'),toastText=node('span',undefined,'pk-toast-text'),toastClose=iconButton('Đóng thông báo',()=>{notification.hidden=true;},'close');notification.hidden=true;notification.setAttribute('aria-live','polite');notification.setAttribute('aria-atomic','true');notification.append(toastIcon,toastText,toastClose);
-        state={mode:'overview',page:0,offset:0,loading:false,metricsRevision:0,appliedFilters:null,applyKnowledgeChange:null,setKnowledgeBusy:null,setKnowledgeError:null,busyRows:new Map(),toast:notification,toastIcon,toastText,toastTimer:null,fields,metrics,content,pagination,status,total,nextTitle,nextCopy,nextButton,rows:[],count:0,export:exportButton};
+        state={mode:'overview',page:0,offset:0,overviewPageSize:10,overviewTerms:[],loading:false,metricsRevision:0,appliedFilters:null,applyKnowledgeChange:null,setKnowledgeBusy:null,setKnowledgeError:null,busyRows:new Map(),toast:notification,toastIcon,toastText,toastTimer:null,fields,metrics,content,pagination,status,total,nextTitle,nextCopy,nextButton,rows:[],count:0,export:exportButton};
         for(const [key,title,glyph] of groups){const tab=btn(title,()=>selectMode(remembered[key]),false,glyph);tab.dataset.group=key;tab.setAttribute('aria-pressed',String(key==='overview'));tabs.append(tab);}
         hero.append(header,metrics,nextStep);workspace.append(panelHead,navigation,filtersBox,status,content,pagination);host.append(hero,workspace,notification);
         const actor=owner;
