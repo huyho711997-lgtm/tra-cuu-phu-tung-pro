@@ -36,7 +36,6 @@ function tiInitSidebarHover(){
             pinButton.setAttribute('aria-pressed',pinned?'true':'false');
             pinButton.setAttribute('aria-label',pinned?'Bỏ ghim thanh bên':'Ghim thanh bên');
             pinButton.title=pinned?'Bỏ ghim thanh bên':'Ghim thanh bên';
-            pinButton.querySelector('span').textContent=pinned?'Bỏ ghim thanh bên':'Ghim thanh bên';
         }
     }
     function syncMode(){
