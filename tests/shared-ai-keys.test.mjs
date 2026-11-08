@@ -22,6 +22,7 @@ function server({role = 'admin', rpcError, credentials = {}, secrets, fetchImpl}
             if (name === 'kgpt_ai_shared_grant') return {data: {updated: args.p_targets.length, allow: args.p_allow, grantedCount: 2, activeCount: 4}};
             if (name === 'kgpt_ai_shared_remove_key') return {data: {credentials: {}, items: [], grantedCount: 0, activeCount: 4}};
             if (name === 'kgpt_ai_shared_secrets') return {data: secrets ?? []};
+            if (name === 'kgpt_ai_global_set') return {data: {credentials: {}, items: [], global: {regReader: args.p_value}, grantedCount: 0, activeCount: 4}};
             throw new Error('Unexpected RPC ' + name);
         },
     };
@@ -219,4 +220,19 @@ test('xóa riêng một key: chỉ Gemini, fp hợp lệ, gửi đúng tham số
     const user = server({role: 'user'});
     for (const body of [{action: 'sharedRemove', name: 'gemini', fp: 'aaaaaaaa'}, {action: 'sharedCheck'}]) assert.equal((await user.request(body)).status, 403);
     assert.ok(!user.calls.some(([n]) => /remove_key|secrets/.test(n)));
+});
+
+test('đổi cách đọc giấy đăng kiểm: chỉ admin, chỉ giá trị hợp lệ, gửi đúng tham số', async () => {
+    const user = server({role: 'user'});
+    const denied = await user.request({action: 'globalSet', name: 'regReader', value: 'fast'});
+    assert.equal(denied.status, 403); assert.equal(used(user, 'kgpt_ai_global_set').length, 0);
+    const app = server();
+    const ok = await app.request({action: 'globalSet', name: 'regReader', value: 'fast', p_actor: USER});
+    assert.equal(ok.status, 200); assert.equal((await ok.json()).global.regReader, 'fast');
+    assert.deepEqual(used(app, 'kgpt_ai_global_set')[0][1], {p_actor: ADMIN, p_name: 'regReader', p_value: 'fast'});
+    for (const body of [{name: 'regReader', value: 'groq'}, {name: 'other', value: 'fast'}, {name: 'regReader'}, {name: 'regReader', value: 5}]) {
+        const bad = await app.request({action: 'globalSet', ...body});
+        assert.equal(bad.status, 400, JSON.stringify(body));
+    }
+    assert.equal(used(app, 'kgpt_ai_global_set').length, 1, 'giá trị sai không chạm CSDL');
 });

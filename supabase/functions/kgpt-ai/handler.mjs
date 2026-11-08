@@ -300,16 +300,20 @@ export function createHandler({createClient,env,fetchImpl=globalThis.fetch,rando
       } else if (type.startsWith('application/json')) {
         try { body = JSON.parse(new TextDecoder().decode(bytes)); } catch (_) { throw invalid(); }
       } else throw invalid();
-      if (!object(body) || !['settings','save','list','generate','ocr','shared','sharedSave','grant','sharedCheck','sharedRemove'].includes(body.action)) throw invalid();
+      if (!object(body) || !['settings','save','list','generate','ocr','shared','sharedSave','grant','sharedCheck','sharedRemove','globalSet'].includes(body.action)) throw invalid();
       const ai = ['generate','ocr'].includes(body.action);
       if (body.action === 'list' && profile.role !== 'admin') throw new HttpError(403,'ACCESS_DENIED','Chỉ quản trị viên được xem danh sách cấu hình.');
-      if (['shared','sharedSave','grant','sharedCheck','sharedRemove'].includes(body.action) && profile.role !== 'admin') throw new HttpError(403,'ACCESS_DENIED','Chỉ quản trị viên được quản lý key dùng chung.');
+      if (['shared','sharedSave','grant','sharedCheck','sharedRemove','globalSet'].includes(body.action) && profile.role !== 'admin') throw new HttpError(403,'ACCESS_DENIED','Chỉ quản trị viên được quản lý key dùng chung.');
       if (!await rpc('kgpt_ai_consume_rate',{p_user_id:actor,p_category:ai?'ai':'settings'})) throw new HttpError(429,'APP_RATE_LIMIT','Bạn thao tác quá nhanh hoặc đã hết hạn mức ngày của ứng dụng. Hãy thử lại sau.');
       if (body.action === 'shared') return reply(await rpc('kgpt_ai_shared_read',{p_actor:actor}));
       if (body.action === 'sharedSave') {
         validateSharedSave(body);
         // Việc gộp key (append) và giới hạn 10 key làm ngay trong CSDL: key cũ không rời khỏi Vault.
         return reply(await rpc('kgpt_ai_shared_save',{p_actor:actor,p_keys:body.keys || {},p_clear:body.clear || [],p_append:body.appendKeys || []}));
+      }
+      if (body.action === 'globalSet') {
+        if (body.name !== 'regReader' || !['gemini','fast'].includes(body.value)) throw invalid();
+        return reply(await rpc('kgpt_ai_global_set',{p_actor:actor,p_name:body.name,p_value:body.value}));
       }
       if (body.action === 'sharedRemove') {
         const target = validateSharedTarget(body, true);

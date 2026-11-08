@@ -800,6 +800,10 @@
                     const clear = Array.isArray(p.clear) ? p.clear.filter(name => typeof name === 'string') : [];
                     const state = await secureAi.sharedSave(keys, clear, { appendKeys: p.append === true && keys.gemini ? ['gemini'] : [] });
                     post({ type: 'kgpt:ai-shared-state', ok: true, saved: true, message: Object.keys(keys).length ? 'Đã lưu key dùng chung.' : 'Đã xóa key dùng chung.', ...state });
+                } else if (message.type === 'kgpt:ai-global-set') {
+                    const state = await secureAi.globalSet(String(p.name || ''), String(p.value || ''));
+                    QUOTE_API_SETTINGS_LOADED_FOR_UID = null; // lần quét kế tiếp đọc lại cách đọc giấy mới
+                    post({ type: 'kgpt:ai-shared-state', ok: true, saved: false, message: 'Đã đổi cách đọc giấy đăng kiểm.', ...state });
                 } else if (message.type === 'kgpt:ai-shared-remove') {
                     const state = await secureAi.sharedRemoveKey(String(p.name || ''), String(p.fp || ''));
                     post({ type: 'kgpt:ai-shared-state', ok: true, saved: false, message: 'Đã xóa key khỏi kho.', ...state });
@@ -2820,7 +2824,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         }
         function normalizeSecureMetadata(data) {
             return normalizeQuoteApiSettings({...data.settings,credentials:data.credentials,allowSelfEdit:data.allowSelfEdit,
-                useSharedKeys:data.useSharedKeys === true,sharedAllowed:data.sharedAllowed === true});
+                useSharedKeys:data.useSharedKeys === true,sharedAllowed:data.sharedAllowed === true,
+                regReader:data.global?.regReader === 'fast' ? 'fast' : 'gemini'});
         }
         function hasConfiguredQuoteApi(settings = {}) {
             return Object.keys(settings.credentials || {}).length > 0 || !!settings.geminiApiKey || !!settings.ocrSpaceApiKey;
@@ -4284,20 +4289,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         // Quét giấy đăng kiểm/đăng ký xe bằng AI -> điền câu nhập nhanh -> chạy bộ phân tích có sẵn (hỏi lại nếu thiếu).
         const VQ_REG_MAX_BYTES = 8 * 1024 * 1024;
         let VQ_REG_CONTROLLER = null;
-        // Bộ đọc giấy: 'gemini' (mặc định) hoặc 'fast' (OCR.Space + Groq, tự chuyển Gemini nếu thiếu). Chỉ là tuỳ chọn hiển thị, không chứa key.
-        const VQ_REG_READER_KEY = 'tascoVehicleRegReader';
+        // Cách đọc giấy do quản trị viên quyết định (Quản lý người dùng → Key AI): 'gemini' (mặc định) hoặc 'fast' (OCR.Space + Groq, tự chuyển Gemini nếu thiếu).
+        // Giá trị đến từ metadata cài đặt (không chứa key); người dùng thường không tự đổi.
         function getVehicleRegReader() {
-            let value = document.getElementById('vehicleRegReader')?.value || '';
-            if (!value) { try { value = localStorage.getItem(getQuoteScopedStorageKey(VQ_REG_READER_KEY)) || ''; } catch (_) {} }
-            return value === 'fast' ? 'fast' : 'gemini';
-        }
-        window.saveVehicleRegReader = function() {
-            try { localStorage.setItem(getQuoteScopedStorageKey(VQ_REG_READER_KEY), getVehicleRegReader()); } catch (_) {}
-        };
-        function syncVehicleRegReaderSelect() {
-            const select = document.getElementById('vehicleRegReader');
-            if (!select) return;
-            try { select.value = localStorage.getItem(getQuoteScopedStorageKey(VQ_REG_READER_KEY)) === 'fast' ? 'fast' : 'gemini'; } catch (_) {}
+            return QUOTE_USER_API_SETTINGS?.regReader === 'fast' ? 'fast' : 'gemini';
         }
         function base64ToBlob(data, mime) {
             const binary = atob(data), bytes = new Uint8Array(binary.length);
@@ -4392,7 +4387,6 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) {
                 setVehicleQuickStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', 'error'); return;
             }
-            syncVehicleRegReaderSelect();
             document.getElementById('vehicleRegFile')?.click();
         };
         window.runVehicleRegistration = async function(file) {
@@ -4410,7 +4404,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             window.resetVehicleQuick();
             revokeVehicleRegPreview();
             try { VQ_REG_URL = URL.createObjectURL(file); } catch (_) { VQ_REG_URL = ''; }
-            const reader = getVehicleRegReader();
+            let reader = getVehicleRegReader();
             let stage = reader === 'fast' ? 'OCR.Space đang đọc chữ' : 'Gemini đang đọc giấy đăng kiểm';
             renderVehicleRegPreview(file, isPdf, null, stage + '...');
             setVehicleRegBusy(true);
@@ -4423,6 +4417,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const deadline = setTimeout(() => { timedOut = true; controller.abort(); }, 60000);
             try {
                 await loadQuoteApiSettingsForCurrentUser();
+                reader = getVehicleRegReader(); // lần quét đầu tiên: cài đặt của admin chỉ có sau khi tải xong
                 const creds = QUOTE_USER_API_SETTINGS.credentials || {};
                 const canFast = reader === 'fast' && !!creds.ocrspace && !!(creds.groq1 || creds.groq2 || creds.groq3);
                 // Gemini là đường chính/dự phòng; chế độ nhanh không có đủ key thì dùng Gemini luôn.

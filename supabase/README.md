@@ -90,3 +90,11 @@ supabase db push --project-ref yxwmcpoklxpzlikxojez   # hoặc dán file migrati
 supabase functions deploy kgpt-ai --project-ref yxwmcpoklxpzlikxojez
 supabase functions deploy kgpt-ai-part-search --project-ref yxwmcpoklxpzlikxojez
 ```
+
+### Cài đặt dùng chung: cách đọc giấy đăng kiểm
+
+Migration `20261108090000_ai_global_settings.sql` thêm bảng `kgpt_private.ai_global_settings` và RPC `kgpt_ai_global_set` (chỉ `service_role`; Edge Function kiểm tra quản trị viên). Action `globalSet` của `kgpt-ai` nhận `{name:'regReader', value:'gemini'|'fast'}`.
+
+- `gemini` (mặc định): Gemini đọc trực tiếp ảnh/PDF (`thinking:'minimal'` để nhanh hơn).
+- `fast`: OCR.Space lấy chữ, Groq bóc tách JSON; thiếu biển số/số khung, file lớn hơn 1MB hoặc lỗi thì tự chuyển sang Gemini. Cần key OCR.Space và Groq.
+- Admin đổi tại *Quản lý người dùng → Key AI dùng chung → Cách đọc giấy đăng kiểm*. Mọi tài khoản đọc giá trị này qua `settings` (trường `global.regReader`) và áp dụng sau khi tải lại trang.

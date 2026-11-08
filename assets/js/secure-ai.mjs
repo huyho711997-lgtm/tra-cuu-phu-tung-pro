@@ -29,6 +29,8 @@ export function createSecureAiClient({supabase,getOwner}) {
             ...(options.appendKeys?.length ? {appendKeys:options.appendKeys} : {})}),
         sharedCheck: (name,fp) => request({action:'sharedCheck',...(name ? {name} : {}),...(fp ? {fp} : {})}),
         sharedRemoveKey: (name,fp) => request({action:'sharedRemove',name,fp}),
+        // Cài đặt dùng chung do quản trị viên quyết định (vd. regReader: cách đọc giấy đăng kiểm).
+        globalSet: (name,value) => request({action:'globalSet',name,value}),
         grant: (targetUserIds,allow) => request({action:'grant',targetUserIds,allow:allow === true}),
         save: (targetUserId,settings,keys={},clear=[],options={}) => request({action:'save',targetUserId,settings,keys,clear,onlyIfMissing:options.onlyIfMissing === true,
             ...(options.appendKeys?.length ? {appendKeys:options.appendKeys} : {})}),

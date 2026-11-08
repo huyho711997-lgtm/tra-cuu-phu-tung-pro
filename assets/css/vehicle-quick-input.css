@@ -213,7 +213,3 @@ html.dark .quote-shared-key-note[data-state="ready"]{border-color:#245c43;backgr
 html.dark .quote-shared-key-note[data-state="legacy"]{border-color:#6b5316;background:#2a2210;color:#f1d28b}
 html.dark .quote-shared-key-note[data-state="blocked"]{border-color:#6a3030;background:#2a1414;color:#f5b3b3}
 
-.vq-quick .vq-reg-reader{height:30px;padding:0 26px 0 10px;border:1px solid #b9d0f5;border-radius:999px;background:#fff;color:#1d4ed8;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
-.vq-quick .vq-reg-reader:focus-visible{outline:3px solid rgba(37,99,235,.3);outline-offset:1px}
-html.dark .vq-quick .vq-reg-reader,.dark .vq-quick .vq-reg-reader{border-color:#3a5c8f;background:rgba(30,41,59,.8);color:#bfdbfe}
-@media (max-width:720px){.vq-quick .vq-reg-reader{width:100%;height:36px}}
