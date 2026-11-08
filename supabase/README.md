@@ -55,3 +55,19 @@ node --check supabase/functions/kgpt-ai/handler.mjs
 ```
 
 Đã kiểm tra thêm 20 tình huống PostgreSQL cục bộ với Vault API giả lập: cú pháp migration, chuyển dữ liệu, quyền RPC, chặn truy cập chéo, khóa tự sửa, rollback, xóa secret và rate limit. Kiểm tra đó không chứng minh extension Vault, schema hoặc cấu hình quyền của project thật đã đúng. Cần kiểm tra lại trên project đích khi công cụ quản trị được nạp.
+
+## Nhiều Gemini key (Free Tier)
+
+Hạn mức Gemini API tính **theo dự án Google Cloud, không theo từng key** (và theo từng model; RPD reset lúc 00:00 giờ Thái Bình Dương). Nhiều key cùng một dự án dùng chung một hạn mức; chỉ key tạo ở **dự án khác nhau** mới có hạn mức riêng. Nguồn: https://aistudio.google.com/docs/rate-limits
+
+- Mỗi tài khoản lưu tối đa 10 key Gemini trong một secret Vault `gemini`, cách nhau bằng dấu phẩy, chấm phẩy hoặc xuống dòng. Không cần migration mới.
+- `kgpt-ai`: mỗi yêu cầu bắt đầu từ một key ngẫu nhiên để trải tải. Key bị 429 được nghỉ (theo `Retry-After`/`retryDelay`, mặc định 65 giây; lỗi hạn mức ngày thì nghỉ đến nửa đêm giờ Thái Bình Dương); key bị 401/403 nghỉ 10 phút. Model là vòng ngoài: hết lượt model ưu tiên thì dùng model dự phòng (hạn mức tính theo model). Mọi key đang nghỉ thì trả 429 ngay kèm `retryAfter`, không gọi dồn nhà cung cấp. Trạng thái nghỉ chỉ nằm trong bộ nhớ của instance Edge Function (dấu vân tay SHA-256 rút gọn, không lưu key) nên có thể mất khi instance khởi động lại.
+- `kgpt-ai-part-search` (nút "Tìm bằng AI") cũng xoay vòng và chuyển key tương tự.
+- Lưu key với `appendKeys:["gemini"]` sẽ gộp key mới vào key đã lưu (bỏ trùng, tối đa 10) thay vì ghi đè; chỉ đọc key của chính mình hoặc khi là quản trị viên, quyền ghi vẫn do RPC lưu kiểm tra.
+
+Triển khai: cần deploy lại **cả hai** function trước khi dùng tùy chọn "Thêm vào key đã lưu" (backend cũ bỏ qua `appendKeys` và sẽ ghi đè key cũ):
+
+```sh
+supabase functions deploy kgpt-ai --project-ref yxwmcpoklxpzlikxojez
+supabase functions deploy kgpt-ai-part-search --project-ref yxwmcpoklxpzlikxojez
+```

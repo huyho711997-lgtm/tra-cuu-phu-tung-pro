@@ -198,3 +198,13 @@ html.dark #partsBatchComposer .parts-ocr-head strong{color:#e2e8f0}
 html.dark #partsBatchComposer .parts-ocr-hide{border-color:#334155;background:#1e293b;color:#cbd5e1}
 html.dark #partsBatchComposer .parts-ocr-note{color:#94a3b8}
 @media (max-width:640px){#partsBatchComposer .parts-batch-ocr-btn{width:100%;justify-content:center}#partsBatchComposer .parts-ocr{flex-direction:column}#partsBatchComposer .parts-ocr-thumbs{max-width:none}}
+
+/* Nhiều Gemini key: ô đếm và tùy chọn thêm key */
+.quote-gemini-key-tools{display:block;margin-top:6px}
+.quote-gemini-key-tools[hidden]{display:none}
+.quote-gemini-append{display:inline-flex;align-items:center;gap:7px;color:#5a6f93;font-size:12px;font-weight:600;cursor:pointer}
+.quote-gemini-append input{width:15px;height:15px;accent-color:#2563eb}
+.quote-gemini-key-count{display:block;margin-top:4px;min-height:0;color:#2f5590;font-size:11.5px;font-weight:700}
+.quote-gemini-key-count:empty{display:none}
+.quote-gemini-key-count[data-tone="error"]{color:#b45309}
+html.dark .quote-gemini-append{color:#cbd5e1}

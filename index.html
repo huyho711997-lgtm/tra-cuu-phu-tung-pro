@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="assets/css/app.css?v=20261019-vault"/>
 <link rel="stylesheet" href="assets/css/parts-knowledge-page.css?v=20261019-knowledge-unified-v1"/>
-<link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261107-quick-v10"/>
+<link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261107-quick-v11"/>
 
 
 
@@ -1441,7 +1441,9 @@
 </div>
 <div class="user-api-field">
 <label>Gemini API Key</label>
-<input autocomplete="off" class="user-api-input" id="editGeminiApiKey" placeholder="Có thể nhập nhiều key, mỗi dòng một key" type="password"/>
+<input autocomplete="off" class="user-api-input" id="editGeminiApiKey" placeholder="Nhiều key cách nhau bằng dấu phẩy hoặc dán nhiều dòng (tối đa 10)" onpaste="pasteGeminiKeys(event)" oninput="updateGeminiKeyCount('editGeminiApiKey','editGeminiKeyCount')" type="password"/>
+<span class="quote-gemini-key-tools" id="editGeminiKeyTools" hidden><label class="quote-gemini-append"><input type="checkbox" id="editGeminiAppend" checked/> Thêm vào key đã lưu (bỏ chọn để thay toàn bộ)</label></span>
+<span class="quote-gemini-key-count" id="editGeminiKeyCount" aria-live="polite"></span>
 </div>
 <div class="user-api-field">
 <label>OCR.Space API Key</label>
@@ -1750,7 +1752,9 @@
 <div class="quote-provider-grid">
 <label class="quote-settings-field quote-gemini-key-group">
 <span>Gemini API key</span>
-<span class="quote-settings-input-wrap"><span class="quote-settings-key-icon" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="m11 11 9 9m-4-4 2-2m-5-1 2-2"/></svg></span><input autocomplete="off" id="quoteGeminiKeyInput" oninput="saveQuoteGeminiKey()" placeholder="Dán Gemini API Key riêng của user — có thể nhập nhiều key, mỗi dòng một key" type="password" value=""/></span>
+<span class="quote-settings-input-wrap"><span class="quote-settings-key-icon" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="m11 11 9 9m-4-4 2-2m-5-1 2-2"/></svg></span><input autocomplete="off" id="quoteGeminiKeyInput" oninput="saveQuoteGeminiKey()" placeholder="Dán Gemini API Key — nhiều key cách nhau bằng dấu phẩy hoặc dán nhiều dòng (tối đa 10, mỗi key một dự án Google)" onpaste="pasteGeminiKeys(event)" type="password" value=""/></span>
+<span class="quote-gemini-key-tools" id="quoteGeminiKeyTools" hidden><label class="quote-gemini-append"><input type="checkbox" id="quoteGeminiAppend" checked/> Thêm vào key đã lưu (bỏ chọn để thay toàn bộ)</label></span>
+<span class="quote-gemini-key-count" id="quoteGeminiKeyCount" aria-live="polite"></span>
 </label>
 <label class="quote-settings-field quote-ocr-only">
 <span>OCR.Space API key</span>
@@ -1787,7 +1791,7 @@
 </div>
 <script src="assets/js/document-libraries.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js" defer></script>
-<script type="module" src="assets/js/app-core.mjs?v=20261107-quick-v10"></script>
+<script type="module" src="assets/js/app-core.mjs?v=20261107-quick-v11"></script>
 <script src="assets/js/app-training.js"></script>
 
 <script id="kgptUnifiedPremiumDropdowns" src="assets/js/kgptUnifiedPremiumDropdowns.js"></script>

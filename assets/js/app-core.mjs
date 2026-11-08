@@ -1,7 +1,7 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
-        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v10";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v11";
         import { buildQuotePartsAiPrompt, mergeQuotePartItems } from "./quote-parts-ocr.mjs?v=20261108-quote-ocr";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
@@ -1908,6 +1908,7 @@
             const engine = document.getElementById('editOcrSpaceEngineSelect');
             const selfEdit = document.getElementById('editApiSelfEditableSelect');
             if (provider) provider.value = normalized.ocrProvider || 'gemini';
+            { const tools = document.getElementById('editGeminiKeyTools'), append = document.getElementById('editGeminiAppend'); if (tools) tools.hidden = !normalized.credentials.gemini; if (append) append.checked = !!normalized.credentials.gemini; }
             if (gemini) { gemini.value = ''; gemini.placeholder = normalized.credentials.gemini ? 'Đã lưu · …'+normalized.credentials.gemini.suffix+'. Để trống để giữ key.' : 'Nhập Gemini key mới'; }
             if (ocr) { ocr.value = ''; ocr.placeholder = normalized.credentials.ocrspace ? 'Đã lưu · …'+normalized.credentials.ocrspace.suffix+'. Để trống để giữ key.' : 'Nhập OCR.Space key mới'; }
             if (lang) lang.value = normalized.ocrLanguage || OCRSPACE_DEFAULT_LANGUAGE;
@@ -2906,7 +2907,13 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const keys = own && !settings.fromAdmin ? {...QUOTE_PENDING_KEYS} : {};
             if (settings.geminiApiKey?.trim()) keys.gemini = settings.geminiApiKey.trim();
             if (settings.ocrSpaceApiKey?.trim()) keys.ocrspace = settings.ocrSpaceApiKey.trim();
-            return normalizeSecureMetadata(await secureAi.save(uid,patch,keys,settings.clearKeys || (own ? [...QUOTE_CLEAR_KEYS] : [])));
+            const clearKeys = settings.clearKeys || (own ? [...QUOTE_CLEAR_KEYS] : []);
+            // "Thêm vào key đã lưu": máy chủ gộp key Gemini mới vào các key cũ (tối đa 10) thay vì ghi đè.
+            const fromAdminForm = !own || settings.fromAdmin;
+            const appendBox = document.getElementById(fromAdminForm ? 'editGeminiAppend' : 'quoteGeminiAppend');
+            const hasSaved = fromAdminForm ? !!EDIT_USER_API_SETTINGS?.credentials?.gemini : !!QUOTE_USER_API_SETTINGS.credentials?.gemini;
+            const appendGemini = !!keys.gemini && !clearKeys.includes('gemini') && hasSaved && appendBox?.checked === true;
+            return normalizeSecureMetadata(await secureAi.save(uid,patch,keys,clearKeys,{appendKeys:appendGemini ? ['gemini'] : []}));
         }
         async function attachApiSettingsToUsers(users = []) {
             const base = users.map(u => ({...u,apiSettings:normalizeQuoteApiSettings(),apiConfigured:false}));
@@ -3003,7 +3010,25 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 : getQuoteGeminiModelLabel()+' đọc ảnh, PDF và văn bản qua máy chủ.';
             window.refreshGroqUsagePanel?.(); enhanceQuoteSettingsDropdowns();
         };
-        window.saveQuoteGeminiKey = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey,document.getElementById('quoteGeminiKeyInput')?.value || ''); updateQuoteApiOwnerHint(); };
+        // Ô key là input một dòng: dán nhiều dòng sẽ bị trình duyệt nối liền thành một key sai. Đổi xuống dòng/khoảng trắng thành dấu phẩy.
+        window.pasteGeminiKeys = function(event) {
+            const text = event.clipboardData?.getData('text') || '';
+            if (!/[\r\n\s;]/.test(text.trim())) return;
+            event.preventDefault();
+            const joined = [...new Set(text.split(/[\s,;]+/).filter(Boolean))].join(',');
+            const input = event.target;
+            const before = input.value.slice(0, input.selectionStart), after = input.value.slice(input.selectionEnd);
+            input.value = (before && !before.endsWith(',') ? before + ',' : before) + joined + (after && !after.startsWith(',') ? ',' + after : after);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        window.updateGeminiKeyCount = function(inputId, countId) {
+            const input = document.getElementById(inputId), badge = document.getElementById(countId);
+            if (!input || !badge) return;
+            const count = new Set(String(input.value || '').split(/[\s,;]+/).filter(Boolean)).size;
+            badge.textContent = count ? count + ' key' + (count > 10 ? ' — tối đa 10 key' : '') : '';
+            badge.dataset.tone = count > 10 ? 'error' : '';
+        };
+        window.saveQuoteGeminiKey = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey,document.getElementById('quoteGeminiKeyInput')?.value || ''); updateGeminiKeyCount('quoteGeminiKeyInput','quoteGeminiKeyCount'); updateQuoteApiOwnerHint(); };
         window.saveQuoteOcrSpaceKey = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceKey,document.getElementById('quoteOcrSpaceKeyInput')?.value || ''); updateQuoteApiOwnerHint(); };
         window.saveQuoteOcrSpaceLanguage = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceLang,document.getElementById('quoteOcrSpaceLangSelect')?.value || OCRSPACE_DEFAULT_LANGUAGE); };
         window.saveQuoteOcrSpaceEngine = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceEngine,document.getElementById('quoteOcrSpaceEngineSelect')?.value || OCRSPACE_DEFAULT_ENGINE); };
@@ -3029,6 +3054,12 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     input.closest('.quote-settings-input-wrap')?.after(clear);
                 }
                 if (clear) { clear.hidden = !credential; clear.disabled = input.disabled; }
+                if (name === 'gemini') {
+                    const tools = document.getElementById('quoteGeminiKeyTools'), append = document.getElementById('quoteGeminiAppend');
+                    if (tools) tools.hidden = !credential;
+                    if (append) append.checked = !!credential;
+                    updateGeminiKeyCount('quoteGeminiKeyInput','quoteGeminiKeyCount');
+                }
             });
         }
         let QUOTE_SETTINGS_OPEN_REVISION = 0;

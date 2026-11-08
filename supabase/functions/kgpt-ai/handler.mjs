@@ -1,6 +1,9 @@
 const MAX_BODY = 20 * 1024 * 1024;
 const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 const KEY_NAMES = ['gemini', 'groq1', 'groq2', 'groq3', 'ocrspace'];
+const MAX_GEMINI_KEYS = 10;
+const allKeys = value => [...new Set(String(value || '').split(/[\n,;]+/).map(k => k.trim()).filter(Boolean))];
+const splitKeys = value => allKeys(value).slice(0, MAX_GEMINI_KEYS);
 const RATE_HEADERS = ['retry-after', 'x-ratelimit-limit-requests', 'x-ratelimit-remaining-requests',
   'x-ratelimit-reset-requests', 'x-ratelimit-limit-tokens', 'x-ratelimit-remaining-tokens', 'x-ratelimit-reset-tokens'];
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -41,6 +44,8 @@ function validateSave(body) {
   if ((body.clear ?? []).length > 5 || (body.clear ?? []).some(name => !KEY_NAMES.includes(name))) throw invalid();
   if (body.targetUserId !== undefined && !uuid(body.targetUserId)) throw invalid();
   if (body.onlyIfMissing !== undefined && typeof body.onlyIfMissing !== 'boolean') throw invalid();
+  if (body.appendKeys !== undefined && (!Array.isArray(body.appendKeys) || body.appendKeys.some(name => name !== 'gemini'))) throw invalid();
+  if (typeof body.keys?.gemini === 'string' && (allKeys(body.keys.gemini).length > MAX_GEMINI_KEYS || allKeys(body.keys.gemini).some(key => key.length < 8))) throw invalid();
   const allowed = {
     ocrProvider: v => ['gemini','ocrspace'].includes(v), llmProvider: v => ['gemini','groq'].includes(v),
     ocrLanguage: v => typeof v === 'string' && /^[a-z]{3}$/.test(v), ocrEngine: v => ['1','2','3'].includes(v),
@@ -69,15 +74,15 @@ async function readBounded(req) {
   return bytes;
 }
 
-function providerFailure(status, provider, attempts) {
+function providerFailure(status, provider, attempts, extra = {}) {
   const label = provider === 'groq' ? 'Groq' : provider === 'gemini' ? 'Gemini' : 'OCR.Space';
   const message = [401,403].includes(status) ? `${label} key không hợp lệ hoặc chưa được cấp quyền. Hãy thay key trong Cài đặt AI.`
-    : status === 429 ? `${label} đang giới hạn lượt dùng. Hãy đợi rồi thử lại.`
+    : status === 429 ? (extra.keyCount > 1 ? `Cả ${extra.keyCount} key ${label} đều đang hết lượt${extra.daily ? ' trong ngày' : ''}. ${extra.retryAfter ? 'Thử lại sau khoảng ' + (extra.retryAfter >= 3600 ? Math.ceil(extra.retryAfter / 3600) + ' giờ' : extra.retryAfter >= 90 ? Math.ceil(extra.retryAfter / 60) + ' phút' : extra.retryAfter + ' giây') + ', hoặc thêm key từ dự án Google khác.' : 'Hãy đợi rồi thử lại hoặc thêm key từ dự án Google khác.'}` : `${label} đang giới hạn lượt dùng. Hãy đợi rồi thử lại.`)
     : status === 404 ? `${label} chưa hỗ trợ model đã chọn. Hãy kiểm tra model trong Cài đặt AI.`
     : status === 413 ? 'Dữ liệu vượt giới hạn nhà cung cấp. Hãy chia nhỏ file.'
     : `${label} chưa xử lý được yêu cầu. Hãy thử lại sau hoặc chia nhỏ dữ liệu.`;
   // Provider authentication failures must not be confused with app-session failures.
-  return new HttpError(status === 429 ? 429 : 502, 'PROVIDER_ERROR', message, { attempts, providerStatus: status });
+  return new HttpError(status === 429 ? 429 : 502, 'PROVIDER_ERROR', message, { attempts, providerStatus: status, ...(extra.retryAfter ? { retryAfter: extra.retryAfter } : {}) });
 }
 
 async function upstream(fetchImpl, url, init, signal) {
@@ -88,27 +93,61 @@ async function upstream(fetchImpl, url, init, signal) {
   }
 }
 
-async function generate(fetchImpl, body, credentials, signal) {
+// Gemini free tier tính hạn mức theo dự án Google Cloud và theo từng model: key hết lượt ở model này vẫn có thể dùng model khác,
+// và key của dự án khác có hạn mức riêng. Bộ nhớ tạm này chỉ sống trong một instance Edge Function (không lưu key, chỉ dấu vân tay).
+const toHex = buffer => [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+async function fingerprint(key) { return toHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key))).slice(0, 16); }
+// Số giây đến 00:00 giờ Thái Bình Dương (lúc Google reset hạn mức ngày).
+export function secondsUntilPacificMidnight(nowMs) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    .formatToParts(new Date(nowMs)).map(p => [p.type, p.value]));
+  const passed = (Number(parts.hour) % 24) * 3600 + Number(parts.minute) * 60 + Number(parts.second);
+  return Math.max(60, 86400 - passed);
+}
+function readRateLimit(response, data, nowMs) {
+  const text = JSON.stringify(data?.error ?? {}).slice(0, 4000);
+  const daily = /PerDay|per day|daily/i.test(text);
+  let seconds = Number(response.headers.get('retry-after'));
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    const match = /retry(?:Delay"?:?\s*"?| in )\s*([0-9.]+)\s*s/i.exec(text);
+    seconds = match ? Math.ceil(Number(match[1])) : 0;
+  }
+  if (daily) seconds = secondsUntilPacificMidnight(nowMs);
+  else seconds = Math.min(Math.max(seconds || 65, 5), 600);
+  return { daily, seconds };
+}
+
+async function generate(fetchImpl, body, credentials, signal, ctx) {
+  const { cooldowns, random, now } = ctx;
   const config = validateGenerate(body), attempts = [];
   const names = body.provider === 'groq' ? [1,2,3].map(n => 'groq' + n) : ['gemini'];
   if (body.provider === 'groq') {
     const start = Math.max(0,names.indexOf('groq' + (body.preferredSlot || '1')));
     names.push(...names.splice(0,start));
   }
-  const unique = new Set(), keys = [];
+  const unique = new Set();
+  let keys = [];
   for (const name of names) {
     const credential = credentials[name];
     if (!credential?.key) continue;
-    const values = name === 'gemini' ? credential.key.split(/[\n,;]+/).map(k => k.trim()).filter(Boolean).slice(0,5) : [credential.key];
+    const values = name === 'gemini' ? splitKeys(credential.key) : [credential.key];
     for (const key of values) if (!unique.has(key)) { unique.add(key); keys.push({ name, key, id: credential.id }); }
   }
   if (!keys.length) throw new HttpError(409,'KEY_NOT_CONFIGURED','Chưa có API key đã lưu. Mở Cài đặt AI để lưu key.');
+  for (const [index, credential] of keys.entries()) { credential.no = index + 1; credential.fp = await fingerprint(credential.key); }
+  // Trải đều tải: mỗi yêu cầu Gemini bắt đầu từ một key khác nhau thay vì luôn dồn vào key đầu.
+  if (body.provider === 'gemini' && keys.length > 1) { const start = Math.floor(random() * keys.length) % keys.length; keys = [...keys.slice(start), ...keys.slice(0, start)]; }
   const models = body.provider === 'groq' ? ['openai/gpt-oss-120b'] : [body.model, ...GEMINI_MODELS.filter(m => m !== body.model)];
-  let lastStatus = 502;
-  const deadline = Date.now() + 120000;
-  for (const credential of keys) {
-    for (const model of models) {
-      if (Date.now() > deadline) throw providerFailure(503,body.provider,attempts);
+  let lastStatus = 502, tried = 0, daily = false, soonest = Infinity;
+  const deadline = now() + 120000;
+  const coolUntil = (credential, model) => Math.max(cooldowns.get(credential.fp + '|' + model) || 0, cooldowns.get(credential.fp + '|*') || 0);
+  // Model là vòng ngoài: dùng hết key cho model ưu tiên rồi mới hạ xuống model dự phòng (hạn mức tính theo model).
+  for (const model of models) {
+    for (const credential of keys) {
+      if (now() > deadline) throw providerFailure(503,body.provider,attempts);
+      const until = coolUntil(credential, model);
+      if (until > now()) { soonest = Math.min(soonest, until); continue; }
+      tried++;
       const groq = body.provider === 'groq';
       const url = groq ? 'https://api.groq.com/openai/v1/chat/completions'
         : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -129,24 +168,35 @@ async function generate(fetchImpl, body, credentials, signal) {
       const usage = groq ? data.usage : undefined;
       const safeUsage = usage && object(usage) ? Object.fromEntries(['prompt_tokens','completion_tokens','total_tokens'].filter(k => Number.isFinite(usage[k])).map(k => [k,usage[k]])) : undefined;
       if (safeUsage && Number.isFinite(usage.prompt_tokens_details?.cached_tokens)) safeUsage.prompt_tokens_details = {cached_tokens:usage.prompt_tokens_details.cached_tokens};
-      attempts.push({keyId:credential.id,slot:credential.name,status:response.status,headers,usage:safeUsage});
+      attempts.push({keyId:credential.id,slot:credential.name,...(groq ? {} : {keyNo:credential.no,model}),status:response.status,headers,usage:safeUsage});
       if (!response.ok) {
         lastStatus = response.status;
-        if ([401,403,429].includes(response.status)) break;
-        if (!groq && [404,408,500,502,503,504].includes(response.status)) continue;
+        if (response.status === 429) {
+          const limit = readRateLimit(response, data, now());
+          daily = daily || limit.daily;
+          cooldowns.set(credential.fp + '|' + model, now() + limit.seconds * 1000);
+          soonest = Math.min(soonest, now() + limit.seconds * 1000);
+          continue; // key khác (hoặc model khác) có thể còn lượt
+        }
+        if ([401,403].includes(response.status)) { cooldowns.set(credential.fp + '|*', now() + 600000); continue; }
+        if (!groq && [404,408,500,502,503,504].includes(response.status)) break; // lỗi của model/dịch vụ: thử model dự phòng
         throw providerFailure(response.status,body.provider,attempts);
       }
       const finish = groq ? data.choices?.[0]?.finish_reason : data.candidates?.[0]?.finishReason;
       if (finish === 'length' || finish === 'MAX_TOKENS') throw new HttpError(502,'OUTPUT_TRUNCATED','AI trả kết quả chưa đầy đủ. Hãy chia nhỏ dữ liệu.',{attempts});
       const output = groq ? data.choices?.[0]?.message?.content : data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\n');
       if (typeof output !== 'string' || !output.trim()) throw new HttpError(502,'EMPTY_OUTPUT','AI chưa trả nội dung. Hãy thử lại.',{attempts});
-      return {output,model,provider:body.provider,slot:credential.name,attempts};
+      return {output,model,provider:body.provider,slot:credential.name,...(body.provider === 'gemini' ? {keyNo:credential.no,keyCount:keys.length} : {}),attempts};
     }
   }
-  throw providerFailure(lastStatus,body.provider,attempts);
+  // Không gọi nhà cung cấp lần nào vì mọi key đang trong thời gian chờ: báo ngay, không gọi dồn.
+  if (!tried) lastStatus = 429;
+  const retryAfter = Number.isFinite(soonest) ? Math.max(1, Math.ceil((soonest - now()) / 1000)) : 0;
+  throw providerFailure(lastStatus,body.provider,attempts,{ keyCount: keys.length, daily, retryAfter: lastStatus === 429 ? retryAfter : 0 });
 }
 
-export function createHandler({createClient,env,fetchImpl=globalThis.fetch}) {
+export function createHandler({createClient,env,fetchImpl=globalThis.fetch,random=Math.random,now=Date.now}) {
+  const cooldowns = new Map();
   return async req => {
     const origin = req.headers.get('origin');
     const allowed = (env('ALLOWED_ORIGINS') || 'https://huyho711997-lgtm.github.io,https://tra-cuu-phu-tung-pro.vercel.app').split(',').map(s => s.trim()).filter(Boolean);
@@ -195,11 +245,25 @@ export function createHandler({createClient,env,fetchImpl=globalThis.fetch}) {
       }
       if (body.action === 'save') {
         validateSave(body);
-        return reply(await rpc('kgpt_ai_settings_save',{p_actor:actor,p_target:body.targetUserId || actor,p_settings:body.settings || {},p_keys:body.keys || {},p_clear:body.clear || [],p_only_missing:body.onlyIfMissing === true}));
+        const target = body.targetUserId || actor;
+        let keys = body.keys || {};
+        // "Thêm key": gộp key Gemini mới vào các key đã lưu (tối đa 10) thay vì ghi đè. Chỉ đọc key của chính mình hoặc khi là quản trị viên;
+        // quyền ghi vẫn do RPC lưu kiểm tra. Key cũ không bao giờ được trả về trình duyệt.
+        if (body.appendKeys?.includes('gemini') && typeof keys.gemini === 'string') {
+          if (target !== actor && profile.role !== 'admin') throw new HttpError(403,'ACCESS_DENIED','Bạn không có quyền thay đổi cấu hình này.');
+          const current = (await rpc('kgpt_ai_credentials',{p_user_id:target}))?.gemini?.key || '';
+          const merged = allKeys([current, keys.gemini].join('\n'));
+          if (merged.length > MAX_GEMINI_KEYS) throw new HttpError(400,'TOO_MANY_KEYS','Tối đa ' + MAX_GEMINI_KEYS + ' key Gemini. Hãy xóa bớt key cũ trước khi thêm.');
+          keys = { ...keys, gemini: merged.join('\n') };
+        }
+        return reply(await rpc('kgpt_ai_settings_save',{p_actor:actor,p_target:target,p_settings:body.settings || {},p_keys:keys,p_clear:body.clear || [],p_only_missing:body.onlyIfMissing === true}));
       }
       if (body.action === 'generate') validateGenerate(body);
       const credentials = await rpc('kgpt_ai_credentials',{p_user_id:actor});
-      if (body.action === 'generate') return reply(await generate(fetchImpl,body,credentials,AbortSignal.any([req.signal,AbortSignal.timeout(120000)])));
+      if (body.action === 'generate') {
+        if (cooldowns.size > 500) for (const [name,until] of cooldowns) if (until <= now()) cooldowns.delete(name);
+        return reply(await generate(fetchImpl,body,credentials,AbortSignal.any([req.signal,AbortSignal.timeout(120000)]),{cooldowns,random,now}));
+      }
       const file = form?.get('file');
       const language = String(form?.get('language') || 'vnm'), engine = String(form?.get('OCREngine') || '2');
       if (!(file instanceof Blob) || !file.size || file.size > 12*1024*1024
@@ -216,7 +280,7 @@ export function createHandler({createClient,env,fetchImpl=globalThis.fetch}) {
       if (!text) throw new HttpError(502,'EMPTY_OCR','OCR.Space không đọc được chữ. Hãy dùng file rõ nét hơn.');
       return reply({text,engine,language});
     } catch (error) {
-      if (error instanceof HttpError) return reply({error:error.message,code:error.code,...(error.attempts?{attempts:error.attempts}:{}),...(error.providerStatus?{providerStatus:error.providerStatus}:{})},error.status);
+      if (error instanceof HttpError) return reply({error:error.message,code:error.code,...(error.attempts?{attempts:error.attempts}:{}),...(error.providerStatus?{providerStatus:error.providerStatus}:{}),...(error.retryAfter?{retryAfter:error.retryAfter}:{})},error.status);
       // Never log request bodies, provider errors, credentials, or SDK error objects.
       return reply({error:'Backend chưa xử lý được yêu cầu. Hãy thử lại sau.',code:'INTERNAL_ERROR'},500);
     }

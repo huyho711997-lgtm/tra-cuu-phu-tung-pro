@@ -23,7 +23,8 @@ export function createSecureAiClient({supabase,getOwner}) {
     return {
         read: targetUserId => request({action:'settings',...(targetUserId?{targetUserId}:{})}),
         list: () => request({action:'list'}),
-        save: (targetUserId,settings,keys={},clear=[],options={}) => request({action:'save',targetUserId,settings,keys,clear,onlyIfMissing:options.onlyIfMissing === true}),
+        save: (targetUserId,settings,keys={},clear=[],options={}) => request({action:'save',targetUserId,settings,keys,clear,onlyIfMissing:options.onlyIfMissing === true,
+            ...(options.appendKeys?.length ? {appendKeys:options.appendKeys} : {})}),
         generate: (parts,config,options={}) => request({action:'generate',provider:options.provider,model:options.model,
             preferredSlot:options.preferredSlot,parts,config},{signal:options.signal}),
         ocr: (file,language,engine,options={}) => {
