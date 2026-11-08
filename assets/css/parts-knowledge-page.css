@@ -283,7 +283,6 @@
   .pk-page .pk-toast, .pk-page .pk-completed>svg, .pk-page .pk-button-busy::before, .pl-dialog .pk-button-busy::before { animation:none; }
   .pk-page .pk-button:not(:disabled):hover, .pl-dialog .pk-button:not(:disabled):hover, .pk-page .pk-button:not(:disabled):active, .pl-dialog .pk-button:not(:disabled):active { transform:none; }
 }
-.pk-capture-notice { display:block; max-width:100%; font-size:9px; line-height:1.5; color:#a3b5cc; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; }
 .pk-capture-status { display:block; font-size:9px; color:#d6ad6c; line-height:1.5; }
 .pk-capture-status:empty { display:none; }
 .pk-auto-reason{display:block;max-width:280px;margin-top:7px;color:#526879;font-size:11px;line-height:1.6}

@@ -2005,7 +2005,6 @@ html.dark #loginOverlay .login-title{color:#f8fafc}
     #mainApp .ti-sidebar-pin:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
     #mainApp.ti-sidebar-collapsed .ti-footer-actions{flex-direction:column-reverse;gap:8px}
     #mainApp.ti-sidebar-collapsed .ti-footer-actions .ti-version-card{flex:none;width:100%}
-    #mainApp.ti-sidebar-collapsed .pk-capture-notice{display:none}
 }
 
 
