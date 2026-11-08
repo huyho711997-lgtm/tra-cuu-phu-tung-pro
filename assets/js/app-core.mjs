@@ -2210,6 +2210,10 @@
                 return task;
             },
             getCount(kind, value, scope) {
+                if (kind === 'Hang') {
+                    const summary = this.record('');
+                    return summary ? (value ? (summary.hangCounts?.[this.normalize(value)] ?? 0) : summary.total) : null;
+                }
                 const data = this.record(scope.hang);
                 if (!data) return null;
                 if (kind === 'Hieu') return data.hieuCounts?.[this.normalize(value)] ?? 0;
@@ -2295,6 +2299,7 @@
             { value: 'aftermarket', label: 'Hàng ngoài', note: 'Nguồn giá phụ tùng thay thế' }
         ];
         function getFilterFacetScope(source, kind) {
+            if (kind === 'Hang') return { hang: '', models: [], years: [] };
             const quote = source === 'quote';
             const hang = document.getElementById(quote ? 'quoteHangSelect' : 'filterHang')?.value || '';
             const models = quote
@@ -2310,7 +2315,7 @@
         }
         function filterFacetBadge(source, kind, value) {
             const scope = getFilterFacetScope(source, kind);
-            const note = kind === 'Nam' ? 'theo hãng và dòng xe đã chọn · tất cả loại hàng' : 'theo hãng, dòng xe và năm SX đã chọn';
+            const note = kind === 'Hang' ? 'tất cả dòng xe, năm sản xuất và loại hàng' : kind === 'Nam' ? 'theo hãng và dòng xe đã chọn · tất cả loại hàng' : 'theo hãng, dòng xe và năm SX đã chọn';
             return `<span class="vehicle-part-count" data-vehicle-count="${sanitize(filterFacetCountKey(scope,kind,value))}" data-count-scope="${note}" data-state="loading"><strong class="vehicle-count-value">···</strong><small>phụ tùng</small></span>`;
         }
         function refreshFilterFacetCounts(source, kind, retryErrors = false, force = false) {
@@ -2354,6 +2359,23 @@
             const type = document.getElementById('filterType')?.value || 'all';
             const typeSelection = document.getElementById('mainTypeFacetSelection');
             if (typeSelection) typeSelection.textContent = `Đang chọn: ${FILTER_FACET_TYPES.find(t => t.value === type)?.label || 'Tất cả loại hàng'}`;
+            const hangCount = Object.keys(CAY_GIA_PHA || {}).length;
+            const mainHangMeta = document.getElementById('mainHangFacetMeta');
+            if (mainHangMeta) mainHangMeta.textContent = hangCount ? `${formatNumberVN(hangCount)} hãng xe · Toàn bộ kho dữ liệu` : 'Đang đồng bộ danh sách hãng xe';
+            const quoteHangMeta = document.getElementById('quoteHangFacetMeta');
+            if (quoteHangMeta) quoteHangMeta.textContent = hangCount ? `${formatNumberVN(hangCount)} hãng xe · Chọn hãng để lọc dòng xe` : 'Đang đồng bộ danh sách hãng xe';
+            const mainHang = document.getElementById('filterHang')?.value || '';
+            const mainHangSel = document.getElementById('mainHangFacetSelection');
+            if (mainHangSel) mainHangSel.textContent = `Đang chọn: ${mainHang || 'Tất cả hãng'}`;
+            const quoteHang = document.getElementById('quoteHangSelect')?.value || '';
+            const quoteHangSel = document.getElementById('quoteHangFacetSelection');
+            if (quoteHangSel) quoteHangSel.textContent = quoteHang ? `Đang chọn: ${quoteHang}` : 'Chọn một hãng xe để đối chiếu';
+            const mainHangRows = Array.from(document.querySelectorAll('#listHang .dropdown-item[data-label]'));
+            const mainHangEmpty = document.getElementById('mainHangFacetEmpty');
+            if (mainHangEmpty) mainHangEmpty.hidden = !mainHangRows.length || mainHangRows.some(row => row.style.display !== 'none');
+            const quoteHangRows = Array.from(document.querySelectorAll('#quoteListHang .dropdown-item[data-label]'));
+            const quoteHangEmpty = document.getElementById('quoteHangFacetEmpty');
+            if (quoteHangEmpty) quoteHangEmpty.hidden = !quoteHangRows.length || quoteHangRows.some(row => row.style.display !== 'none');
         }
         function renderMainTypeDropdown() {
             const box = document.getElementById('listType');
@@ -2362,7 +2384,7 @@
             box.innerHTML = FILTER_FACET_TYPES.map(type => `<button type="button" class="dropdown-item vehicle-model-option vehicle-type-option${type.value===current?' active':''}" data-value="${type.value}" data-facet-value="${type.value}" onclick="selectType('${type.value}')"><span class="vehicle-choice-mark" aria-hidden="true"></span><span class="vehicle-model-name"><strong>${type.label}</strong><small class="vehicle-type-note">${type.note}</small></span>${filterFacetBadge('main','Type',type.value)}</button>`).join('');
             refreshFilterFacetCounts('main','Type');
         }
-        for (const [id,kind] of [['btnNam','Nam'],['btnType','Type']]) {
+        for (const [id,kind] of [['btnHang','Hang'],['btnNam','Nam'],['btnType','Type']]) {
             document.getElementById(id)?.addEventListener('click',()=>refreshFilterFacetCounts('main',kind,true,true));
         }
         document.getElementById('quoteNamSelect')?.addEventListener('change',()=>renderQuoteTypeDropdown());
@@ -2373,7 +2395,8 @@
             resetVehiclePartCounts();
             TascoFilterCounts.ensure();
             renderHangList();
-            fillNamSXDropdown(NAM_ALL);
+            updateNamSXDropdown();
+            syncFilterFacetSummary();
             renderQuoteVehicleSelectors();
             requestVehiclePartCounts(document.getElementById('filterHang')?.value || '');
             window.refreshVehicleQuickExamples?.();
@@ -2520,8 +2543,11 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         function renderHangList() {
             const list = document.getElementById('listHang');
             const sortedHang = Object.keys(CAY_GIA_PHA).sort();
-            list.innerHTML = '<div class="dropdown-item active border-b border-slate-100 mb-1 pb-2 font-black text-blue-600" onclick="selectHang(\'\')">Tất cả hãng</div>';
-            sortedHang.forEach(hang => {
+            const current = document.getElementById('filterHang')?.value || '';
+            list.innerHTML = `<button type="button" class="dropdown-item vehicle-model-option${!current ? ' active' : ''}" data-value="" data-facet-value="" data-label="tất cả hãng" onclick="selectHang('')"><span class="vehicle-choice-mark" aria-hidden="true"></span><span class="vehicle-model-name">Tất cả hãng</span>${filterFacetBadge('main','Hang','')}</button>` + sortedHang.map(hang => `<button type="button" class="dropdown-item vehicle-model-option${hang === current ? ' active' : ''}" data-value="${sanitize(hang)}" data-facet-value="${sanitize(hang)}" data-label="${sanitize(hang).toLowerCase()}" onclick="selectHang('${escapeJsSingle(hang)}')"><span class="vehicle-choice-mark" aria-hidden="true"></span><span class="vehicle-model-name">${sanitize(hang)}</span>${filterFacetBadge('main','Hang',hang)}</button>`).join('');
+            filterDropdown('Hang');
+            refreshFilterFacetCounts('main','Hang');
+            if (false) sortedHang.forEach(hang => {
                 list.innerHTML += `<div class="dropdown-item" onclick="selectHang('${sanitize(hang)}')">${sanitize(hang)}</div>`;
             });
         }
@@ -2529,7 +2555,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             document.getElementById('filterHang').value = hang;
             document.getElementById('labelHang').innerText = hang || 'Tất cả hãng';
             document.querySelectorAll('#listHang .dropdown-item').forEach(el => {
-                el.classList.toggle('active', el.innerText === (hang || 'Tất cả hãng'));
+                el.classList.toggle('active', (el.dataset.value || '') === (hang || ''));
             });
             updateHieuXeDropdown();
         };
@@ -2564,7 +2590,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     container.appendChild(item);
                 });
             } else { container.innerHTML = '<p class="text-[11px] text-slate-400 italic p-3">Chọn hãng xe trước</p>'; }
-            fillNamSXDropdown(NAM_ALL);
+            updateNamSXDropdown();
+            syncFilterFacetSummary();
             filterDropdown('Hieu');
             requestVehiclePartCounts(hang);
         };
@@ -2603,8 +2630,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const hang = document.getElementById('filterHang').value;
             const selected = Array.from(document.querySelectorAll('input[name="hieu_xe"]:checked')).map(cb => cb.value);
             let combinedNams = new Set();
-            if (hang && selected.length > 0) {
-                selected.forEach(h => { if (CAY_GIA_PHA[hang][h]) CAY_GIA_PHA[hang][h].forEach(n => combinedNams.add(n)); });
+            if (hang && CAY_GIA_PHA[hang]) {
+                const targetHieus = selected.length > 0 ? selected : Object.keys(CAY_GIA_PHA[hang]);
+                targetHieus.forEach(h => { if (CAY_GIA_PHA[hang][h]) CAY_GIA_PHA[hang][h].forEach(n => combinedNams.add(n)); });
+                // Đã gộp vào targetHieus (toàn bộ dòng xe của hãng khi chưa tick dòng xe cụ thể)
                 fillNamSXDropdown(Array.from(combinedNams));
             } else { fillNamSXDropdown(NAM_ALL); }
         };
@@ -3193,6 +3222,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 : document.querySelectorAll('#list' + type + ' .dropdown-item');
             items.forEach(item => { item.style.display = (item.dataset.label || item.innerText.toLowerCase()).includes(input) ? 'flex' : 'none'; });
             if (type === 'Hieu' && window.onHieuXeChange) onHieuXeChange();
+            if (type === 'Hang') syncFilterFacetSummary();
             if (type === 'Nam' && window.onNamSXChange) onNamSXChange();
         };
         window.toggleExactPartName = function() {
@@ -3256,7 +3286,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             dropdown.classList.toggle('hidden', !willOpen);
             if (willOpen) {
                 if (type === 'Hieu') requestVehiclePartCounts(document.getElementById('quoteHangSelect')?.value || '', true);
-                if (type === 'Nam' || type === 'Type') refreshFilterFacetCounts('quote',type,true,true);
+                if (type === 'Hang' || type === 'Nam' || type === 'Type') refreshFilterFacetCounts('quote',type,true,true);
                 const input = document.getElementById('quoteSearch' + type);
                 if (input) setTimeout(() => input.focus(), 0);
             }
@@ -3284,10 +3314,11 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const current = select?.value || '';
             const options = Array.from(select?.options || []).map(opt => opt.value).filter(Boolean);
             box.innerHTML = options.length
-                ? options.map(value => `<button type="button" class="dropdown-item${value === current ? ' active' : ''}" data-label="${sanitize(value).toLowerCase()}" onclick="selectQuoteHang('${escapeJsSingle(value)}')"><span>${sanitize(value)}</span></button>`).join('')
+                ? options.map(value => `<button type="button" class="dropdown-item vehicle-model-option${value === current ? ' active' : ''}" data-facet-value="${sanitize(value)}" data-label="${sanitize(value).toLowerCase()}" onclick="selectQuoteHang('${escapeJsSingle(value)}')"><span class="vehicle-choice-mark" aria-hidden="true"></span><span class="vehicle-model-name">${sanitize(value)}</span>${filterFacetBadge('quote','Hang',value)}</button>`).join('')
                 : '<div class="dropdown-item !cursor-default !text-slate-400">Chưa có dữ liệu hãng xe</div>';
             setQuoteDropdownButtonLabel('Hang', current || 'Chọn hãng xe');
             filterQuoteDropdown('Hang');
+            refreshFilterFacetCounts('quote','Hang');
         }
         function renderQuoteHieuDropdown() {
             const box = document.getElementById('quoteListHieu');
@@ -3296,7 +3327,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const current = select?.value || '';
             const options = Array.from(select?.options || []).map(opt => opt.value).filter(Boolean);
             box.innerHTML = options.length
-                ? options.map(value => `<button type="button" class="dropdown-item vehicle-model-option${value === current ? ' active' : ''}" data-label="${sanitize(value).toLowerCase()}" onclick="selectQuoteHieu('${escapeJsSingle(value)}')"><span class="vehicle-model-name">${sanitize(value)}</span>${vehiclePartCountBadge(document.getElementById('quoteHangSelect')?.value || '', value)}</button>`).join('')
+                ? options.map(value => `<button type="button" class="dropdown-item vehicle-model-option${value === current ? ' active' : ''}" data-label="${sanitize(value).toLowerCase()}" onclick="selectQuoteHieu('${escapeJsSingle(value)}')"><span class="vehicle-choice-mark" aria-hidden="true"></span><span class="vehicle-model-name">${sanitize(value)}</span>${vehiclePartCountBadge(document.getElementById('quoteHangSelect')?.value || '', value)}</button>`).join('')
                 : `<div class="dropdown-item !cursor-default !text-slate-400">${document.getElementById('quoteHangSelect')?.value ? 'Không có dòng xe' : 'Chọn hãng xe trước'}</div>`;
             setQuoteDropdownButtonLabel('Hieu', current || (document.getElementById('quoteHangSelect')?.value ? 'Chọn dòng xe...' : 'Chọn hãng trước'));
             filterQuoteDropdown('Hieu');
@@ -3357,6 +3388,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             list.querySelectorAll('.dropdown-item[data-label]').forEach(item => {
                 const label = item.dataset.label || item.innerText.toLowerCase();
                 item.style.display = label.includes(keyword) ? 'flex' : 'none';
+                if (type === 'Hang') syncFilterFacetSummary();
             });
         };
         window.toggleQuoteDropdownClearBtn = function(type) {

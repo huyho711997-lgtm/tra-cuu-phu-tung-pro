@@ -17,7 +17,11 @@
 
 
 
-<link rel="stylesheet" href="assets/css/app.css?v=20261108-pg-quote"/>
+
+
+
+<link rel="stylesheet" href="assets/css/app.css?v=20261108-hang-picker-sync"/>
+
 
 <link rel="stylesheet" href="assets/css/parts-knowledge-page.css?v=20261108-review-prompt"/>
 <link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261108-batch-scan"/>
@@ -603,14 +607,18 @@
 <span class="truncate" id="labelHang">Tất cả hãng</span>
 <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
 </button>
-<div class="z-[99999] hidden bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 w-64 p-2" id="dropdownHang">
-<div class="relative w-full mb-2">
+<div class="z-[99999] hidden bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 w-72 p-2 vehicle-premium-picker" id="dropdownHang">
+<div class="vehicle-picker-head"><div><div class="vehicle-picker-title">Hãng xe trong kho</div><p class="vehicle-picker-meta" id="mainHangFacetMeta">Tất cả hãng xe trong kho</p></div><span class="vehicle-picker-tag"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 5v9l9 5 9-5V8M12 13v9" stroke-width="1.8" stroke-linejoin="round"/></svg>Kho giá</span></div>
+<div class="relative w-full mb-2 vehicle-picker-search">
+<svg class="vehicle-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke-width="1.8"/><path d="m16 16 4 4" stroke-width="1.8" stroke-linecap="round"/></svg>
 <input autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" class="search-inner !mb-0 pr-8" id="searchHang" oninput="filterDropdown('Hang'); toggleDropdownClearBtn('Hang')" placeholder="Tìm hãng xe..." type="text"/>
 <button class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-full flex items-center justify-center transition-all cursor-pointer z-10" id="clearSearchHang" onclick="clearDropdownSearch('Hang')" title="Xóa">
 <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
 </button>
 </div>
-<div class="max-h-60 overflow-y-auto space-y-0.5" id="listHang"></div>
+<div class="max-h-60 overflow-y-auto space-y-0.5 vehicle-picker-list" id="listHang"></div>
+<p class="vehicle-picker-empty" id="mainHangFacetEmpty" hidden>Không tìm thấy hãng xe phù hợp.</p>
+<div class="vehicle-picker-footer"><span class="vehicle-picker-selection" id="mainHangFacetSelection">Đang chọn: Tất cả hãng</span><span class="vehicle-picker-note"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-width="1.6"/><path d="M12 11v5m0-9h.01" stroke-width="1.6" stroke-linecap="round"/></svg>Số bản ghi phụ tùng trong kho · tất cả dòng xe và năm SX</span></div>
 </div>
 <input id="filterHang" type="hidden" value=""/>
 </div>
@@ -808,14 +816,18 @@
 <span class="truncate" id="quoteLabelHang">Chọn hãng xe</span>
 <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
 </button>
-<div class="quote-filter-dropdown hidden bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 w-full p-2" id="quoteDropdownHang">
-<div class="relative w-full mb-2">
+<div class="quote-filter-dropdown hidden bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 w-full p-2 vehicle-premium-picker" id="quoteDropdownHang">
+<div class="vehicle-picker-head"><div><div class="vehicle-picker-title">Hãng xe trong kho</div><p class="vehicle-picker-meta" id="quoteHangFacetMeta">Tất cả hãng xe trong kho</p></div><span class="vehicle-picker-tag"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 5v9l9 5 9-5V8M12 13v9" stroke-width="1.8" stroke-linejoin="round"/></svg>Kho giá</span></div>
+<div class="relative w-full mb-2 vehicle-picker-search">
+<svg class="vehicle-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke-width="1.8"/><path d="m16 16 4 4" stroke-width="1.8" stroke-linecap="round"/></svg>
 <input autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" class="search-inner !mb-0 pr-8" id="quoteSearchHang" oninput="filterQuoteDropdown('Hang'); toggleQuoteDropdownClearBtn('Hang')" placeholder="Tìm hãng xe..." type="text"/>
 <button class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-full flex items-center justify-center transition-all cursor-pointer z-10" id="quoteClearSearchHang" onclick="clearQuoteDropdownSearch('Hang')" title="Xóa" type="button">
 <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
 </button>
 </div>
-<div class="max-h-60 overflow-y-auto space-y-0.5" id="quoteListHang"></div>
+<div class="max-h-60 overflow-y-auto space-y-0.5 vehicle-picker-list" id="quoteListHang"></div>
+<p class="vehicle-picker-empty" id="quoteHangFacetEmpty" hidden>Không tìm thấy hãng xe phù hợp.</p>
+<div class="vehicle-picker-footer"><span class="vehicle-picker-selection" id="quoteHangFacetSelection">Chọn một hãng xe để đối chiếu</span><span class="vehicle-picker-note"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-width="1.6"/><path d="M12 11v5m0-9h.01" stroke-width="1.6" stroke-linecap="round"/></svg>Số bản ghi phụ tùng trong kho · tất cả dòng xe và năm SX</span></div>
 </div>
 </div>
 <div class="field-group quote-filter-field">
@@ -1768,7 +1780,11 @@
 </div>
 <script src="assets/js/document-libraries.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js" defer></script>
-<script type="module" src="assets/js/app-core.mjs?v=20261108-garage-quote"></script>
+
+
+
+<script type="module" src="assets/js/app-core.mjs?v=20261108-hang-picker-sync"></script>
+
 <script src="assets/js/app-training.js"></script>
 
 <script id="kgptUnifiedPremiumDropdowns" src="assets/js/kgptUnifiedPremiumDropdowns.js"></script>
