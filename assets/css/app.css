@@ -2426,7 +2426,7 @@ html.dark #outsideGarageSection .pg-page-size-option:hover,html.dark #outsideGar
 /* pgQuoteOcr: đọc hạng mục sơn từ báo giá trên trang Giá sơn sửa gara ngoài */
 #outsideGarageSection .pg-item-search-field .pg-input{padding-right:74px}
 #outsideGarageSection .pg-search-wrap>#pgClearSearch{right:42px}
-#outsideGarageSection .pg-search-wrap>.pg-scan-btn{position:absolute;right:8px;top:7px;width:30px;height:30px;padding:5px;display:grid;place-items:center;background:#edf2f9;border:0;border-radius:9px;color:#4f70ce;cursor:pointer;transition:background .16s ease,color .16s ease}
+#outsideGarageSection .pg-overview-actions .pg-search-wrap>.pg-scan-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:30px;height:30px;padding:5px;display:grid;place-items:center;background:#edf2f9;border:0;border-radius:9px;color:#4f70ce;cursor:pointer;transition:background .16s ease,color .16s ease}
 #outsideGarageSection .pg-search-wrap>.pg-scan-btn svg{width:18px;height:18px}
 #outsideGarageSection .pg-search-wrap>.pg-scan-btn:hover:not(:disabled){background:#dfe9fb;color:#2563eb}
 #outsideGarageSection .pg-search-wrap>.pg-scan-btn:disabled{opacity:.55;cursor:progress}
