@@ -289,6 +289,49 @@
 .dark .pk-page .pk-overview-count[data-tone=blue] { background:#1c3558; border-color:#2e507d; color:#bad5ff; }
 .dark .pk-page .pk-overview-count[data-tone=rose] { background:#402c3c; border-color:#654052; color:#ffbdcc; }
 .dark .pk-page .pk-overview-count[data-tone=green] { background:#193c35; border-color:#2d5a4b; color:#9ce3bc; }
+/* Knowledge review table */
+.pk-page .pk-knowledge-table table { min-width:1130px; }
+.pk-page .pk-knowledge-table th { padding:14px 18px; background:linear-gradient(180deg,#f3f7fd,#eaf1fb); border-bottom:1px solid #dce7f5; color:#607795; font-size:10px; letter-spacing:.075em; }
+.pk-page .pk-knowledge-table td { padding:14px 18px; border-color:#e8eef6; vertical-align:middle; background:#fff; }
+.pk-page .pk-knowledge-table tbody tr:nth-child(even) td { background:#fbfdff; }
+.pk-page .pk-knowledge-table tbody tr:hover td { background:#f5f9ff; }
+.pk-page .pk-knowledge-table tr.pk-row-selected td { background:#edf5ff; }
+.pk-page .pk-knowledge-table tr.pk-row-processed td { background:#f6faf8; }
+.pk-page .pk-knowledge-table.is-pending th:first-child,.pk-page .pk-knowledge-table.is-pending td:first-child { width:64px; text-align:center; }
+.pk-page .pk-knowledge-table .pk-part-mapping { min-width:220px; padding:12px 14px; border:1px solid #e0eaf8; border-left:3px solid #7da5ed; border-radius:11px; background:linear-gradient(135deg,#f8fbff,#f3f7fe); box-shadow:0 5px 16px -15px rgba(37,74,133,.5); }
+.pk-page .pk-knowledge-table .pk-alias { margin-bottom:5px; color:#62758f; font-size:12px; font-weight:700; line-height:1.45; }
+.pk-page .pk-knowledge-table .pk-canonical-line { align-items:center; gap:7px; }
+.pk-page .pk-knowledge-table .pk-canonical-line>svg { width:15px; height:15px; margin:0; color:#6591d6; }
+.pk-page .pk-knowledge-table .pk-canonical { color:#214a80; font-size:13px; line-height:1.45; font-weight:800; }
+.pk-page .pk-knowledge-table .pk-part-mapping .pk-row-note { margin-top:7px; color:#71829a; font-size:10.5px; line-height:1.6; }
+.pk-page .pk-knowledge-table .pk-vehicle { gap:6px; }
+.pk-page .pk-knowledge-table .pk-vehicle-brand { color:#344e70; font-size:10.5px; letter-spacing:.055em; }
+.pk-page .pk-knowledge-table .pk-vehicle-model { padding:4px 8px; border-color:#dfe9f7; border-radius:7px; background:#f3f7fd; color:#496b9d; }
+.pk-page .pk-knowledge-table .pk-vehicle-meta { color:#72849d; line-height:1.5; }
+.pk-page .pk-knowledge-table .pk-evidence { min-width:180px; max-width:275px; }
+.pk-page .pk-knowledge-table .pk-evidence .pk-badge { padding:6px 9px; border:1px solid #f5e8cc; border-radius:8px; font-size:10px; }
+.pk-page .pk-knowledge-table .pk-evidence small { color:#667c98; line-height:1.5; }
+.pk-page .pk-knowledge-table .pk-evidence .pk-auto-reason { color:#788ba3; font-size:10.5px; }
+.pk-page .pk-knowledge-table .pk-updated { display:inline-block; color:#536984; font-size:11px; font-weight:700; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.pk-page .pk-knowledge-table .pk-knowledge-actions { gap:6px; }
+.pk-page .pk-knowledge-table .pk-knowledge-actions>.pk-icon-button { border:1px solid #e1eaf5; background:#fff; color:#7188a5; }
+.pk-page .pk-knowledge-table .pk-knowledge-actions>.pk-icon-button:hover { border-color:#b7cff5; background:#edf5ff; color:#3264ad; }
+.pk-page .pk-knowledge-table .pk-knowledge-actions>.pk-reject:hover { border-color:#f3c9d2; background:#fff3f5; color:#c63859; }
+.dark .pk-page .pk-knowledge-table th { background:#1c304c; border-color:#314762; color:#b8cae3; }
+.dark .pk-page .pk-knowledge-table td { background:#142238; border-color:#293c55; }
+.dark .pk-page .pk-knowledge-table tbody tr:nth-child(even) td { background:#17283e; }
+.dark .pk-page .pk-knowledge-table tbody tr:hover td { background:#1b3355; }
+.dark .pk-page .pk-knowledge-table tr.pk-row-selected td { background:#1c365a; }
+.dark .pk-page .pk-knowledge-table tr.pk-row-processed td { background:#18352f; }
+.dark .pk-page .pk-knowledge-table .pk-part-mapping { background:linear-gradient(135deg,#1b304c,#1a2a42); border-color:#355171; border-left-color:#7ca7ed; box-shadow:none; }
+.dark .pk-page .pk-knowledge-table .pk-alias,.dark .pk-page .pk-knowledge-table .pk-part-mapping .pk-row-note,.dark .pk-page .pk-knowledge-table .pk-evidence small,.dark .pk-page .pk-knowledge-table .pk-vehicle-meta,.dark .pk-page .pk-knowledge-table .pk-updated { color:#b5c7dc; }
+.dark .pk-page .pk-knowledge-table .pk-canonical { color:#dceaff; }
+.dark .pk-page .pk-knowledge-table .pk-vehicle-brand { color:#cad9ed; }
+.dark .pk-page .pk-knowledge-table .pk-vehicle-model { background:#203853; border-color:#365171; color:#bfd4ef; }
+.dark .pk-page .pk-knowledge-table .pk-evidence .pk-badge { border-color:transparent; }
+.dark .pk-page .pk-knowledge-table .pk-knowledge-actions>.pk-icon-button { background:#1c3049; border-color:#344d69; color:#b1c4dc; }
+.dark .pk-page .pk-knowledge-table .pk-knowledge-actions>.pk-icon-button:hover { background:#29466b; border-color:#5277a7; color:#e4f0ff; }
+.dark .pk-page .pk-select-all input:not(:checked):not(:indeterminate),.dark .pk-page .pk-knowledge-table .pk-row-check:not(:checked) { background-color:#213650; border-color:#829cbf; }
 @keyframes pk-spin { to { transform:rotate(360deg); } }
 @keyframes pk-check-in { from { opacity:0; transform:scale(.8); } to { opacity:1; transform:scale(1); } }
 @keyframes pk-toast-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }

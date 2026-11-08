@@ -212,15 +212,15 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
             actions.append(iconButton('Chỉnh sửa: '+row.alias,()=>review(row),'edit'),iconButton('Nguồn & lịch sử: '+row.alias,()=>knowledgeEvidence(row),'file'));
         }
         const headers=['Tên gọi → tên kho','Phạm vi xe','Nguồn bằng chứng','Cập nhật','Thao tác'];if(view.mode==='pending')headers.unshift('Chọn');
-        view.content.append(table(headers,rows.map(row=>{
+        const knowledgeTable=table(headers,rows.map(row=>{
             const name=node('div',undefined,'pk-part-mapping'),canonical=node('div',undefined,'pk-canonical-line');canonical.append(icon('arrow'),node('strong',row.canonical_name,'pk-canonical'));name.append(node('span',row.alias,'pk-alias'),canonical,node('small',row.note || '','pk-row-note'));
-            const evidence=node('div');evidence.append(badge(observed(row),row.evidence_type==='observed'?'amber':'blue'),node('small',userName(row.created_by)),node('small',knowledgeReviewHint(row),'pk-auto-reason'));
-            const actions=node('div',undefined,'pk-row-actions pk-knowledge-actions'),vehicle=vehicleChips(row),updated=node('span',date(row.updated_at)),actionCell=node('div'),feedback=node('span','','pk-row-feedback');fillActions(row,actions);actionCell.append(actions,feedback);
+            const evidence=node('div',undefined,'pk-evidence');evidence.append(badge(observed(row),row.evidence_type==='observed'?'amber':'blue'),node('small',userName(row.created_by)),node('small',knowledgeReviewHint(row),'pk-auto-reason'));
+            const actions=node('div',undefined,'pk-row-actions pk-knowledge-actions'),vehicle=vehicleChips(row),updated=node('span',date(row.updated_at),'pk-updated'),actionCell=node('div'),feedback=node('span','','pk-row-feedback');fillActions(row,actions);actionCell.append(actions,feedback);
             entries.set(row.id,{row,name,vehicle,evidence,updated,actions,feedback});
             const cells=[name,vehicle,evidence,updated,actionCell];
             if(view.mode==='pending'){const check=node('input');check.type='checkbox';check.className='pk-row-check';check.setAttribute('aria-label','Chọn gợi ý '+row.alias+' → '+row.canonical_name+' · '+scope(row));check.addEventListener('change',()=>{if(check.checked)selected.set(row.id,row);else selected.delete(row.id);syncSelection();});checks.set(row.id,check);cells.unshift(check);}
             return cells;
-        })));
+        }));knowledgeTable.classList.add('pk-knowledge-table');if(view.mode==='pending')knowledgeTable.classList.add('is-pending');view.content.append(knowledgeTable);
         view.setKnowledgeBusy=(ids,status)=>{
             for(const id of ids){const entry=entries.get(id);if(!entry)continue;const tr=entry.actions.closest('tr');
                 if(status)view.busyRows.set(id,status);else view.busyRows.delete(id);
