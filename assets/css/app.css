@@ -558,6 +558,7 @@ html.dark #outsideGarageSection .pg-overview-actions .pg-reset{border-color:#304
 #outsideGarageSection .pg-results-heading p,#outsideGarageSection .pg-unit{font-size:12px}
 #outsideGarageSection .pg-results-heading-meta{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:16px;margin-left:auto;min-width:0}
 #outsideGarageSection .pg-damage-guide{position:relative;z-index:30;max-width:100%}
+#outsideGarageSection .pg-damage-guide[open]{z-index:60}
 #outsideGarageSection .pg-damage-guide summary{display:flex;align-items:center;gap:12px;padding:0;border:0;border-radius:10px;list-style:none;cursor:pointer;color:var(--pg-ink)}
 #outsideGarageSection .pg-damage-guide summary::-webkit-details-marker{display:none}
 #outsideGarageSection .pg-damage-guide summary::marker{content:""}
