@@ -3,7 +3,7 @@
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs?v=20261108-key-manage";
         import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, buildRegistrationTextPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261108-reg-fast";
         import { buildQuotePartsAiPrompt, buildQuotePartsTextPrompt, joinQuoteOcrTexts, mergeQuotePartItems } from "./quote-parts-ocr.mjs?v=20261108-quote-fast";
-        import { buildGarageQuoteImagePrompt, buildGarageQuoteTextPrompt, matchGarageQuoteItems } from "./garage-quote-ocr.mjs?v=20261108-garage-quote";
+        import { buildGarageQuoteImagePrompt, buildGarageQuoteTextPrompt, buildGarageQuoteMapPrompt, matchGarageQuoteItems } from "./garage-quote-ocr.mjs?v=20261108-garage-reason";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -4568,7 +4568,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const canFast = reader === 'fast' && !!creds.ocrspace && !!(creds.groq1 || creds.groq2 || creds.groq3);
             if (!creds.gemini && !canFast) throw new Error('Đọc báo giá cần key Gemini (hoặc cả key OCR.Space và Groq ở chế độ nhanh). '+AI_KEY_MISSING_HINT);
             setStage(canFast ? 'OCR.Space đang đọc chữ' : 'Gemini đang đọc báo giá');
-            const rawItems = [];
+            const rawItems = [], meta = { vehicle: '' };
             let pending = files.slice(), engineLabel = '';
             // Chế độ nhanh: mỗi tệp ≤ ~1MB (giới hạn OCR.Space gói miễn phí) đi OCR.Space -> Groq; tệp lớn hoặc đọc lỗi chuyển Gemini.
             if (canFast) {
@@ -4591,6 +4591,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                             { responseMimeType: 'application/json', maxOutputTokens: 4096, temperature: 0 }, { provider: 'groq', signal: fastSignal });
                         const parsed = extractJsonObjectFromGeminiText(answer.output);
                         const list = Array.isArray(parsed?.items) ? parsed.items : Array.isArray(parsed) ? parsed : [];
+                        if (!meta.vehicle && typeof parsed?.xe === 'string') meta.vehicle = parsed.xe.trim().slice(0, 80);
                         if (list.length) { rawItems.push(...list); pending = pending.filter(file => !texts.has(file)); engineLabel = 'OCR.Space + Groq'; }
                     } catch (fastError) {
                         if (controller.signal.aborted) throw fastError;
@@ -4611,9 +4612,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                     { signal: controller.signal, maxRetriesPerModel: 1 });
                 const parsed = extractJsonObjectFromGeminiText(answer.output);
                 rawItems.push(...(Array.isArray(parsed?.items) ? parsed.items : Array.isArray(parsed) ? parsed : []));
+                if (!meta.vehicle && typeof parsed?.xe === 'string') meta.vehicle = parsed.xe.trim().slice(0, 80);
                 engineLabel = engineLabel ? engineLabel + ' + Gemini' : (canFast ? 'Gemini (dự phòng)' : 'Gemini');
             }
-            return { rawItems, engineLabel };
+            return { rawItems, engineLabel, meta };
         }
         window.openPartsBatchOcrPicker = function() {
             if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) { setPartsBatchStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', true); return; }
@@ -4712,27 +4714,46 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             let timedOut = false, stage = 'Đang đọc báo giá';
             const paint = () => { if (controller === GARAGE_QUOTE_CONTROLLER && !timedOut) window.pgQuote.status(stage + '... ' + Math.round((Date.now() - startedAt) / 1000) + 's'); };
             const ticker = setInterval(paint, 1000);
-            const deadline = setTimeout(() => { timedOut = true; controller.abort(); }, 90000);
+            const deadline = setTimeout(() => { timedOut = true; controller.abort(); }, 150000);
             try {
                 await loadQuoteApiSettingsForCurrentUser();
                 const catalog = window.pgQuote.catalog();
-                const { rawItems, engineLabel } = await readQuoteFilesWithAi(files, {
-                    controller, buildImagePrompt: () => buildGarageQuoteImagePrompt(catalog), buildTextPrompt: text => buildGarageQuoteTextPrompt(text, catalog),
+                // Bước 1: chép các dòng đồng/sơn (OCR.Space + Groq hoặc Gemini). Bước 2: AI suy luận quy từng dòng về hạng mục bảng giá.
+                const { rawItems, engineLabel, meta } = await readQuoteFilesWithAi(files, {
+                    controller, buildImagePrompt: () => buildGarageQuoteImagePrompt(), buildTextPrompt: text => buildGarageQuoteTextPrompt(text),
                     setStage: message => { stage = message; paint(); }
                 });
+                if (controller.signal.aborted) throw new DOMException('Đã hủy.', 'AbortError');
+                if (!rawItems.length) { clearInterval(ticker); clearTimeout(deadline); if (controller === GARAGE_QUOTE_CONTROLLER) window.pgQuote.fail('Không tìm thấy dòng đồng/sơn nào trong báo giá này. Hãy chụp rõ hơn hoặc nhập tay tên hạng mục.'); return; }
+                let mapped = null, reasoned = false;
+                try {
+                    stage = 'AI đang suy luận khớp ' + rawItems.length + ' dòng với bảng giá'; paint();
+                    const parts = [{ text: buildGarageQuoteMapPrompt(rawItems, meta?.vehicle, catalog) }];
+                    const creds = QUOTE_USER_API_SETTINGS.credentials || {};
+                    // Gemini không đặt mức thinking => dùng mặc định (suy luận sâu); chỉ là văn bản ngắn nên vẫn nhanh. Không có Gemini thì dùng Groq.
+                    const answer = creds.gemini
+                        ? await callGeminiGenerateContentWithRetry(parts, { responseMimeType: 'application/json', maxOutputTokens: 6144, temperature: 0.2 }, { signal: controller.signal, maxRetriesPerModel: 1 })
+                        : await secureAi.generate(parts, { responseMimeType: 'application/json', maxOutputTokens: 6144, temperature: 0.2 }, { provider: 'groq', signal: controller.signal });
+                    mapped = extractJsonObjectFromGeminiText(answer.output);
+                    reasoned = Array.isArray(mapped?.items) || Array.isArray(mapped?.chua_khop);
+                } catch (mapError) {
+                    if (controller.signal.aborted) throw mapError;
+                }
                 clearInterval(ticker); clearTimeout(deadline);
                 if (controller !== GARAGE_QUOTE_CONTROLLER) return;
-                const result = matchGarageQuoteItems(rawItems, catalog);
-                const tookLabel = engineLabel + ' · ' + ((Date.now() - startedAt) / 1000).toFixed(1) + 's';
-                if (!result.matched.length && !result.unmatched.length) { window.pgQuote.fail('Không tìm thấy hạng mục sơn trong báo giá này. Hãy chụp rõ hơn hoặc nhập tay tên hạng mục.'); return; }
+                // Suy luận lỗi: quay về khớp theo mã/tên từ các dòng đã chép để vẫn có kết quả.
+                const result = matchGarageQuoteItems(reasoned ? mapped : rawItems, catalog);
+                result.vehicle = meta?.vehicle || '';
+                const tookLabel = engineLabel + (reasoned ? ' + AI suy luận' : '') + ' · ' + ((Date.now() - startedAt) / 1000).toFixed(1) + 's';
+                if (!result.matched.length && !result.unmatched.length) { window.pgQuote.fail('Không khớp được dòng nào với bảng giá. Hãy nhập tay tên hạng mục.'); return; }
                 const lines = result.matched.reduce((sum, item) => sum + item.count, 0) + result.unmatched.length;
                 const message = !result.matched.length
-                    ? 'Đọc được ' + lines + ' dòng sơn nhưng chưa có dòng nào khớp bảng giá. Hãy nhập tay tên hạng mục. (' + tookLabel + ')'
-                    : 'Đọc được ' + lines + ' dòng sơn · khớp ' + result.matched.length + ' hạng mục bảng giá' + (result.unmatched.length ? ' · ' + result.unmatched.length + ' dòng chưa khớp' : '') + '. Đối chiếu với ảnh; bảng bên dưới chỉ hiện các hạng mục này. (' + tookLabel + ')';
+                    ? 'Đọc được ' + lines + ' dòng đồng/sơn nhưng chưa có dòng nào khớp bảng giá. Hãy chọn gợi ý bên dưới hoặc nhập tay. (' + tookLabel + ')'
+                    : 'Đọc được ' + lines + ' dòng đồng/sơn · khớp ' + result.matched.length + ' hạng mục bảng giá' + (result.unmatched.length ? ' · ' + result.unmatched.length + ' dòng chưa khớp' : '') + (reasoned ? '' : ' (AI suy luận không phản hồi nên chỉ khớp theo tên)') + '. Đối chiếu với ảnh; bảng bên dưới chỉ hiện các hạng mục này. (' + tookLabel + ')';
                 window.pgQuote.apply(result, message);
             } catch (error) {
                 if (controller !== GARAGE_QUOTE_CONTROLLER) return;
-                if (timedOut) { window.pgQuote.fail('AI phản hồi quá lâu (90 giây). Hãy thử lại với ít tệp/ảnh nhỏ hơn.'); return; }
+                if (timedOut) { window.pgQuote.fail('AI phản hồi quá lâu (150 giây). Hãy thử lại với ít tệp/ảnh nhỏ hơn.'); return; }
                 if (error?.name === 'AbortError') return;
                 window.pgQuote.fail(typeof handleGeminiApiError === 'function' && !/Gemini API key/.test(error?.message || '') ? handleGeminiApiError(error) : (error?.message || 'Không đọc được báo giá bằng AI.'));
             } finally {

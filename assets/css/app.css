@@ -2463,3 +2463,21 @@ html.dark #outsideGarageSection .pg-quote-row strong{color:#93bbff}
 html.dark #outsideGarageSection .pg-quote-note,html.dark #outsideGarageSection .pg-quote-group,html.dark #outsideGarageSection .pg-quote-paper{color:#94a3b8}
 html.dark #outsideGarageSection .pg-search-wrap>.pg-scan-btn{background:#1e293b;color:#93bbff}
 @media(max-width:640px){#outsideGarageSection .pg-quote-panel{flex-direction:column}#outsideGarageSection .pg-quote-thumbs{max-width:none}}
+
+/* pgQuoteOcr: kết quả suy luận (lý do, cần kiểm tra, gợi ý cho dòng chưa khớp, nhóm xe) */
+#outsideGarageSection .pg-quote-list{flex-direction:column;flex-wrap:nowrap;gap:6px}
+#outsideGarageSection .pg-quote-row{display:block;border-radius:12px;padding:7px 12px}
+#outsideGarageSection .pg-quote-main{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+#outsideGarageSection .pg-quote-paper{max-width:420px}
+#outsideGarageSection .pg-quote-reason{display:block;margin-top:3px;color:#7a8ba4;font-size:11px;line-height:1.45;font-style:italic}
+#outsideGarageSection .pg-quote-check{padding:1px 7px;border-radius:999px;background:#fff4d6;color:#a16207;font-size:10px;font-weight:800}
+#outsideGarageSection .pg-quote-vehicle{margin:10px 0 0;color:#334155;font-size:12px}
+#outsideGarageSection .pg-quote-vehicle .pg-quote-btn{margin-left:4px}
+#outsideGarageSection .pg-quote-unmatched{margin:10px 0 0;color:#b45309;font-size:11.5px}
+#outsideGarageSection .pg-quote-unlist{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+#outsideGarageSection .pg-quote-unrow{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:#92400e}
+#outsideGarageSection .pg-quote-unrow .pg-quote-btn{height:26px;border-color:#f3d3a7;color:#b45309}
+html.dark #outsideGarageSection .pg-quote-vehicle{color:#cbd5e1}
+html.dark #outsideGarageSection .pg-quote-reason{color:#94a3b8}
+html.dark #outsideGarageSection .pg-quote-check{background:#3b2f0e;color:#fcd34d}
+html.dark #outsideGarageSection .pg-quote-unrow{color:#fbbf24}

@@ -11,7 +11,7 @@
   const fold=value=>String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/[^a-z0-9]/g,'');
   const quote={active:false,only:false,result:null,thumbs:[],message:'',tone:''};
   const state={group:'sedan',model:'',query:'',level:'all',status:'all',page:1,size:10};
-  const aliases={1:'ca pô nắp capo bonnet hood',2:'ga lăng lưới tản nhiệt',5:'cửa trước cửa sau',17:'ba đờ sốc cản trước bumper',18:'quây dưới ba đờ sốc cản',19:'ốp đầu ba đờ sốc cản',20:'ba đờ sốc cản trước miếng trên',21:'ba đờ sốc cản trước miếng dưới',22:'ba đờ sốc cản sau',24:'la zăng mâm bánh xe'};
+  const aliases={1:'ca pô nắp capo bonnet hood nắp động cơ xương capo',2:'ga lăng lưới tản nhiệt mặt ca lăng két nước',3:'chắn bùn cánh trước',4:'ốp chắn bùn viền tai xe',10:'cánh sau quây sau tai sau',5:'cửa trước cửa sau',17:'ba đờ sốc cản trước bumper',18:'quây dưới ba đờ sốc cản',19:'ốp đầu ba đờ sốc cản',20:'ba đờ sốc cản trước miếng trên',21:'ba đờ sốc cản trước miếng dưới',22:'ba đờ sốc cản sau',24:'la zăng mâm bánh xe'};
   const searchableItems=new Map(catalog.items.map(item=>[item.id,fold(item.name+' '+(aliases[item.no]||''))]));
   function parseItemQuery(value){return [...new Set(value.split(/[,;\r\n]+/).map(fold).filter(Boolean))];}
   const groups=catalog.groups;
@@ -47,6 +47,15 @@
     if(line)line.textContent='Đơn giá bên dưới theo nhóm xe: '+currentGroup().label+(state.level==='all'?' · mức A và B':' · mức '+state.level);
   }
   function revokeQuoteThumbs(){quote.thumbs.forEach(t=>{try{URL.revokeObjectURL(t.url);}catch(_){}});quote.thumbs=[];}
+  // Thêm tay một hạng mục (gợi ý của AI cho dòng chưa khớp) vào danh sách khớp.
+  function addQuoteMatch(id,name){
+    const result=quote.result,item=catalog.items.find(i=>i.id===id);
+    if(!result||!item)return;
+    const found=result.matched.find(m=>m.id===id)||(result.matched.push({id:item.id,no:item.no,name:item.name,papers:[],level:'',count:0,reasons:[],check:false}),result.matched[result.matched.length-1]);
+    found.count++;if(!found.papers.includes(name))found.papers.push(name);found.reasons.push('Bạn chọn gợi ý cho dòng này');
+    result.unmatched=result.unmatched.filter(n=>n!==name);delete result.suggestions[name];
+    quote.only=true;state.page=1;renderQuotePanel();render();
+  }
   function renderQuotePanel(){
     const box=el('pgQuotePanel');
     box.replaceChildren();
@@ -61,7 +70,8 @@
     });
     const info=make('div','pg-quote-info'),head=make('div','pg-quote-head'),actions=make('div','pg-quote-actions');
     head.append(make('strong','','Báo giá đã quét ('+quote.thumbs.length+' tệp)'),actions);
-    if(quote.result&&quote.result.matched.length){
+    const result=quote.result;
+    if(result&&result.matched.length){
       const toggle=make('button','pg-quote-btn',quote.only?'Xem toàn bộ bảng giá':'Chỉ hạng mục trong báo giá');toggle.type='button';
       toggle.addEventListener('click',()=>{quote.only=!quote.only;state.page=1;renderQuotePanel();render();});
       actions.append(toggle);
@@ -69,25 +79,53 @@
     const hide=make('button','pg-quote-btn','Ẩn');hide.type='button';hide.addEventListener('click',()=>window.pgQuote.clear());actions.append(hide);
     const note=make('p','pg-quote-note',quote.message);if(quote.tone)note.dataset.tone=quote.tone;
     info.append(head,note);
-    if(quote.result){
-      if(quote.result.matched.length){
+    if(result){
+      if(result.vehicle){
+        const line=make('p','pg-quote-vehicle','Xe trên báo giá: '),suggested=groups.find(g=>g.id===result.group);
+        line.append(make('strong','',result.vehicle));
+        if(suggested&&suggested.id!==state.group){
+          line.append(document.createTextNode(' · nhóm gợi ý: '+suggested.label+' '));
+          const switchBtn=make('button','pg-quote-btn','Chuyển sang nhóm này');switchBtn.type='button';
+          switchBtn.addEventListener('click',()=>{state.group=suggested.id;state.model='';state.page=1;renderQuotePanel();render();});
+          line.append(switchBtn);
+        }else if(suggested)line.append(document.createTextNode(' · đúng nhóm đang chọn'));
+        info.append(line);
+      }
+      if(result.matched.length){
         const list=make('ul','pg-quote-list');
-        quote.result.matched.forEach(entry=>{
-          const row=make('li','pg-quote-row');
-          row.append(make('span','pg-quote-paper',entry.papers.join(', ')),make('span','pg-quote-arrow','→'),make('strong','',entry.name));
-          if(entry.level)row.append(make('span','pg-quote-level pg-quote-level-'+entry.level.toLowerCase(),'Mức '+entry.level));
-          if(entry.count>1)row.append(make('span','pg-quote-count','×'+entry.count));
+        result.matched.forEach(entry=>{
+          const row=make('li','pg-quote-row'),main=make('div','pg-quote-main');
+          main.append(make('span','pg-quote-paper',entry.papers.join(' · ')),make('span','pg-quote-arrow','→'),make('strong','',entry.name));
+          if(entry.level)main.append(make('span','pg-quote-level pg-quote-level-'+entry.level.toLowerCase(),'Mức '+entry.level));
+          if(entry.count>1)main.append(make('span','pg-quote-count','×'+entry.count));
+          if(entry.check)main.append(make('span','pg-quote-check','Cần kiểm tra'));
+          row.append(main);
+          if(entry.reasons.length)row.append(make('small','pg-quote-reason',entry.reasons.slice(0,2).join(' · ')));
           list.append(row);
         });
         info.append(list,make('p','pg-quote-group'));
       }
-      if(quote.result.unmatched.length)info.append(make('p','pg-quote-unmatched','Chưa khớp hạng mục nào trong bảng giá ('+quote.result.unmatched.length+'): '+quote.result.unmatched.join(' · ')));
+      if(result.unmatched.length){
+        const wrap=make('div','pg-quote-unmatched');
+        wrap.append(make('strong','','Chưa khớp hạng mục nào trong bảng giá ('+result.unmatched.length+')'));
+        const list=make('ul','pg-quote-unlist');
+        result.unmatched.forEach(name=>{
+          const row=make('li','pg-quote-unrow');row.append(make('span','',name));
+          (result.suggestions[name]||[]).forEach(id=>{
+            const item=catalog.items.find(i=>i.id===id);if(!item)return;
+            const add=make('button','pg-quote-btn','+ '+item.name);add.type='button';add.title='Tính dòng này vào hạng mục '+item.name;
+            add.addEventListener('click',()=>addQuoteMatch(id,name));row.append(add);
+          });
+          list.append(row);
+        });
+        wrap.append(list);info.append(wrap);
+      }
     }
     box.append(thumbs,info);box.hidden=false;
     updateQuoteGroupLine();
   }
   window.pgQuote={
-    catalog:()=>({items:catalog.items,aliases}),
+    catalog:()=>({items:catalog.items,aliases,groups:groups.map(g=>({id:g.id,label:g.label,models:g.models}))}),
     begin(thumbs,message){revokeQuoteThumbs();Object.assign(quote,{active:true,only:false,result:null,thumbs,message,tone:''});state.page=1;renderQuotePanel();render();},
     status(message){quote.message=message;const note=el('pgQuotePanel').querySelector('.pg-quote-note');if(note)note.textContent=message;},
     apply(result,message){Object.assign(quote,{active:true,result,only:result.matched.length>0,message,tone:''});state.page=1;renderQuotePanel();render();el('pgQuotePanel').scrollIntoView({block:'nearest',behavior:'smooth'});},
