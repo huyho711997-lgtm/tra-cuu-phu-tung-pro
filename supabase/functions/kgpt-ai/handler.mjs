@@ -54,6 +54,22 @@ function validateSave(body) {
   if (Object.entries(body.settings ?? {}).some(([name,value]) => !allowed[name]?.(value))) throw invalid();
 }
 
+// Key dùng chung: chỉ admin gọi (handler kiểm tra role, RPC kiểm tra lại). Dùng cùng quy tắc kiểm tra key như key riêng.
+function validateSharedSave(body) {
+  const keys = body.keys ?? {}, clear = body.clear ?? [];
+  if (!object(keys) || !Array.isArray(clear) || clear.length > 5 || clear.some(name => !KEY_NAMES.includes(name))) throw invalid();
+  if (Object.entries(keys).some(([name,key]) => !KEY_NAMES.includes(name) || typeof key !== 'string' || key.trim().length < 8 || key.length > 8192)) throw invalid();
+  if (body.appendKeys !== undefined && (!Array.isArray(body.appendKeys) || body.appendKeys.some(name => name !== 'gemini'))) throw invalid();
+  if (typeof keys.gemini === 'string' && allKeys(keys.gemini).some(key => key.length < 8)) throw invalid();
+  if (typeof keys.gemini === 'string' && allKeys(keys.gemini).length > MAX_GEMINI_KEYS) throw new HttpError(400,'TOO_MANY_KEYS','Tối đa ' + MAX_GEMINI_KEYS + ' key Gemini.');
+  if (!Object.keys(keys).length && !clear.length) throw invalid();
+}
+function validateGrant(body) {
+  const targets = body.targetUserIds;
+  if (!Array.isArray(targets) || !targets.length || targets.length > 1000 || !targets.every(uuid) || typeof body.allow !== 'boolean') throw invalid();
+  return [...new Set(targets)];
+}
+
 async function readBounded(req) {
   if (Number(req.headers.get('content-length') || 0) > MAX_BODY) throw new HttpError(413, 'BODY_TOO_LARGE', 'Dữ liệu quá lớn. Hãy chia nhỏ file.');
   if (!req.body) throw invalid();
@@ -133,7 +149,7 @@ async function generate(fetchImpl, body, credentials, signal, ctx) {
     const values = name === 'gemini' ? splitKeys(credential.key) : [credential.key];
     for (const key of values) if (!unique.has(key)) { unique.add(key); keys.push({ name, key, id: credential.id }); }
   }
-  if (!keys.length) throw new HttpError(409,'KEY_NOT_CONFIGURED','Chưa có API key đã lưu. Mở Cài đặt AI để lưu key.');
+  if (!keys.length) throw new HttpError(409,'KEY_NOT_CONFIGURED','Tài khoản chưa được cấp key AI. Hãy liên hệ quản trị viên để được cấp quyền dùng key dùng chung.');
   for (const [index, credential] of keys.entries()) { credential.no = index + 1; credential.fp = await fingerprint(credential.key); }
   // Trải đều tải: mỗi yêu cầu Gemini bắt đầu từ một key khác nhau thay vì luôn dồn vào key đầu.
   if (body.provider === 'gemini' && keys.length > 1) { const start = Math.floor(random() * keys.length) % keys.length; keys = [...keys.slice(start), ...keys.slice(0, start)]; }
@@ -221,6 +237,7 @@ export function createHandler({createClient,env,fetchImpl=globalThis.fetch,rando
         const {data,error} = await service.rpc(name,args);
         if (error) {
           if (error.code === '42501') throw new HttpError(403,'ACCESS_DENIED','Bạn không có quyền thay đổi cấu hình này.');
+          if (/AI_TOO_MANY_KEYS/.test(error.message || '')) throw new HttpError(400,'TOO_MANY_KEYS','Tối đa ' + MAX_GEMINI_KEYS + ' key Gemini. Hãy xóa bớt key cũ trước khi thêm.');
           if (/AI_INVALID/.test(error.message || '')) throw invalid();
           throw new HttpError(503,'STORAGE_UNAVAILABLE','Không truy cập được kho key. Hãy thử lại sau.');
         }
@@ -235,10 +252,18 @@ export function createHandler({createClient,env,fetchImpl=globalThis.fetch,rando
       } else if (type.startsWith('application/json')) {
         try { body = JSON.parse(new TextDecoder().decode(bytes)); } catch (_) { throw invalid(); }
       } else throw invalid();
-      if (!object(body) || !['settings','save','list','generate','ocr'].includes(body.action)) throw invalid();
+      if (!object(body) || !['settings','save','list','generate','ocr','shared','sharedSave','grant'].includes(body.action)) throw invalid();
       const ai = ['generate','ocr'].includes(body.action);
       if (body.action === 'list' && profile.role !== 'admin') throw new HttpError(403,'ACCESS_DENIED','Chỉ quản trị viên được xem danh sách cấu hình.');
+      if (['shared','sharedSave','grant'].includes(body.action) && profile.role !== 'admin') throw new HttpError(403,'ACCESS_DENIED','Chỉ quản trị viên được quản lý key dùng chung.');
       if (!await rpc('kgpt_ai_consume_rate',{p_user_id:actor,p_category:ai?'ai':'settings'})) throw new HttpError(429,'APP_RATE_LIMIT','Bạn thao tác quá nhanh hoặc đã hết hạn mức ngày của ứng dụng. Hãy thử lại sau.');
+      if (body.action === 'shared') return reply(await rpc('kgpt_ai_shared_read',{p_actor:actor}));
+      if (body.action === 'sharedSave') {
+        validateSharedSave(body);
+        // Việc gộp key (append) và giới hạn 10 key làm ngay trong CSDL: key cũ không rời khỏi Vault.
+        return reply(await rpc('kgpt_ai_shared_save',{p_actor:actor,p_keys:body.keys || {},p_clear:body.clear || [],p_append:body.appendKeys || []}));
+      }
+      if (body.action === 'grant') return reply(await rpc('kgpt_ai_shared_grant',{p_actor:actor,p_targets:validateGrant(body),p_allow:body.allow}));
       if (body.action === 'settings' || body.action === 'list') {
         if (body.targetUserId !== undefined && !uuid(body.targetUserId)) throw invalid();
         return reply(await rpc('kgpt_ai_settings_read',{p_actor:actor,p_target:body.targetUserId || actor,p_list:body.action==='list'}));

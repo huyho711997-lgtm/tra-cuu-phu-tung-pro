@@ -8,7 +8,7 @@ export function createGroqKeyPool({ generate = generateGroqContent, now = Date.n
             const { apiKeys = [], preferredKey, isCurrent = () => true, getRetryAt,
                 onKeyChange, onRequest, onUsage, ...requestOptions } = options;
             const keys = [...new Set(apiKeys.slice(0, 3).map(key => String(key || '').trim()).filter(Boolean))];
-            if (!keys.length) throw new Error('Chưa có Groq API key. Mở Cài đặt AI để nhập key.');
+            if (!keys.length) throw new Error('Tài khoản chưa được cấp key Groq. Hãy liên hệ quản trị viên để được cấp quyền dùng key dùng chung.');
             const preferred = keys.indexOf(preferredKey);
             const ordered = preferred > 0 ? [...keys.slice(preferred), ...keys.slice(0, preferred)] : keys;
             const checkCurrent = () => {

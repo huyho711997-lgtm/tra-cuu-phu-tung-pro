@@ -23,6 +23,11 @@ export function createSecureAiClient({supabase,getOwner}) {
     return {
         read: targetUserId => request({action:'settings',...(targetUserId?{targetUserId}:{})}),
         list: () => request({action:'list'}),
+        // Key dùng chung (chỉ quản trị viên): đọc metadata, lưu/thêm/xóa key, cấp hoặc thu hồi quyền dùng cho tài khoản.
+        sharedRead: () => request({action:'shared'}),
+        sharedSave: (keys={},clear=[],options={}) => request({action:'sharedSave',keys,clear,
+            ...(options.appendKeys?.length ? {appendKeys:options.appendKeys} : {})}),
+        grant: (targetUserIds,allow) => request({action:'grant',targetUserIds,allow:allow === true}),
         save: (targetUserId,settings,keys={},clear=[],options={}) => request({action:'save',targetUserId,settings,keys,clear,onlyIfMissing:options.onlyIfMissing === true,
             ...(options.appendKeys?.length ? {appendKeys:options.appendKeys} : {})}),
         generate: (parts,config,options={}) => request({action:'generate',provider:options.provider,model:options.model,

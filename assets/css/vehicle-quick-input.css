@@ -200,11 +200,15 @@ html.dark #partsBatchComposer .parts-ocr-note{color:#94a3b8}
 @media (max-width:640px){#partsBatchComposer .parts-batch-ocr-btn{width:100%;justify-content:center}#partsBatchComposer .parts-ocr{flex-direction:column}#partsBatchComposer .parts-ocr-thumbs{max-width:none}}
 
 /* Nhiều Gemini key: ô đếm và tùy chọn thêm key */
-.quote-gemini-key-tools{display:block;margin-top:6px}
-.quote-gemini-key-tools[hidden]{display:none}
-.quote-gemini-append{display:inline-flex;align-items:center;gap:7px;color:#5a6f93;font-size:12px;font-weight:600;cursor:pointer}
-.quote-gemini-append input{width:15px;height:15px;accent-color:#2563eb}
-.quote-gemini-key-count{display:block;margin-top:4px;min-height:0;color:#2f5590;font-size:11.5px;font-weight:700}
+/* Cài đặt AI cá nhân: trạng thái quyền dùng key AI dùng chung (không còn ô nhập key) */
+.quote-shared-key-note{display:flex;align-items:flex-start;gap:10px;margin:2px 0 4px;padding:11px 13px;border:1px solid #cfdcf3;border-radius:12px;background:#f3f7ff;color:#27456f;font-size:12.5px;font-weight:600;line-height:1.5}
+.quote-shared-key-note svg{flex:0 0 18px;width:18px;height:18px;margin-top:1px}
+.quote-shared-key-note[data-state="ready"]{border-color:#b7e4cb;background:#effaf4;color:#14633f}
+.quote-shared-key-note[data-state="legacy"]{border-color:#f3d9a4;background:#fff8e8;color:#8a5a06}
+.quote-shared-key-note[data-state="blocked"]{border-color:#f2c1c1;background:#fff4f4;color:#a12b2b}
+.quote-gemini-key-count{display:block;margin-top:4px;color:#2f5590;font-size:11.5px;font-weight:700}
 .quote-gemini-key-count:empty{display:none}
-.quote-gemini-key-count[data-tone="error"]{color:#b45309}
-html.dark .quote-gemini-append{color:#cbd5e1}
+html.dark .quote-shared-key-note{border-color:#34507c;background:#14233b;color:#c8d9f5}
+html.dark .quote-shared-key-note[data-state="ready"]{border-color:#245c43;background:#10261d;color:#a6e3c4}
+html.dark .quote-shared-key-note[data-state="legacy"]{border-color:#6b5316;background:#2a2210;color:#f1d28b}
+html.dark .quote-shared-key-note[data-state="blocked"]{border-color:#6a3030;background:#2a1414;color:#f5b3b3}

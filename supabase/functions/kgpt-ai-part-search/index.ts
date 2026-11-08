@@ -91,7 +91,7 @@ export async function handleRequest(req) {
     const { data: credentials, error: credentialsError } = await service.rpc("kgpt_ai_credentials", { p_user_id: uid });
     if (credentialsError) return json(503, { error: "Không đọc được kho key của tài khoản." });
     const keys = [...new Set(String(credentials?.gemini?.key || "").split(/[\n,;]+/).map(k => k.trim()).filter(Boolean))].slice(0,10);
-    if (!keys.length) return json(400, { error: "Chưa lưu Gemini API key. Mở Cài đặt Gemini, nhập key Free Tier và bấm Lưu cấu hình.", code: "GEMINI_KEY_MISSING" });
+    if (!keys.length) return json(400, { error: "Tài khoản chưa được cấp key Gemini. Hãy liên hệ quản trị viên để được cấp quyền dùng key dùng chung.", code: "GEMINI_KEY_MISSING" });
     const cacheKey = uid + ":" + JSON.stringify(input);
     const cached = analyses.get(cacheKey);
     let analysis = cached && cached.expires > Date.now() ? cached.value : null;

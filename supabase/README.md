@@ -71,3 +71,20 @@ Triển khai: cần deploy lại **cả hai** function trước khi dùng tùy c
 supabase functions deploy kgpt-ai --project-ref yxwmcpoklxpzlikxojez
 supabase functions deploy kgpt-ai-part-search --project-ref yxwmcpoklxpzlikxojez
 ```
+
+## Key AI dùng chung (admin quản lý, admin cấp quyền)
+
+Key Gemini / Groq / OCR.Space được **quản trị viên lưu một lần** ở trang *Quản lý người dùng → Key AI dùng chung*; người dùng không còn tự nhập key. Admin bật/tắt quyền dùng cho từng tài khoản bằng công tắc ở cột *Key AI dùng chung* (hoặc “Bật cho tất cả tài khoản đang hoạt động”).
+
+- Migration `20261108060000_shared_ai_keys.sql`: bảng `kgpt_private.ai_shared_credentials` (key nằm trong Vault, như key riêng), cột `ai_settings.use_shared_keys` (mặc định `false` — **không ai được dùng cho đến khi admin cấp**), và các RPC chỉ `service_role` gọi: `kgpt_ai_shared_read`, `kgpt_ai_shared_save`, `kgpt_ai_shared_grant`. `kgpt_ai_credentials` và `settings_metadata` đã được cập nhật.
+- Quy tắc chọn key: admin luôn dùng được key chung; người khác chỉ khi được cấp. Tài khoản được cấp dùng **key chung ưu tiên hơn key riêng cùng tên**; tên nào key chung không có thì dùng key riêng. Tài khoản chưa được cấp vẫn dùng key riêng cũ (nếu có) như trước.
+- Edge Function `kgpt-ai` có thêm 3 action chỉ dành cho admin: `shared` (đọc metadata), `sharedSave` (lưu / thêm bằng `appendKeys:["gemini"]` / xóa; gộp key và giới hạn 10 key làm ngay trong CSDL nên key cũ không rời khỏi Vault), `grant` (cấp/thu hồi cho tối đa 1000 tài khoản). Trình duyệt chỉ nhận id phiên bản và 4 ký tự cuối (chỉ admin thấy), không bao giờ nhận key.
+- Mọi người dùng chung một bộ key nên hạn mức Gemini free (tính theo dự án Google Cloud) bị chia sẻ: hãy dùng key từ **nhiều dự án khác nhau**. Trạng thái “key đang nghỉ” nằm trong bộ nhớ của instance Edge Function và được dùng chung giữa mọi người dùng trong instance đó.
+
+Triển khai (thứ tự quan trọng — migration trước, function sau):
+
+```sh
+supabase db push --project-ref yxwmcpoklxpzlikxojez   # hoặc dán file migration vào SQL Editor bằng quyền owner
+supabase functions deploy kgpt-ai --project-ref yxwmcpoklxpzlikxojez
+supabase functions deploy kgpt-ai-part-search --project-ref yxwmcpoklxpzlikxojez
+```

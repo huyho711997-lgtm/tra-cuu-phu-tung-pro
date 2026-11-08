@@ -1,6 +1,6 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
-        import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
+        import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs?v=20261108-shared-keys";
         import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v11";
         import { buildQuotePartsAiPrompt, mergeQuotePartItems } from "./quote-parts-ocr.mjs?v=20261108-quote-ocr";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
@@ -776,6 +776,7 @@
                 email: user.email || '',
                 role: user.role || 'user',
                 status: user.status || 'active',
+                aiShared: user.apiSettings?.useSharedKeys === true,
                 permissions: normalizeUserPermissions(user.permissions || await getStoredUserPermissions(user.uid), user.role || 'user'),
                 updatedAt: (user.updatedAt?.seconds || user.createdAt?.seconds || 0) * 1000
             })));
@@ -784,6 +785,33 @@
             setTimeout(installUserHistoryActions, 40);
             setTimeout(installUserHistoryActions, 180);
         };
+        // Key AI dùng chung: chỉ admin (đã kiểm tra ở listener). Máy chủ kiểm tra lại role; key chỉ đi một chiều vào Vault, không bao giờ trả về.
+        async function handleSharedAiKeyMessage(message, frame) {
+            const post = data => frame.contentWindow?.postMessage(data, '*');
+            const p = message.payload || {};
+            const uids = Array.isArray(p.uids) ? [...new Set(p.uids.filter(id => typeof id === 'string'))] : [];
+            const allow = p.allow === true;
+            try {
+                if (message.type === 'kgpt:ai-shared-load') {
+                    post({ type: 'kgpt:ai-shared-state', ok: true, ...await secureAi.sharedRead() });
+                } else if (message.type === 'kgpt:ai-shared-save') {
+                    const keys = {};
+                    for (const [name, value] of Object.entries(p.keys || {})) if (typeof value === 'string' && value.trim()) keys[name] = value.trim();
+                    const clear = Array.isArray(p.clear) ? p.clear.filter(name => typeof name === 'string') : [];
+                    const state = await secureAi.sharedSave(keys, clear, { appendKeys: p.append === true && keys.gemini ? ['gemini'] : [] });
+                    post({ type: 'kgpt:ai-shared-state', ok: true, saved: true, message: Object.keys(keys).length ? 'Đã lưu key dùng chung.' : 'Đã xóa key dùng chung.', ...state });
+                } else if (message.type === 'kgpt:ai-grant') {
+                    const result = await secureAi.grant(uids, allow);
+                    ADMIN_USER_CACHE = ADMIN_USER_CACHE.map(user => uids.includes(user.uid) ? { ...user, apiSettings: { ...(user.apiSettings || {}), useSharedKeys: allow, sharedAllowed: allow } } : user);
+                    renderAdminUserCards();
+                    post({ type: 'kgpt:ai-grant-result', ok: true, uids, ...result, allow,
+                        message: allow ? `Đã cấp quyền dùng key AI cho ${result.updated ?? uids.length} tài khoản.` : `Đã thu hồi quyền dùng key AI của ${result.updated ?? uids.length} tài khoản.` });
+                }
+            } catch (error) {
+                const failure = { ok: false, message: error?.message || 'Không thực hiện được. Hãy thử lại.' };
+                post(message.type === 'kgpt:ai-grant' ? { type: 'kgpt:ai-grant-result', ...failure, uids, allow } : { type: 'kgpt:ai-shared-state', ...failure });
+            }
+        }
         window.addEventListener('message', async function(event) {
             const frame = document.getElementById('userManagementFrame');
             if (!frame?.contentWindow || event.source !== frame.contentWindow) return;
@@ -796,6 +824,7 @@
                     await window.refreshUserList();
                     return;
                 }
+                if (String(message.type).startsWith('kgpt:ai-')) { await handleSharedAiKeyMessage(message, frame); return; }
                 const payload = message.payload || {};
                 const roleMap = { 'Quản trị viên': 'admin', 'Giảng viên': 'teacher', 'Người dùng': 'user' };
                 const normalizedRole = roleMap[payload.role] || payload.role || 'user';
@@ -1740,8 +1769,8 @@
                 const initials = sanitize(getInitials(u.fullName || u.email));
                 const loginCount = new Intl.NumberFormat('vi-VN').format(Number(u.loginCount || 0));
                 const searchCount = new Intl.NumberFormat('vi-VN').format(Number(u.searchCount || 0));
-                const apiConfigured = hasConfiguredQuoteApi(u.apiSettings || {});
-                const apiStatusText = apiConfigured ? 'Đã cấu hình' : 'Chưa có';
+                const apiConfigured = u.role === 'admin' || (u.apiSettings?.useSharedKeys === true);
+                const apiStatusText = u.role === 'admin' ? 'Luôn bật' : apiConfigured ? 'Được dùng' : 'Chưa cấp';
                 const roleLabel = u.role === 'admin' ? 'Admin' : (u.role === 'user_no_quote' ? 'Chỉ dòng xe' : 'Đầy đủ');
                 const roleClass = u.role === 'admin' ? 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800' : (u.role === 'user_no_quote' ? 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' : 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800');
                 return `
@@ -1756,13 +1785,13 @@
                         <div class="admin-user-metrics">
                             <div class="admin-user-metric"><div class="admin-user-metric-label">Đăng nhập</div><div class="admin-user-metric-value">${loginCount}</div></div>
                             <div class="admin-user-metric"><div class="admin-user-metric-label">Tra cứu</div><div class="admin-user-metric-value">${searchCount}</div></div>
-                            <div class="admin-user-metric"><div class="admin-user-metric-label">API OCR</div><div class="admin-user-metric-value ${apiConfigured ? 'text-emerald-600' : 'text-amber-600'}">${apiStatusText}</div></div>
+                            <div class="admin-user-metric"><div class="admin-user-metric-label">Key AI chung</div><div class="admin-user-metric-value ${apiConfigured ? 'text-emerald-600' : 'text-amber-600'}">${apiStatusText}</div></div>
                             <div class="admin-user-metric"><div class="admin-user-metric-label">Lần cuối</div><div class="admin-user-metric-value text-[10px] leading-snug text-slate-600 dark:text-slate-300">${sanitize(lastLogin)}</div></div>
                         </div>
                         <div class="admin-user-actions">
                             <button onclick="viewUserHistoryById('${uid}')" class="admin-user-action-btn text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20" title="Xem lịch sử"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></button>
                             <button onclick="toggleUserStatus('${uid}', '${sanitize(u.status || 'active')}')" class="admin-user-action-btn ${lockColor}" title="${lockText} tài khoản">${lockIcon}</button>
-                            <button onclick="openUserApiSettingsById('${uid}')" class="admin-user-action-btn ${apiConfigured ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20'}" title="Cấu hình API OCR cho user"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM14 10l6 6m0 0-2 2m2-2 2-2"/></svg></button>
+                            <button onclick="openUserApiSettingsById('${uid}')" class="admin-user-action-btn ${apiConfigured ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20'}" title="Quyền dùng key AI cho user"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM14 10l6 6m0 0-2 2m2-2 2-2"/></svg></button>
                             <button onclick="openEditUserById('${uid}')" class="admin-user-action-btn text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20" title="Sửa thông tin"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg></button>
                             <button onclick="deleteSubUserById('${uid}')" class="admin-user-action-btn text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30" title="Xóa hồ sơ"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 7h16M10 7V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3M5 7l.867 12.142A2 2 0 0 0 7.862 21h8.276a2 2 0 0 0 1.995-1.858L19 7M10 11v6M14 11v6"/></svg></button>
                         </div>
@@ -1893,48 +1922,21 @@
         function setEditApiStatus(settings = {}, loadingText = '') {
             const el = document.getElementById('editApiStatusText');
             if (!el) return;
-            const ready = hasConfiguredQuoteApi(settings);
-            el.classList.toggle('ready', ready);
-            el.textContent = loadingText || (ready ? 'Đã cấu hình API' : 'Chưa có API key');
+            const info = sharedKeyNoticeState(normalizeQuoteApiSettings(settings));
+            el.classList.toggle('ready', info.state === 'ready');
+            el.textContent = loadingText || (info.state === 'ready' ? 'Được dùng key chung' : info.state === 'legacy' ? 'Chỉ có key riêng cũ' : 'Chưa được cấp key');
         }
-        let EDIT_USER_API_SETTINGS = {}, EDIT_USER_API_CLEAR = [];
+        let EDIT_USER_API_SETTINGS = {};
         function fillEditUserApiFields(settings = {}) {
             const normalized = normalizeQuoteApiSettings(settings);
-            EDIT_USER_API_SETTINGS = normalized; EDIT_USER_API_CLEAR = [];
-            const provider = document.getElementById('editApiProviderSelect');
-            const gemini = document.getElementById('editGeminiApiKey');
-            const ocr = document.getElementById('editOcrSpaceApiKey');
-            const lang = document.getElementById('editOcrSpaceLangSelect');
-            const engine = document.getElementById('editOcrSpaceEngineSelect');
-            const selfEdit = document.getElementById('editApiSelfEditableSelect');
-            if (provider) provider.value = normalized.ocrProvider || 'gemini';
-            { const tools = document.getElementById('editGeminiKeyTools'), append = document.getElementById('editGeminiAppend'); if (tools) tools.hidden = !normalized.credentials.gemini; if (append) append.checked = !!normalized.credentials.gemini; }
-            if (gemini) { gemini.value = ''; gemini.placeholder = normalized.credentials.gemini ? 'Đã lưu · …'+normalized.credentials.gemini.suffix+'. Để trống để giữ key.' : 'Nhập Gemini key mới'; }
-            if (ocr) { ocr.value = ''; ocr.placeholder = normalized.credentials.ocrspace ? 'Đã lưu · …'+normalized.credentials.ocrspace.suffix+'. Để trống để giữ key.' : 'Nhập OCR.Space key mới'; }
-            if (lang) lang.value = normalized.ocrLanguage || OCRSPACE_DEFAULT_LANGUAGE;
-            if (engine) engine.value = String(normalized.ocrEngine || OCRSPACE_DEFAULT_ENGINE);
-            if (selfEdit) selfEdit.value = normalized.allowSelfEdit === false ? 'false' : 'true';
+            EDIT_USER_API_SETTINGS = normalized;
+            const select = document.getElementById('editApiSharedSelect');
+            const isAdmin = (document.getElementById('editUserRole')?.value || '') === 'admin';
+            if (select) { select.value = normalized.useSharedKeys ? 'true' : 'false'; select.disabled = isAdmin; window.KGPTPremiumDropdown?.sync?.(select); }
+            const note = document.getElementById('editApiSharedNote');
+            if (note) note.textContent = isAdmin ? 'Quản trị viên luôn dùng được key dùng chung.' : '';
             setEditApiStatus(normalized);
         }
-        function collectEditUserApiSettings() {
-            return normalizeQuoteApiSettings({
-                ...EDIT_USER_API_SETTINGS, clearKeys:EDIT_USER_API_CLEAR, fromAdmin:true,
-                ocrProvider: document.getElementById('editApiProviderSelect')?.value || 'gemini',
-                geminiApiKey: document.getElementById('editGeminiApiKey')?.value?.trim() || '',
-                ocrSpaceApiKey: document.getElementById('editOcrSpaceApiKey')?.value?.trim() || '',
-                ocrLanguage: document.getElementById('editOcrSpaceLangSelect')?.value || OCRSPACE_DEFAULT_LANGUAGE,
-                ocrEngine: document.getElementById('editOcrSpaceEngineSelect')?.value || OCRSPACE_DEFAULT_ENGINE,
-                allowSelfEdit: (document.getElementById('editApiSelfEditableSelect')?.value || 'true') === 'true'
-            });
-        }
-        window.clearEditUserApiKeys = function() {
-            EDIT_USER_API_CLEAR = ['gemini','groq1','groq2','groq3','ocrspace'];
-            const gemini = document.getElementById('editGeminiApiKey');
-            const ocr = document.getElementById('editOcrSpaceApiKey');
-            if (gemini) gemini.value = '';
-            if (ocr) ocr.value = '';
-            setEditApiStatus(collectEditUserApiSettings());
-        };
         window.openEditUser = async (uid, email, fullName, focusSection = 'profile') => {
             editingUserId = uid;
             document.getElementById('editUserEmailDisplay').innerText = email;
@@ -1959,7 +1961,7 @@
                 setTimeout(() => {
                     const box = document.getElementById('editUserApiConfigBox');
                     box?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    document.getElementById('editGeminiApiKey')?.focus();
+                    document.getElementById('editApiSharedSelect')?.focus();
                 }, 180);
             }
         };
@@ -1967,7 +1969,8 @@
             const newFullName = document.getElementById('editFullName').value.trim();
             const newPass = document.getElementById('editUserPass').value.trim();
             const newRole = document.getElementById('editUserRole')?.value || 'user';
-            let apiSettings = collectEditUserApiSettings();
+            const wantShared = document.getElementById('editApiSharedSelect')?.value === 'true';
+            let apiSettings = { ...EDIT_USER_API_SETTINGS };
             if (!newFullName) return customAlert("Vui lòng không để trống ô Họ Tên!");
             if (newPass && newPass.length < 6) return customAlert("Mật khẩu cập nhật tối thiểu 6 ký tự!");
             try {
@@ -1975,28 +1978,26 @@
                     fullName: newFullName,
                     role: newRole
                 });
-                apiSettings = await saveQuoteApiSettingsForUid(editingUserId, apiSettings);
+                // Quyền dùng key dùng chung do admin quyết định; admin luôn được dùng nên không cần cấp.
+                if (newRole !== 'admin' && wantShared !== (EDIT_USER_API_SETTINGS.useSharedKeys === true)) {
+                    await secureAi.grant([editingUserId], wantShared);
+                    apiSettings = { ...apiSettings, useSharedKeys: wantShared, sharedAllowed: wantShared };
+                }
                 const editedCacheIndex = ADMIN_USER_CACHE.findIndex(u => u.uid === editingUserId);
                 if (editedCacheIndex >= 0) {
                     ADMIN_USER_CACHE[editedCacheIndex] = {
                         ...ADMIN_USER_CACHE[editedCacheIndex],
                         fullName: newFullName,
                         role: newRole,
-                        apiSettings,
-                        apiConfigured: hasConfiguredQuoteApi(apiSettings)
+                        apiSettings
                     };
-                }
-                if (editingUserId === (auth?.currentUser?.uid || currentUserProfile?.uid)) {
-                    QUOTE_USER_API_SETTINGS = normalizeQuoteApiSettings(apiSettings);
-                    QUOTE_API_SETTINGS_LOADED_FOR_UID = editingUserId;
-                    initQuoteAiSettings();
                 }
                 closeModal('modalEditUser');
                 refreshUserList();
                 if (newPass) {
-                    customAlert("Đã lưu họ tên và API key.\n\nĐể đổi mật khẩu an toàn, vui lòng dùng tính năng 'Quên mật khẩu' ở ngoài màn hình cho email thành viên này.", "success");
+                    customAlert("Đã lưu họ tên và quyền dùng key AI.\n\nĐể đổi mật khẩu an toàn, vui lòng dùng tính năng 'Quên mật khẩu' ở ngoài màn hình cho email thành viên này.", "success");
                 } else {
-                    customAlert("Cập nhật hồ sơ và API key riêng của thành viên thành công!", "success");
+                    customAlert("Cập nhật hồ sơ và quyền dùng key AI của thành viên thành công!", "success");
                 }
             } catch (e) { customAlert("Lỗi tác vụ: " + e.message); }
         };
@@ -2797,8 +2798,9 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
         const QUOTE_DEFAULT_API_SETTINGS = {
             ocrProvider:'gemini', llmProvider:'gemini', groqActiveKey:'1',
             ocrLanguage:OCRSPACE_DEFAULT_LANGUAGE, ocrEngine:OCRSPACE_DEFAULT_ENGINE,
-            allowSelfEdit:true, credentials:{}
+            allowSelfEdit:true, useSharedKeys:false, sharedAllowed:false, credentials:{}
         };
+        const AI_KEY_MISSING_HINT = 'Tài khoản chưa được cấp key AI. Hãy liên hệ quản trị viên để được cấp quyền dùng key dùng chung.';
         let QUOTE_USER_API_SETTINGS = {...QUOTE_DEFAULT_API_SETTINGS};
         let QUOTE_API_SETTINGS_LOADED_FOR_UID = null, QUOTE_API_SETTINGS_LOAD_PENDING = null;
         let QUOTE_API_SETTINGS_DIRTY = false, QUOTE_API_SETTINGS_ERROR = '', QUOTE_API_MIGRATION_NOTICE = '';
@@ -2809,7 +2811,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 allowSelfEdit:raw.allowSelfEdit !== false};
         }
         function normalizeSecureMetadata(data) {
-            return normalizeQuoteApiSettings({...data.settings,credentials:data.credentials,allowSelfEdit:data.allowSelfEdit});
+            return normalizeQuoteApiSettings({...data.settings,credentials:data.credentials,allowSelfEdit:data.allowSelfEdit,
+                useSharedKeys:data.useSharedKeys === true,sharedAllowed:data.sharedAllowed === true});
         }
         function hasConfiguredQuoteApi(settings = {}) {
             return Object.keys(settings.credentials || {}).length > 0 || !!settings.geminiApiKey || !!settings.ocrSpaceApiKey;
@@ -2844,12 +2847,30 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const owner = document.getElementById('quoteApiOwnerName'),status = document.getElementById('quoteApiOwnerStatus'),badge = document.getElementById('quoteApiOwnerBadge');
             if (owner) owner.textContent = getQuoteApiOwnerLabel();
             if (status) status.textContent = QUOTE_API_SETTINGS_ERROR || QUOTE_API_MIGRATION_NOTICE || (QUOTE_API_SETTINGS_DIRTY ? 'Có thay đổi chưa lưu. Bấm Lưu cấu hình để cập nhật.'
-                : loaded ? 'API key được lưu mã hóa trên máy chủ theo tài khoản.' : 'Đang tải cấu hình tài khoản…');
+                : loaded ? 'Key AI được quản trị viên lưu mã hóa trên máy chủ.' : 'Đang tải cấu hình tài khoản…');
+            updateSharedKeyNotice();
             if (badge) badge.textContent = QUOTE_API_SETTINGS_ERROR ? 'Chưa kết nối' : QUOTE_API_MIGRATION_NOTICE ? 'Chưa chuyển hết' : QUOTE_API_SETTINGS_DIRTY ? 'Chưa lưu' : loaded ? 'Đã bảo vệ' : 'Đang tải';
+        }
+        // Key AI do quản trị viên quản lý ở Quản lý người dùng; người dùng chỉ xem được trạng thái của mình, không thấy key.
+        function sharedKeyNoticeState(settings = QUOTE_USER_API_SETTINGS) {
+            const own = Object.values(settings.credentials || {}).filter(c => c && !c.shared).length > 0;
+            if (settings.sharedAllowed) return {state:'ready',text:currentUserProfile?.role === 'admin' && settings.useSharedKeys !== true
+                ? 'Quản trị viên luôn dùng được key AI dùng chung. Quản lý key và cấp quyền tại Quản lý người dùng.'
+                : 'Đang dùng key AI dùng chung do quản trị viên cấp. Bạn không cần nhập key.'};
+            if (own) return {state:'legacy',text:'Đang dùng key riêng đã lưu trước đây. Liên hệ quản trị viên để được cấp quyền dùng key dùng chung.'};
+            return {state:'blocked',text:AI_KEY_MISSING_HINT};
+        }
+        function updateSharedKeyNotice() {
+            const box = document.getElementById('quoteSharedKeyNotice');
+            if (!box) return;
+            const loaded = QUOTE_API_SETTINGS_LOADED_FOR_UID === getQuoteApiOwnerId();
+            const info = !loaded ? {state:'loading',text:'Đang kiểm tra quyền dùng key AI…'} : sharedKeyNoticeState();
+            box.dataset.state = info.state;
+            const text = box.querySelector('.quote-shared-key-text');
+            if (text) text.textContent = info.text;
         }
         function clearQuoteApiInputsForPrivacy() {
             Object.values(QUOTE_SECRET_INPUTS).forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; });
-            ['editGeminiApiKey','editOcrSpaceApiKey'].forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; });
             QUOTE_PENDING_KEYS = {}; QUOTE_CLEAR_KEYS.clear();
             QUOTE_USER_API_SETTINGS = {...QUOTE_DEFAULT_API_SETTINGS};
             QUOTE_API_SETTINGS_LOADED_FOR_UID = null; QUOTE_API_SETTINGS_DIRTY = false; QUOTE_API_SETTINGS_ERROR = '';
@@ -2904,16 +2925,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             Object.values(QUOTE_API_FIELD_MAP).forEach(field => { if (settings[field] !== undefined) patch[field] = String(settings[field]); });
             if (currentUserProfile?.role === 'admin') patch.allowSelfEdit = settings.allowSelfEdit !== false;
             const own = uid === getQuoteApiOwnerId();
-            const keys = own && !settings.fromAdmin ? {...QUOTE_PENDING_KEYS} : {};
-            if (settings.geminiApiKey?.trim()) keys.gemini = settings.geminiApiKey.trim();
-            if (settings.ocrSpaceApiKey?.trim()) keys.ocrspace = settings.ocrSpaceApiKey.trim();
+            // Giao diện không còn ô nhập key riêng: key do admin lưu ở Quản lý người dùng. Chỉ còn lưu tùy chọn (nhà cung cấp, model, ngôn ngữ).
+            const keys = own ? {...QUOTE_PENDING_KEYS} : {};
             const clearKeys = settings.clearKeys || (own ? [...QUOTE_CLEAR_KEYS] : []);
-            // "Thêm vào key đã lưu": máy chủ gộp key Gemini mới vào các key cũ (tối đa 10) thay vì ghi đè.
-            const fromAdminForm = !own || settings.fromAdmin;
-            const appendBox = document.getElementById(fromAdminForm ? 'editGeminiAppend' : 'quoteGeminiAppend');
-            const hasSaved = fromAdminForm ? !!EDIT_USER_API_SETTINGS?.credentials?.gemini : !!QUOTE_USER_API_SETTINGS.credentials?.gemini;
-            const appendGemini = !!keys.gemini && !clearKeys.includes('gemini') && hasSaved && appendBox?.checked === true;
-            return normalizeSecureMetadata(await secureAi.save(uid,patch,keys,clearKeys,{appendKeys:appendGemini ? ['gemini'] : []}));
+            return normalizeSecureMetadata(await secureAi.save(uid,patch,keys,clearKeys));
         }
         async function attachApiSettingsToUsers(users = []) {
             const base = users.map(u => ({...u,apiSettings:normalizeQuoteApiSettings(),apiConfigured:false}));
@@ -2936,13 +2951,6 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.llmProvider,value);
             if (changed) { window.resetPartsAiSearch?.(); window.resetPartsBatchSearch?.(); }
             updateQuoteAiProviderUI();
-        };
-        window.saveGroqKey = function() {
-            ['groqKey','groqKey2','groqKey3'].forEach((name,index) => {
-                const input = document.getElementById('quoteGroqKeyInput'+(index?index+1:''));
-                if (input) setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS[name],input.value);
-            });
-            updateQuoteApiOwnerHint();
         };
         window.selectGroqKey = function() {
             const slot = document.getElementById('quoteGroqActiveKeySelect')?.value;
@@ -3010,58 +3018,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 : getQuoteGeminiModelLabel()+' đọc ảnh, PDF và văn bản qua máy chủ.';
             window.refreshGroqUsagePanel?.(); enhanceQuoteSettingsDropdowns();
         };
-        // Ô key là input một dòng: dán nhiều dòng sẽ bị trình duyệt nối liền thành một key sai. Đổi xuống dòng/khoảng trắng thành dấu phẩy.
-        window.pasteGeminiKeys = function(event) {
-            const text = event.clipboardData?.getData('text') || '';
-            if (!/[\r\n\s;]/.test(text.trim())) return;
-            event.preventDefault();
-            const joined = [...new Set(text.split(/[\s,;]+/).filter(Boolean))].join(',');
-            const input = event.target;
-            const before = input.value.slice(0, input.selectionStart), after = input.value.slice(input.selectionEnd);
-            input.value = (before && !before.endsWith(',') ? before + ',' : before) + joined + (after && !after.startsWith(',') ? ',' + after : after);
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-        };
-        window.updateGeminiKeyCount = function(inputId, countId) {
-            const input = document.getElementById(inputId), badge = document.getElementById(countId);
-            if (!input || !badge) return;
-            const count = new Set(String(input.value || '').split(/[\s,;]+/).filter(Boolean)).size;
-            badge.textContent = count ? count + ' key' + (count > 10 ? ' — tối đa 10 key' : '') : '';
-            badge.dataset.tone = count > 10 ? 'error' : '';
-        };
-        window.saveQuoteGeminiKey = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey,document.getElementById('quoteGeminiKeyInput')?.value || ''); updateGeminiKeyCount('quoteGeminiKeyInput','quoteGeminiKeyCount'); updateQuoteApiOwnerHint(); };
-        window.saveQuoteOcrSpaceKey = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceKey,document.getElementById('quoteOcrSpaceKeyInput')?.value || ''); updateQuoteApiOwnerHint(); };
         window.saveQuoteOcrSpaceLanguage = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceLang,document.getElementById('quoteOcrSpaceLangSelect')?.value || OCRSPACE_DEFAULT_LANGUAGE); };
         window.saveQuoteOcrSpaceEngine = function() { setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.ocrSpaceEngine,document.getElementById('quoteOcrSpaceEngineSelect')?.value || OCRSPACE_DEFAULT_ENGINE); };
-        window.clearSavedAiKey = function(name) {
-            if (!QUOTE_SECRET_INPUTS[name]) return;
-            delete QUOTE_PENDING_KEYS[name]; QUOTE_CLEAR_KEYS.add(name); QUOTE_API_SETTINGS_DIRTY = true;
-            const input = document.getElementById(QUOTE_SECRET_INPUTS[name]);
-            if (input) { input.value = ''; input.placeholder = 'Sẽ xóa key khi bấm Lưu cấu hình'; }
-            updateQuoteApiOwnerHint();
-        };
-        function showSecureKeyFields() {
-            Object.entries(QUOTE_SECRET_INPUTS).forEach(([name,id]) => {
-                const input = document.getElementById(id); if (!input) return;
-                input.value = QUOTE_PENDING_KEYS[name] || '';
-                const credential = QUOTE_USER_API_SETTINGS.credentials?.[name];
-                input.placeholder = QUOTE_CLEAR_KEYS.has(name) ? 'Sẽ xóa khi lưu' : credential ? `Đã lưu · …${credential.suffix}. Để trống để giữ key.` : 'Dán API key để lưu mã hóa trên máy chủ';
-                input.disabled = QUOTE_USER_API_SETTINGS.allowSelfEdit === false && currentUserProfile?.role !== 'admin';
-                let clear = document.getElementById(id+'Clear');
-                if (!clear) {
-                    clear = document.createElement('button'); clear.id = id+'Clear'; clear.type = 'button';
-                    clear.className = 'secure-ai-key-clear'; clear.textContent = 'Xóa key đã lưu';
-                    clear.addEventListener('click',() => clearSavedAiKey(name));
-                    input.closest('.quote-settings-input-wrap')?.after(clear);
-                }
-                if (clear) { clear.hidden = !credential; clear.disabled = input.disabled; }
-                if (name === 'gemini') {
-                    const tools = document.getElementById('quoteGeminiKeyTools'), append = document.getElementById('quoteGeminiAppend');
-                    if (tools) tools.hidden = !credential;
-                    if (append) append.checked = !!credential;
-                    updateGeminiKeyCount('quoteGeminiKeyInput','quoteGeminiKeyCount');
-                }
-            });
-        }
         let QUOTE_SETTINGS_OPEN_REVISION = 0;
         let QUOTE_SETTINGS_RETURN_FOCUS = null;
         function setQuoteSettingsBusy(busy) {
@@ -3090,7 +3048,6 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 const input = document.getElementById(id);
                 if (input && input.value !== value) input.value = value;
             });
-            showSecureKeyFields();
             updateQuoteAiProviderUI();
         }
         window.openQuoteGeminiSettings = async function(source = 'quote') {
@@ -3105,8 +3062,8 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const description = modal.querySelector('.quote-settings-desc');
             if (title) title.textContent = isParts ? 'AI cho tra cứu dòng xe' : 'Gemini / Groq & OCR';
             if (description) description.textContent = isParts
-                ? 'Dùng key đã lưu của tài khoản để tìm tên phụ tùng. Hãng, dòng xe và năm sản xuất được lọc riêng trong kho.'
-                : 'Chọn công cụ đọc báo giá. API key được lưu riêng theo từng tài khoản.';
+                ? 'Dùng key AI dùng chung do quản trị viên cấp để tìm tên phụ tùng. Hãng, dòng xe và năm sản xuất được lọc riêng trong kho.'
+                : 'Chọn công cụ đọc báo giá. Key AI do quản trị viên cấp và quản lý tập trung.';
             const geminiInput = document.getElementById('quoteGeminiKeyInput');
             const providerSelect = document.getElementById('quoteAiProviderSelect');
             if (geminiInput) geminiInput.placeholder = isParts ? 'Dán Gemini API key Free Tier' : 'Dán Gemini API Key riêng — có thể nhập nhiều key, mỗi dòng một key';
@@ -3163,7 +3120,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             if (QUOTE_API_SETTINGS_ERROR) return customAlert(QUOTE_API_SETTINGS_ERROR,'error');
             const uid = getQuoteApiOwnerId();
             if (QUOTE_API_SETTINGS_LOADED_FOR_UID !== uid) return customAlert('Chưa tải được cấu hình. Hãy mở lại Cài đặt AI.','error');
-            saveLlmProvider(); saveGroqKey(); saveQuoteAiProvider(); saveQuoteGeminiKey(); saveQuoteOcrSpaceKey(); saveQuoteOcrSpaceLanguage(); saveQuoteOcrSpaceEngine();
+            saveLlmProvider(); saveQuoteAiProvider(); saveQuoteOcrSpaceLanguage(); saveQuoteOcrSpaceEngine();
             setQuoteSettingsBusy(true);
             try {
                 const saved = await saveQuoteApiSettingsForUid(uid,QUOTE_USER_API_SETTINGS);
@@ -4436,7 +4393,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             try {
                 await loadQuoteApiSettingsForCurrentUser();
                 // Quét giấy đăng kiểm luôn dùng Gemini (đọc ảnh/PDF trực tiếp), bất kể AI đang chọn cho các tính năng khác.
-                if (!QUOTE_USER_API_SETTINGS.credentials?.gemini) throw new Error('Quét giấy đăng kiểm cần Gemini API key. Mở Cài đặt AI để nhập key Gemini.');
+                if (!QUOTE_USER_API_SETTINGS.credentials?.gemini) throw new Error('Quét giấy đăng kiểm cần key Gemini. '+AI_KEY_MISSING_HINT);
                 const media = isPdf ? { mime: 'application/pdf', data: await fileToBase64(file) } : await prepareVehicleRegImage(file);
                 if (controller.signal.aborted) throw new DOMException('Đã hủy.', 'AbortError');
                 const parts = [{ text: buildRegistrationAiPrompt() }, { inline_data: { mime_type: media.mime, data: media.data } }];
@@ -4545,7 +4502,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             try {
                 await loadQuoteApiSettingsForCurrentUser();
                 // Giống quét đăng kiểm: đọc ảnh/PDF luôn dùng Gemini.
-                if (!QUOTE_USER_API_SETTINGS.credentials?.gemini) throw new Error('Đọc báo giá cần Gemini API key. Mở Cài đặt AI để nhập key Gemini.');
+                if (!QUOTE_USER_API_SETTINGS.credentials?.gemini) throw new Error('Đọc báo giá cần key Gemini. '+AI_KEY_MISSING_HINT);
                 const parts = [{ text: buildQuotePartsAiPrompt() }];
                 for (const file of files) {
                     const media = isPdfFile(file) ? { mime: 'application/pdf', data: await fileToBase64(file) } : await prepareVehicleRegImage(file, 2400);
@@ -5513,7 +5470,7 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
                 state.phase = 'ai'; renderPartsPriceReview(state);
                 await loadQuoteApiSettingsForCurrentUser();
                 if (!isCurrentPartsPriceReview(state)) return;
-                if (!hasSelectedAiKey()) throw new Error('Chưa có ' + getLlmProviderName() + ' API key. Mở Cài đặt AI, nhập key rồi thử lại đánh giá.');
+                if (!hasSelectedAiKey()) throw new Error('Chưa có key ' + getLlmProviderName() + '. '+AI_KEY_MISSING_HINT);
                 for (let index = 0; index < eligible.length; index += 8) {
                     if (!isCurrentPartsPriceReview(state)) return;
                     const chunk = eligible.slice(index, index + 8);
@@ -7696,27 +7653,18 @@ Tên file: ${fileName}`;
         }
         function buildGeminiKeyErrorMessage(message = '') {
             if (isGeminiKeyLeakedError(message)) {
-                return 'Gemini API Key hiện tại đã bị Google đánh dấu là bị lộ nên không thể dùng tiếp. Hãy tạo key mới, bấm nút cài đặt Gemini và dán key mới vào. Với file DOCX, hệ thống sẽ thử đọc biên bản bằng bộ đọc nội bộ không cần Gemini.';
+                return 'Key Gemini dùng chung đã bị Google đánh dấu là bị lộ nên không dùng tiếp được. Hãy báo quản trị viên tạo key mới và thay trong Quản lý người dùng → Key AI dùng chung.';
             }
             if (/API key not valid|invalid api key|API_KEY_INVALID/i.test(String(message || ''))) {
-                return 'Gemini API Key không hợp lệ. Hãy kiểm tra lại key trong phần cài đặt Gemini.';
+                return 'Key Gemini dùng chung không hợp lệ. Hãy báo quản trị viên kiểm tra lại key trong Quản lý người dùng.';
             }
             if (/high demand|overloaded|try again later|temporar|unavailable|503|504/i.test(String(message || ''))) {
-                return 'Gemini đang quá tải tạm thời. Hệ thống đã tự thử lại và chuyển model/key dự phòng nếu có. Bạn có thể bấm xử lý lại sau ít phút hoặc nhập thêm 1-2 API key dự phòng trong cài đặt Gemini.';
+                return 'Gemini đang quá tải tạm thời. Hệ thống đã tự thử lại và chuyển model/key dự phòng nếu có. Bạn có thể bấm xử lý lại sau ít phút, hoặc nhờ quản trị viên thêm key Gemini từ dự án Google khác.';
             }
             return message || 'Gemini API lỗi không xác định.';
         }
         function handleGeminiApiError(error) {
-            const message = error?.message || String(error || '');
-            if (isGeminiKeyLeakedError(message)) {
-                setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.geminiKey, '');
-                const uid = auth?.currentUser?.uid || currentUserProfile?.uid || '';
-                if (uid) saveQuoteApiSettingsForUid(uid, QUOTE_USER_API_SETTINGS).catch(err => console.warn('Không cập nhật được cấu hình Gemini:', err));
-                const input = document.getElementById('quoteGeminiKeyInput');
-                if (input) input.value = '';
-                setTimeout(() => openQuoteGeminiSettings?.(), 120);
-            }
-            return buildGeminiKeyErrorMessage(message);
+            return buildGeminiKeyErrorMessage(error?.message || String(error || ''));
         }
         function getQuoteGeminiKeys() { const id = getQuoteGeminiKey(); return id ? [id] : []; }
         function getGeminiModelCandidates() {
@@ -7742,10 +7690,10 @@ Tên file: ${fileName}`;
             return secureAi.generate(parts,generationConfig,{...options,provider:'gemini',model:getQuoteGeminiModel()});
         }
         async function callGeminiQuoteExtraction({ file = null, text = '', mode = getQuoteOcrMode() }) {
-            if (!hasSelectedAiKey()) throw new Error('Chưa có ' + getLlmProviderName() + ' API key. Mở Cài đặt AI để nhập key.');
+            if (!hasSelectedAiKey()) throw new Error('Chưa có key ' + getLlmProviderName() + '. '+AI_KEY_MISSING_HINT);
             const parts = [{ text: buildGeminiQuotePrompt(file?.name || 'dữ liệu báo giá', mode) }];
             if (file && getLlmProvider() === 'groq') {
-                if (!getQuoteOcrSpaceKey()) throw new Error('Groq cần OCR.Space API key để đọc ảnh/PDF. Nhập key OCR.Space trong Cài đặt AI hoặc chuyển sang Gemini.');
+                if (!getQuoteOcrSpaceKey()) throw new Error('Groq cần key OCR.Space để đọc ảnh/PDF. Hãy nhờ quản trị viên thêm key OCR.Space dùng chung hoặc chuyển sang Gemini.');
                 const ocr = await callOcrSpaceApi(file);
                 parts.push({ text: ocr.text });
             } else if (file) {
@@ -7779,7 +7727,7 @@ ${text}` });
         function handleOcrSpaceApiError(error) {
             const message = error?.message || String(error || '');
             if (/API key|apikey|403|401|unauthorized|not valid/i.test(message)) {
-                return 'OCR.Space API Key không hợp lệ hoặc chưa nhập key. Hãy đăng ký free key và dán vào phần cài đặt AI OCR.';
+                return 'Key OCR.Space không hợp lệ hoặc chưa có. Hãy báo quản trị viên kiểm tra key OCR.Space dùng chung trong Quản lý người dùng.';
             }
             if (/file size|too large|413|limit/i.test(message)) {
                 return 'File vượt giới hạn OCR.Space Free. Hãy nén ảnh/PDF hoặc dùng Gemini mode.';
@@ -8188,10 +8136,10 @@ Tên file: ${fileName}`;
             return result?.value || '';
         }
         async function callGeminiAppraisalExtraction({ file = null, text = '' }) {
-            if (!hasSelectedAiKey()) throw new Error('Chưa có ' + getLlmProviderName() + ' API key. Mở Cài đặt AI để nhập key.');
+            if (!hasSelectedAiKey()) throw new Error('Chưa có key ' + getLlmProviderName() + '. '+AI_KEY_MISSING_HINT);
             const parts = [{ text: buildGeminiAppraisalPrompt(file?.name || 'biên bản giám định') }];
             if (file && getLlmProvider() === 'groq') {
-                if (!getQuoteOcrSpaceKey()) throw new Error('Groq cần OCR.Space API key để đọc ảnh/PDF. Nhập key OCR.Space trong Cài đặt AI hoặc chuyển sang Gemini.');
+                if (!getQuoteOcrSpaceKey()) throw new Error('Groq cần key OCR.Space để đọc ảnh/PDF. Hãy nhờ quản trị viên thêm key OCR.Space dùng chung hoặc chuyển sang Gemini.');
                 const ocr = await callOcrSpaceApi(file);
                 parts.push({ text: ocr.text });
             } else if (file) {
@@ -8650,10 +8598,7 @@ ${text}` });
         window.openModal = (id) => document.getElementById(id).classList.remove('hidden');
         window.closeModal = (id) => {
             document.getElementById(id).classList.add('hidden');
-            if (id === 'modalEditUser') {
-                ['editGeminiApiKey','editOcrSpaceApiKey'].forEach(inputId => { const input = document.getElementById(inputId); if (input) input.value = ''; });
-                EDIT_USER_API_SETTINGS = {}; EDIT_USER_API_CLEAR = [];
-            }
+            if (id === 'modalEditUser') EDIT_USER_API_SETTINGS = {};
         };
         window.customAlert = function(message, type = 'error') {
             const alertText = String(message ?? '');

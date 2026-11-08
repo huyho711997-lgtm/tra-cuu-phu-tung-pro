@@ -87,7 +87,7 @@ test('cancellation before or during fallback and account change stop remaining k
 test('missing keys fail without network and observer failures never repeat successful requests', async () => {
     let calls = 0;
     const pool = createGroqKeyPool({ generate: async (_, __, options) => { calls++; options.onRequest(); options.onUsage({}); return { output: '{}' }; } });
-    await assert.rejects(pool.generate(parts, {}, { apiKeys: [] }), /Chưa có Groq/);
+    await assert.rejects(pool.generate(parts, {}, { apiKeys: [] }), /chưa được cấp key Groq/);
     const badObserver = () => { throw new Error('observer'); };
     await pool.generate(parts, {}, { apiKeys: ['a','b'], getRetryAt: badObserver, onKeyChange: badObserver, onRequest: badObserver, onUsage: badObserver });
     assert.equal(calls, 1);

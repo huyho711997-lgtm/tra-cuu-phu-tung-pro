@@ -166,22 +166,24 @@ test('oversized uploads, missing stored keys and truncated outputs return safe e
     app=server({credentials:{groq1:{id:'one',key:SECRET},groq2:{id:'two',key:'second-secret'}},fetchImpl:async()=>json({error:{message:SECRET}},503)});
     res=await app.request();assert.equal(res.status,502);assert.equal(app.upstream.length,1);
 });
-test('settings keep newly entered keys in memory and blank inputs never delete saved credentials',()=>{
+test('settings never persist keys in browser storage and clearing is impossible from the personal settings screen',()=>{
     const core=readFileSync(new URL('../assets/js/app-core.mjs',import.meta.url),'utf8');
     const a=core.indexOf('        const QUOTE_AI_STORAGE_KEYS ='),b=core.indexOf('        let QUOTE_SETTINGS_OPEN_REVISION =',a);
     const storage=browserStorage(),input={value:SECRET};
     const context=vm.createContext({auth:{currentUser:{uid:USER}},currentUserProfile:{role:'user'},localStorage:storage,
-        OCRSPACE_DEFAULT_LANGUAGE:'vnm',OCRSPACE_DEFAULT_ENGINE:'2',document:{getElementById:id=>id==='quoteGroqKeyInput'?input:null},DOMException});
+        OCRSPACE_DEFAULT_LANGUAGE:'vnm',OCRSPACE_DEFAULT_ENGINE:'2',document:{getElementById:()=>null},DOMException});
     context.window=context;
     vm.runInContext(core.slice(a,b),context);
-    vm.runInContext('saveGroqKey();',context);
-    assert.ok(![...storage.values.values()].includes(SECRET));
+    context.__secret=input.value;
+    vm.runInContext('setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.groqKey,__secret)',context);
+    assert.ok(![...storage.values.values()].includes(SECRET),'key must stay in memory only');
     vm.runInContext("QUOTE_USER_API_SETTINGS.credentials = {groq1:{id:'server-id',suffix:'1234'}};",context);
-    input.value='';vm.runInContext('saveGroqKey();',context);
+    vm.runInContext("setQuoteUserSetting(QUOTE_AI_STORAGE_KEYS.groqKey,'')",context);
     assert.equal(vm.runInContext('getGroqKey()',context),'server-id');
-    assert.equal(vm.runInContext('QUOTE_CLEAR_KEYS.size',context),0);
-    vm.runInContext("clearSavedAiKey('groq1')",context);
-    assert.equal(vm.runInContext("QUOTE_CLEAR_KEYS.has('groq1')",context),true);
+    assert.equal(vm.runInContext('QUOTE_CLEAR_KEYS.size',context),0,'a blank value must never delete a saved key');
+    // Key chung do admin quản lý: màn hình cá nhân không có chức năng xóa/ghi đè key.
+    assert.equal(vm.runInContext('typeof clearSavedAiKey',context),'undefined');
+    assert.equal(vm.runInContext('typeof saveGroqKey',context),'undefined');
 });
 test('failed legacy upload keeps server metadata usable and reports incomplete migration',async()=>{
     const core=readFileSync(new URL('../assets/js/app-core.mjs',import.meta.url),'utf8');

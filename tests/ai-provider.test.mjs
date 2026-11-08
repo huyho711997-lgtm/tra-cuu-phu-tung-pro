@@ -104,8 +104,8 @@ test('Groq quote and appraisal images use OCR.Space then send text only', async 
 
 test('Groq media without OCR key fails clearly; text extraction needs no OCR key', async () => {
     const { context, requests, ocrCalls } = extractionHarness('groq', '');
-    await assert.rejects(context.callGeminiQuoteExtraction({ file: { name: 'photo.jpg' } }), /OCR.Space API key/);
-    await assert.rejects(context.callGeminiAppraisalExtraction({ file: { name: 'photo.jpg' } }), /OCR.Space API key/);
+    await assert.rejects(context.callGeminiQuoteExtraction({ file: { name: 'photo.jpg' } }), /key OCR\.Space/);
+    await assert.rejects(context.callGeminiAppraisalExtraction({ file: { name: 'photo.jpg' } }), /key OCR\.Space/);
     assert.equal(requests.length, 0);
     await context.callGeminiQuoteExtraction({ text: 'Cản trước 1.000.000' });
     await context.callGeminiAppraisalExtraction({ text: 'Thay thế cản trước' });
@@ -129,6 +129,9 @@ test('both searches, price review and document extraction use the provider dispa
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
     assert.match(html, /id="quoteLlmProviderSelect"/);
     assert.match(html, /value="groq"/);
-    assert.match(html, /id="quoteGroqKeyInput"[^>]*type="password"/);
+    // Key do quản trị viên quản lý tập trung: Cài đặt AI cá nhân không còn ô nhập key nào, chỉ hiện trạng thái quyền dùng.
+    assert.doesNotMatch(html, /id="quote(?:Groq|Gemini|OcrSpace)KeyInput\d?"/);
+    assert.match(html, /id="quoteSharedKeyNotice"/);
+    assert.match(html, /id="quoteGroqActiveKeySelect"/);
     assert.doesNotMatch(html, /class="[^"]*quote-ocr-only[^"]*"[^>]*id="quoteLlmProviderSelect"/);
 });
