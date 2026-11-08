@@ -1,5 +1,5 @@
 (function () {
-    const pages = {"teacher": "assets/pages/teacher.html", "student": "assets/pages/student.html", "users": "assets/pages/users.html?v=20261108-key-actions", "feedbacks": "assets/pages/feedbacks.html"};
+    const pages = {"teacher": "assets/pages/teacher.html", "student": "assets/pages/student.html", "users": "assets/pages/users.html?v=20261108-user-tabs", "feedbacks": "assets/pages/feedbacks.html"};
     window.__loadEmbeddedPage = async function (frame, key) {
         if (!frame || frame.dataset.loaded || frame.dataset.loading) return;
         if (!pages[key]) return;
