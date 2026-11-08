@@ -1,7 +1,8 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs";
-        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v9";
+        import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v10";
+        import { buildQuotePartsAiPrompt, mergeQuotePartItems } from "./quote-parts-ocr.mjs?v=20261108-quote-ocr";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -4352,15 +4353,15 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             box.hidden = false;
         }
         // Thu nhỏ ảnh chụp từ điện thoại (thường vài MB) trước khi gửi AI để nhanh hơn và không vượt giới hạn dung lượng của backend.
-        async function prepareVehicleRegImage(file) {
+        async function prepareVehicleRegImage(file, maxSide = 1600) {
             const original = async () => ({ mime: file.type || 'image/jpeg', data: await fileToBase64(file) });
             if (!String(file.type || '').startsWith('image/') || typeof createImageBitmap !== 'function') return original();
             let bitmap = null;
             try {
                 bitmap = await createImageBitmap(file);
                 const longSide = Math.max(bitmap.width, bitmap.height);
-                if (longSide <= 1600 && file.size <= 1024 * 1024) return original();
-                const scale = Math.min(1, 1600 / longSide);
+                if (longSide <= maxSide && file.size <= 1536 * 1024) return original();
+                const scale = Math.min(1, maxSide / longSide);
                 const canvas = document.createElement('canvas');
                 canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
                 const context = canvas.getContext('2d');
@@ -4441,6 +4442,114 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             } finally { clearInterval(ticker); clearTimeout(deadline); if (controller === VQ_REG_CONTROLLER) { setVehicleRegBusy(false); VQ_REG_CONTROLLER = null; } }
         };
         // VEHICLE_QUICK_INPUT_END
+        // PARTS_BATCH_QUOTE_OCR_BEGIN
+        // Đọc hạng mục từ ảnh/PDF báo giá (Gemini) và đưa vào ô "Tìm nhiều phụ tùng" để kiểm tra rồi phân tích.
+        const QUOTE_OCR_MAX_FILES = 4;
+        let QUOTE_OCR_CONTROLLER = null;
+        let QUOTE_OCR_URLS = [];
+        function clearPartsBatchOcrPreview() {
+            QUOTE_OCR_URLS.forEach(url => { try { URL.revokeObjectURL(url); } catch (_) {} });
+            QUOTE_OCR_URLS = [];
+            const box = document.getElementById('partsBatchOcr');
+            if (box) { box.replaceChildren(); box.hidden = true; }
+        }
+        function renderPartsBatchOcrPreview(files, message, tone = '') {
+            const box = document.getElementById('partsBatchOcr');
+            if (!box || !QUOTE_OCR_URLS.length) return;
+            box.replaceChildren();
+            const thumbs = vqEl('div', 'parts-ocr-thumbs');
+            files.forEach((file, index) => {
+                const url = QUOTE_OCR_URLS[index];
+                const isPdf = file.type === 'application/pdf' || String(file.name || '').toLowerCase().endsWith('.pdf');
+                const thumb = vqEl('button', 'parts-ocr-thumb' + (isPdf ? ' is-pdf' : '')); thumb.type = 'button';
+                thumb.title = String(file.name || '').slice(0, 80);
+                if (isPdf) { thumb.append(vqEl('strong', '', 'PDF')); thumb.addEventListener('click', () => window.open(url, '_blank', 'noopener')); }
+                else { const image = vqEl('img'); image.src = url; image.alt = 'Ảnh báo giá ' + (index + 1); thumb.appendChild(image); thumb.addEventListener('click', () => openVehicleRegLightbox(url)); }
+                thumbs.appendChild(thumb);
+            });
+            const info = vqEl('div', 'parts-ocr-info');
+            const head = vqEl('div', 'parts-ocr-head');
+            const hide = vqEl('button', 'parts-ocr-hide', 'Ẩn'); hide.type = 'button'; hide.addEventListener('click', clearPartsBatchOcrPreview);
+            head.append(vqEl('strong', '', 'Báo giá đã quét (' + files.length + ' tệp)'), hide);
+            const note = vqEl('p', 'parts-ocr-note', message); if (tone) note.dataset.tone = tone;
+            info.append(head, note);
+            box.append(thumbs, info);
+            box.hidden = false;
+        }
+        function setPartsBatchOcrBusy(busy) {
+            const button = document.getElementById('btnPartsBatchOcr');
+            if (!button) return;
+            button.disabled = busy;
+            button.setAttribute('aria-busy', String(busy));
+            const label = button.querySelector('span');
+            if (label) label.textContent = busy ? 'Đang đọc báo giá...' : 'Đọc hạng mục từ báo giá';
+        }
+        window.openPartsBatchOcrPicker = function() {
+            if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) { setPartsBatchStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', true); return; }
+            document.getElementById('partsBatchOcrFile')?.click();
+        };
+        window.runPartsBatchOcr = async function(fileList) {
+            const picker = document.getElementById('partsBatchOcrFile');
+            const files = Array.from(fileList || []);
+            if (picker) picker.value = '';
+            if (!files.length) return;
+            const fail = message => setPartsBatchStatus(message, true);
+            if (files.length > QUOTE_OCR_MAX_FILES) { fail('Mỗi lần đọc tối đa ' + QUOTE_OCR_MAX_FILES + ' tệp báo giá.'); return; }
+            const isPdfFile = file => file.type === 'application/pdf' || String(file.name || '').toLowerCase().endsWith('.pdf');
+            if (files.some(file => !isPdfFile(file) && !String(file.type || '').startsWith('image/'))) { fail('Chỉ nhận ảnh (JPG, PNG...) hoặc PDF báo giá.'); return; }
+            if (files.some(file => file.size > VQ_REG_MAX_BYTES)) { fail('Có tệp quá lớn (tối đa 8MB mỗi tệp). Hãy chụp/nén nhỏ hơn.'); return; }
+            if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) { fail('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.'); return; }
+            QUOTE_OCR_CONTROLLER?.abort();
+            const controller = QUOTE_OCR_CONTROLLER = new AbortController();
+            clearPartsBatchOcrPreview();
+            QUOTE_OCR_URLS = files.map(file => { try { return URL.createObjectURL(file); } catch (_) { return ''; } });
+            renderPartsBatchOcrPreview(files, 'Gemini đang đọc báo giá...');
+            setPartsBatchOcrBusy(true);
+            const startedAt = Date.now();
+            let timedOut = false;
+            const paint = () => { if (controller === QUOTE_OCR_CONTROLLER && !timedOut) setPartsBatchStatus('Gemini đang đọc báo giá... ' + Math.round((Date.now() - startedAt) / 1000) + 's'); };
+            paint();
+            const ticker = setInterval(paint, 1000);
+            const deadline = setTimeout(() => { timedOut = true; controller.abort(); }, 90000);
+            try {
+                await loadQuoteApiSettingsForCurrentUser();
+                // Giống quét đăng kiểm: đọc ảnh/PDF luôn dùng Gemini.
+                if (!QUOTE_USER_API_SETTINGS.credentials?.gemini) throw new Error('Đọc báo giá cần Gemini API key. Mở Cài đặt AI để nhập key Gemini.');
+                const parts = [{ text: buildQuotePartsAiPrompt() }];
+                for (const file of files) {
+                    const media = isPdfFile(file) ? { mime: 'application/pdf', data: await fileToBase64(file) } : await prepareVehicleRegImage(file, 2400);
+                    parts.push({ inline_data: { mime_type: media.mime, data: media.data } });
+                }
+                if (controller.signal.aborted) throw new DOMException('Đã hủy.', 'AbortError');
+                const answer = await callGeminiGenerateContentWithRetry(parts, { responseMimeType: 'application/json', maxOutputTokens: 4096, temperature: 0 },
+                    { signal: controller.signal, maxRetriesPerModel: 1 });
+                clearInterval(ticker); clearTimeout(deadline);
+                if (controller !== QUOTE_OCR_CONTROLLER) return;
+                const input = document.getElementById('partsBatchInput');
+                let existing = [];
+                try { existing = parsePartsBatchTerms(input?.value || ''); } catch (_) { existing = String(input?.value || '').split(/[,;\r\n]+/).map(term => term.trim()).filter(Boolean).slice(0, PARTS_BATCH_MAX_TERMS); }
+                const result = mergeQuotePartItems(extractJsonObjectFromGeminiText(answer.output), existing, PARTS_BATCH_MAX_TERMS);
+                const { labor, duplicate, invalid, overflow } = result.skipped;
+                if (!result.items.length) {
+                    const reason = overflow ? 'Danh sách đã đủ ' + PARTS_BATCH_MAX_TERMS + ' phụ tùng.' : 'Không tìm thấy hạng mục phụ tùng mới trong báo giá này.';
+                    renderPartsBatchOcrPreview(files, reason, 'error'); fail(reason); return;
+                }
+                if (input) input.value = result.merged.join('\n');
+                window.updatePartsBatchDraft();
+                const extras = [labor && labor + ' dòng nhân công/sơn/tổng đã bỏ', duplicate && duplicate + ' dòng trùng', invalid && invalid + ' dòng không đọc rõ',
+                    overflow && overflow + ' dòng vượt giới hạn ' + PARTS_BATCH_MAX_TERMS + ' phụ tùng (đọc báo giá tiếp theo sau khi tra cứu)'].filter(Boolean);
+                const message = 'Đọc được ' + result.items.length + ' hạng mục phụ tùng' + (extras.length ? ' · ' + extras.join(' · ') : '') + '. Đối chiếu với ảnh, sửa danh sách rồi bấm Phân tích danh sách bằng AI.';
+                renderPartsBatchOcrPreview(files, message);
+                setPartsBatchStatus('Đã thêm ' + result.items.length + ' hạng mục từ báo giá vào danh sách.');
+            } catch (error) {
+                if (controller !== QUOTE_OCR_CONTROLLER) return;
+                if (timedOut) { renderPartsBatchOcrPreview(files, 'Gemini phản hồi quá lâu (90 giây).', 'error'); fail('Gemini phản hồi quá lâu. Hãy thử lại với ít tệp/ảnh nhỏ hơn.'); return; }
+                if (error?.name === 'AbortError') return;
+                const message = typeof handleGeminiApiError === 'function' && !/Gemini API key/.test(error?.message || '') ? handleGeminiApiError(error) : (error?.message || 'Không đọc được báo giá bằng AI.');
+                renderPartsBatchOcrPreview(files, 'Chưa đọc được báo giá này bằng AI.', 'error'); fail(message);
+            } finally { clearInterval(ticker); clearTimeout(deadline); if (controller === QUOTE_OCR_CONTROLLER) { setPartsBatchOcrBusy(false); QUOTE_OCR_CONTROLLER = null; } }
+        };
+        // PARTS_BATCH_QUOTE_OCR_END
 
         // THỰC THI TRA CỨU PHỤ TÙNG DATA
         let PARTS_DATA_SEARCH_REVISION = 0;

@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="assets/css/app.css?v=20261019-vault"/>
 <link rel="stylesheet" href="assets/css/parts-knowledge-page.css?v=20261019-knowledge-unified-v1"/>
-<link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261107-quick-v9"/>
+<link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261107-quick-v10"/>
 
 
 
@@ -691,9 +691,10 @@
 <p id="partsBatchAppliedSummary" hidden role="status"></p>
 <div id="partsBatchEditor">
 <textarea id="partsBatchInput" rows="3" maxlength="4000" aria-label="Danh sách tên phụ tùng cần tra cứu" aria-describedby="partsBatchHelp" placeholder="cản trước, đèn pha trái, capo" oninput="updatePartsBatchDraft()" onkeydown="if(event.key === 'Enter' &amp;&amp; (event.ctrlKey || event.metaKey)) { event.preventDefault(); runPartsBatchSearch(); }"></textarea>
+<div class="parts-ocr" id="partsBatchOcr" hidden aria-live="polite"></div>
 <div id="partsBatchPreview" aria-label="Danh sách phụ tùng đã nhập"></div>
 <div id="partsBatchAiReview" hidden aria-label="Gợi ý tên kho bằng AI cho từng phụ tùng"></div>
-<div class="parts-batch-composer-footer"><p id="partsBatchStatus" role="status" aria-live="polite"> </p><div class="parts-batch-ai-actions"><button id="btnPartsBatchSearch" type="button" onclick="runPartsBatchSearch()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z"/></svg><span>Phân tích danh sách bằng AI</span></button><button id="btnPartsBatchApply" type="button" hidden disabled onclick="applyPartsBatchAiSelection()">Xem báo giá đã chọn</button></div></div>
+<div class="parts-batch-composer-footer"><p id="partsBatchStatus" role="status" aria-live="polite"> </p><div class="parts-batch-ai-actions"><button id="btnPartsBatchOcr" class="parts-batch-ocr-btn" type="button" onclick="openPartsBatchOcrPicker()" title="Tải ảnh/PDF báo giá sửa chữa để AI tự lấy danh sách hạng mục phụ tùng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" stroke-linejoin="round"/><path d="M14 3v5h5M9 13h6M9 17h4" stroke-linecap="round"/></svg><span>Đọc hạng mục từ báo giá</span></button><input type="file" id="partsBatchOcrFile" accept="image/*,application/pdf" multiple hidden onchange="runPartsBatchOcr(this.files)"><button id="btnPartsBatchSearch" type="button" onclick="runPartsBatchSearch()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z"/></svg><span>Phân tích danh sách bằng AI</span></button><button id="btnPartsBatchApply" type="button" hidden disabled onclick="applyPartsBatchAiSelection()">Xem báo giá đã chọn</button></div></div>
 </div>
 </section>
 <div class="parts-ai-results" id="partsAiResults" hidden aria-label="Gợi ý tên phụ tùng từ kho"></div>
@@ -1786,7 +1787,7 @@
 </div>
 <script src="assets/js/document-libraries.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js" defer></script>
-<script type="module" src="assets/js/app-core.mjs?v=20261107-quick-v9"></script>
+<script type="module" src="assets/js/app-core.mjs?v=20261107-quick-v10"></script>
 <script src="assets/js/app-training.js"></script>
 
 <script id="kgptUnifiedPremiumDropdowns" src="assets/js/kgptUnifiedPremiumDropdowns.js"></script>

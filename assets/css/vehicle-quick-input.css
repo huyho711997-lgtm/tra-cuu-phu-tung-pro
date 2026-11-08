@@ -170,3 +170,31 @@ html.dark .vq-quick .vq-reg-hide,.dark .vq-quick .vq-reg-hide{border-color:#3341
 .vq-quick .vq-near{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;background:#fff4d6;color:#a35a00;font-size:9.5px;font-weight:800;letter-spacing:.02em;line-height:1}
 .vq-quick .vq-option[aria-pressed="true"] .vq-near{background:rgba(255,255,255,.26);color:#fff}
 html.dark .vq-quick .vq-near,.dark .vq-quick .vq-near{background:#3a2c0e;color:#fcd34d}
+
+/* OCR hạng mục từ báo giá (ô Tìm nhiều phụ tùng) */
+#partsBatchComposer .parts-batch-ocr-btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 15px 0 13px;border:1px solid #b9d0f5;border-radius:12px;background:#fff;color:#1d4ed8;font:700 12px 'Plus Jakarta Sans',sans-serif;cursor:pointer;box-shadow:0 8px 18px -14px rgba(37,99,235,.7);transition:border-color .16s,background .16s,transform .16s}
+#partsBatchComposer .parts-batch-ocr-btn svg{width:16px;height:16px;flex:0 0 auto}
+#partsBatchComposer .parts-batch-ocr-btn:hover:not(:disabled){border-color:#3b82f6;background:#eff6ff;transform:translateY(-1px)}
+#partsBatchComposer .parts-batch-ocr-btn:focus-visible{outline:3px solid rgba(37,99,235,.3);outline-offset:1px}
+#partsBatchComposer .parts-batch-ocr-btn:disabled{opacity:.75;cursor:progress}
+#partsBatchComposer .parts-batch-ocr-btn[aria-busy="true"] svg{animation:vqPulse 1s ease-in-out infinite}
+#partsBatchComposer .parts-ocr{display:flex;gap:14px;align-items:flex-start;margin-top:12px;padding:12px;border:1px solid #cfe0fb;border-radius:14px;background:#fff}
+#partsBatchComposer .parts-ocr[hidden]{display:none}
+#partsBatchComposer .parts-ocr-thumbs{display:flex;flex-wrap:wrap;gap:8px;flex:0 0 auto;max-width:296px}
+#partsBatchComposer .parts-ocr-thumb{position:relative;width:84px;height:84px;padding:0;border:1px solid #c3d6f6;border-radius:10px;overflow:hidden;background:#f1f5fb;cursor:zoom-in}
+#partsBatchComposer .parts-ocr-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+#partsBatchComposer .parts-ocr-thumb.is-pdf{display:flex;align-items:center;justify-content:center;color:#b91c1c;background:#fef2f2;border-color:#fecaca;cursor:pointer}
+#partsBatchComposer .parts-ocr-thumb.is-pdf strong{font:900 18px 'Plus Jakarta Sans',sans-serif}
+#partsBatchComposer .parts-ocr-info{flex:1 1 auto;min-width:0}
+#partsBatchComposer .parts-ocr-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#partsBatchComposer .parts-ocr-head strong{color:#0f2a55;font-size:13px;font-weight:800}
+#partsBatchComposer .parts-ocr-hide{height:26px;padding:0 11px;border:1px solid #d5e1f5;border-radius:999px;background:#fff;color:#5a6f93;font:700 11px 'Plus Jakarta Sans',sans-serif;cursor:pointer}
+#partsBatchComposer .parts-ocr-hide:hover{background:#f1f5fb}
+#partsBatchComposer .parts-ocr-note{margin:8px 0 0;color:#5a6f93;font-size:12px;line-height:1.55}
+#partsBatchComposer .parts-ocr-note[data-tone="error"]{color:#b45309}
+html.dark #partsBatchComposer .parts-batch-ocr-btn{border-color:#3a5c8f;background:rgba(30,41,59,.8);color:#bfdbfe}
+html.dark #partsBatchComposer .parts-ocr{border-color:#2c4670;background:#0f1b30}
+html.dark #partsBatchComposer .parts-ocr-head strong{color:#e2e8f0}
+html.dark #partsBatchComposer .parts-ocr-hide{border-color:#334155;background:#1e293b;color:#cbd5e1}
+html.dark #partsBatchComposer .parts-ocr-note{color:#94a3b8}
+@media (max-width:640px){#partsBatchComposer .parts-batch-ocr-btn{width:100%;justify-content:center}#partsBatchComposer .parts-ocr{flex-direction:column}#partsBatchComposer .parts-ocr-thumbs{max-width:none}}
