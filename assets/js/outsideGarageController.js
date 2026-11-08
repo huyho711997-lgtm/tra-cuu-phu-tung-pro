@@ -9,6 +9,7 @@
   const money=new Intl.NumberFormat('vi-VN');
   const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fold=value=>String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const quote={active:false,only:false,result:null,thumbs:[],message:'',tone:''};
   const state={group:'sedan',model:'',query:'',level:'all',status:'all',page:1,size:10};
   const aliases={1:'ca pô nắp capo bonnet hood',2:'ga lăng lưới tản nhiệt',5:'cửa trước cửa sau',17:'ba đờ sốc cản trước bumper',18:'quây dưới ba đờ sốc cản',19:'ốp đầu ba đờ sốc cản',20:'ba đờ sốc cản trước miếng trên',21:'ba đờ sốc cản trước miếng dưới',22:'ba đờ sốc cản sau',24:'la zăng mâm bánh xe'};
   const searchableItems=new Map(catalog.items.map(item=>[item.id,fold(item.name+' '+(aliases[item.no]||''))]));
@@ -39,6 +40,60 @@
     root.querySelectorAll('.pg-page-size-option').forEach(option=>option.setAttribute('aria-selected',String(Number(option.dataset.size)===state.size)));
   }
   function closePageSize(){const drop=el('pgPageSizeDropdown');drop.classList.remove('open');el('pgPageSizeTrigger').setAttribute('aria-expanded','false');}
+  // ---- Báo giá: OCR hạng mục sơn (do app-core thực hiện) rồi lọc bảng giá theo các hạng mục đọc được ----
+  const make=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
+  function updateQuoteGroupLine(){
+    const line=el('pgQuotePanel')?.querySelector('.pg-quote-group');
+    if(line)line.textContent='Đơn giá bên dưới theo nhóm xe: '+currentGroup().label+(state.level==='all'?' · mức A và B':' · mức '+state.level);
+  }
+  function revokeQuoteThumbs(){quote.thumbs.forEach(t=>{try{URL.revokeObjectURL(t.url);}catch(_){}});quote.thumbs=[];}
+  function renderQuotePanel(){
+    const box=el('pgQuotePanel');
+    box.replaceChildren();
+    if(!quote.active){box.hidden=true;return;}
+    const thumbs=make('div','pg-quote-thumbs');
+    quote.thumbs.forEach((thumb,index)=>{
+      const button=make('button','pg-quote-thumb'+(thumb.isPdf?' is-pdf':''));button.type='button';button.title=thumb.name;
+      if(thumb.isPdf)button.append(make('strong','','PDF'));
+      else{const image=document.createElement('img');image.src=thumb.url;image.alt='Ảnh báo giá '+(index+1);button.append(image);}
+      button.addEventListener('click',()=>window.pgOpenQuoteThumb?.(thumb.url,thumb.isPdf));
+      thumbs.append(button);
+    });
+    const info=make('div','pg-quote-info'),head=make('div','pg-quote-head'),actions=make('div','pg-quote-actions');
+    head.append(make('strong','','Báo giá đã quét ('+quote.thumbs.length+' tệp)'),actions);
+    if(quote.result&&quote.result.matched.length){
+      const toggle=make('button','pg-quote-btn',quote.only?'Xem toàn bộ bảng giá':'Chỉ hạng mục trong báo giá');toggle.type='button';
+      toggle.addEventListener('click',()=>{quote.only=!quote.only;state.page=1;renderQuotePanel();render();});
+      actions.append(toggle);
+    }
+    const hide=make('button','pg-quote-btn','Ẩn');hide.type='button';hide.addEventListener('click',()=>window.pgQuote.clear());actions.append(hide);
+    const note=make('p','pg-quote-note',quote.message);if(quote.tone)note.dataset.tone=quote.tone;
+    info.append(head,note);
+    if(quote.result){
+      if(quote.result.matched.length){
+        const list=make('ul','pg-quote-list');
+        quote.result.matched.forEach(entry=>{
+          const row=make('li','pg-quote-row');
+          row.append(make('span','pg-quote-paper',entry.papers.join(', ')),make('span','pg-quote-arrow','→'),make('strong','',entry.name));
+          if(entry.level)row.append(make('span','pg-quote-level pg-quote-level-'+entry.level.toLowerCase(),'Mức '+entry.level));
+          if(entry.count>1)row.append(make('span','pg-quote-count','×'+entry.count));
+          list.append(row);
+        });
+        info.append(list,make('p','pg-quote-group'));
+      }
+      if(quote.result.unmatched.length)info.append(make('p','pg-quote-unmatched','Chưa khớp hạng mục nào trong bảng giá ('+quote.result.unmatched.length+'): '+quote.result.unmatched.join(' · ')));
+    }
+    box.append(thumbs,info);box.hidden=false;
+    updateQuoteGroupLine();
+  }
+  window.pgQuote={
+    catalog:()=>({items:catalog.items,aliases}),
+    begin(thumbs,message){revokeQuoteThumbs();Object.assign(quote,{active:true,only:false,result:null,thumbs,message,tone:''});state.page=1;renderQuotePanel();render();},
+    status(message){quote.message=message;const note=el('pgQuotePanel').querySelector('.pg-quote-note');if(note)note.textContent=message;},
+    apply(result,message){Object.assign(quote,{active:true,result,only:result.matched.length>0,message,tone:''});state.page=1;renderQuotePanel();render();el('pgQuotePanel').scrollIntoView({block:'nearest',behavior:'smooth'});},
+    fail(message){Object.assign(quote,{active:true,result:null,only:false,message,tone:'error'});renderQuotePanel();render();},
+    clear(){window.pgQuoteCancel?.();revokeQuoteThumbs();Object.assign(quote,{active:false,only:false,result:null,message:'',tone:''});state.page=1;renderQuotePanel();render();}
+  };
   function groupIndex(){return groups.findIndex(g=>g.id===state.group);}
   function currentGroup(){return groups[groupIndex()];}
   function rates(item){const index=groupIndex();return item.rates.common?{common:item.rates.common[index]}:{A:item.rates.A?.[index]??null,B:item.rates.B?.[index]??null};}
@@ -66,7 +121,8 @@
     const overhaul=all.find(item=>item.no===32).rates.common[index];
     el('pgOverhaulPrice').innerHTML=money.format(overhaul)+' <small>₫</small>';
     const terms=parseItemQuery(state.query);
-    const matches=all.filter(item=>!terms.length||terms.some(term=>searchableItems.get(item.id).includes(term)));
+    const quoteIds=quote.result&&quote.only?new Set(quote.result.matched.map(m=>m.id)):null;
+    const matches=all.filter(item=>(!quoteIds||quoteIds.has(item.id))&&(!terms.length||terms.some(term=>searchableItems.get(item.id).includes(term))));
     const searchHelp=terms.length>1?'Đang tìm '+terms.length+' từ khóa · Dùng , hoặc ;':'Nhiều hạng mục: cách nhau bằng , hoặc ;';
     if(el('pgItemSearchHelp').textContent!==searchHelp)el('pgItemSearchHelp').textContent=searchHelp;
     const matchesPriced=matches.filter(hasRate);
@@ -80,7 +136,8 @@
     const start=(state.page-1)*state.size;
     const shown=visibleItems.slice(start,start+state.size);
     el('pgResultCount').textContent=visibleItems.length;
-    el('pgResultSubtitle').textContent=(state.model?state.model+' · ':'')+group.label+' · Bảng giá 2024';
+    el('pgResultSubtitle').textContent=(state.model?state.model+' · ':'')+group.label+' · Bảng giá 2024'+(quoteIds?' · Theo báo giá':'');
+    updateQuoteGroupLine();
     const levelHead=level=>'<th scope="col"><span class="pg-th-level"><i class="pg-th-dot'+(level==='B'?' pg-b':'')+'"></i>MỨC '+level+'</span><small>'+(level==='A'?'Trầy xước nhẹ':'Xước sâu, lõm hoặc móp')+'</small></th>';
     el('pgTableHead').innerHTML='<tr><th scope="col">STT</th><th scope="col">HẠNG MỤC SƠN SỬA</th>'+(state.level==='all'?levelHead('A')+levelHead('B'):levelHead(state.level))+'<th scope="col">NGUỒN<small>Trang PDF</small></th></tr>';
     el('pgTableBody').classList.toggle('pg-single-level',state.level!=='all');
@@ -200,7 +257,7 @@
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&el('pgPageSizeDropdown').classList.contains('open')){closePageSize();el('pgPageSizeTrigger').focus({preventScroll:true});}});
   el('pgReset').addEventListener('click',()=>{
     Object.assign(state,{group:'sedan',model:'',query:'',level:'all',status:'all',page:1,size:10});
-    el('pgItemSearch').value='';el('pgDamage').value='all';syncPageSize();
+    el('pgItemSearch').value='';el('pgDamage').value='all';syncPageSize();window.pgQuote.clear();
     // Keep the existing shared select UI in sync without assigning it a second owner.
     el('pgDamage').dispatchEvent(new Event('change',{bubbles:true}));
     closePicker();render();

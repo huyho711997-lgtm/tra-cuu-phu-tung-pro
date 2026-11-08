@@ -3,6 +3,7 @@
         import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs?v=20261108-key-manage";
         import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, buildRegistrationTextPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261108-reg-fast";
         import { buildQuotePartsAiPrompt, buildQuotePartsTextPrompt, joinQuoteOcrTexts, mergeQuotePartItems } from "./quote-parts-ocr.mjs?v=20261108-quote-fast";
+        import { buildGarageQuoteImagePrompt, buildGarageQuoteTextPrompt, matchGarageQuoteItems } from "./garage-quote-ocr.mjs?v=20261108-garage-quote";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
         import { createGroqUsageTracker, renderGroqUsagePanel } from "./groq-usage.mjs";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0";
@@ -4525,6 +4526,63 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const label = button.querySelector('span');
             if (label) label.textContent = busy ? 'Đang đọc báo giá...' : 'Đọc hạng mục từ báo giá';
         }
+        // Đọc ảnh/PDF báo giá -> danh sách dòng thô {items:[...]}. Dùng chung cho "Tìm nhiều phụ tùng" và "Giá sơn sửa gara ngoài".
+        // Cách đọc do admin chọn (regReader, cùng cài đặt với quét đăng kiểm): 'fast' = OCR.Space lấy chữ + Groq bóc tách, Gemini dự phòng.
+        const isQuotePdfFile = file => file.type === 'application/pdf' || String(file.name || '').toLowerCase().endsWith('.pdf');
+        async function readQuoteFilesWithAi(files, { controller, buildImagePrompt, buildTextPrompt, setStage }) {
+            const isPdfFile = isQuotePdfFile;
+            const reader = getVehicleRegReader();
+            const creds = QUOTE_USER_API_SETTINGS.credentials || {};
+            const canFast = reader === 'fast' && !!creds.ocrspace && !!(creds.groq1 || creds.groq2 || creds.groq3);
+            if (!creds.gemini && !canFast) throw new Error('Đọc báo giá cần key Gemini (hoặc cả key OCR.Space và Groq ở chế độ nhanh). '+AI_KEY_MISSING_HINT);
+            setStage(canFast ? 'OCR.Space đang đọc chữ' : 'Gemini đang đọc báo giá');
+            const rawItems = [];
+            let pending = files.slice(), engineLabel = '';
+            // Chế độ nhanh: mỗi tệp ≤ ~1MB (giới hạn OCR.Space gói miễn phí) đi OCR.Space -> Groq; tệp lớn hoặc đọc lỗi chuyển Gemini.
+            if (canFast) {
+                const fastSignal = AbortSignal.any([controller.signal, AbortSignal.timeout(40000)]);
+                const small = files.filter(file => !isPdfFile(file) || file.size <= 1000 * 1000); // ảnh được thu nhỏ bên dưới rồi mới kiểm tra 1MB
+                const texts = new Map();
+                await Promise.all(small.map(async file => {
+                    try {
+                        const media = isPdfFile(file) ? { mime: 'application/pdf', blob: file } : await prepareVehicleRegImage(file, 2000).then(m => ({ mime: m.mime, blob: base64ToBlob(m.data, m.mime) }));
+                        if (media.blob.size > 1000 * 1000) return;
+                        const ocr = await secureAi.ocr(media.blob, getQuoteOcrSpaceLanguage(), getQuoteOcrSpaceEngine(), { signal: fastSignal });
+                        if (ocr?.text) texts.set(file, ocr.text);
+                    } catch (_) { /* tệp này chuyển Gemini */ }
+                }));
+                if (controller.signal.aborted) throw new DOMException('Đã hủy.', 'AbortError');
+                if (texts.size) {
+                    try {
+                        setStage('Groq đang bóc tách hạng mục');
+                        const answer = await secureAi.generate([{ text: buildTextPrompt(joinQuoteOcrTexts([...texts.values()])) }],
+                            { responseMimeType: 'application/json', maxOutputTokens: 4096, temperature: 0 }, { provider: 'groq', signal: fastSignal });
+                        const parsed = extractJsonObjectFromGeminiText(answer.output);
+                        const list = Array.isArray(parsed?.items) ? parsed.items : Array.isArray(parsed) ? parsed : [];
+                        if (list.length) { rawItems.push(...list); pending = pending.filter(file => !texts.has(file)); engineLabel = 'OCR.Space + Groq'; }
+                    } catch (fastError) {
+                        if (controller.signal.aborted) throw fastError;
+                    }
+                }
+            }
+            if (pending.length) {
+                if (!creds.gemini) throw new Error(canFast ? 'Chế độ nhanh chưa đọc được báo giá này và chưa có key Gemini để dự phòng. Hãy chụp rõ hơn hoặc nhập tay.' : 'Đọc báo giá cần key Gemini. '+AI_KEY_MISSING_HINT);
+                setStage(canFast ? 'Chế độ nhanh chưa đọc đủ, Gemini đang đọc thay' : 'Gemini đang đọc báo giá');
+                const parts = [{ text: buildImagePrompt() }];
+                for (const file of pending) {
+                    const media = isPdfFile(file) ? { mime: 'application/pdf', data: await fileToBase64(file) } : await prepareVehicleRegImage(file, 2400);
+                    parts.push({ inline_data: { mime_type: media.mime, data: media.data } });
+                }
+                if (controller.signal.aborted) throw new DOMException('Đã hủy.', 'AbortError');
+                // thinking:'minimal': chỉ chép danh sách dòng, không cần suy luận sâu (mặc định Gemini 3 chậm nhiều giây, hay quá hạn khi nhiều ảnh).
+                const answer = await callGeminiGenerateContentWithRetry(parts, { responseMimeType: 'application/json', maxOutputTokens: 4096, temperature: 0, thinking: 'minimal' },
+                    { signal: controller.signal, maxRetriesPerModel: 1 });
+                const parsed = extractJsonObjectFromGeminiText(answer.output);
+                rawItems.push(...(Array.isArray(parsed?.items) ? parsed.items : Array.isArray(parsed) ? parsed : []));
+                engineLabel = engineLabel ? engineLabel + ' + Gemini' : (canFast ? 'Gemini (dự phòng)' : 'Gemini');
+            }
+            return { rawItems, engineLabel };
+        }
         window.openPartsBatchOcrPicker = function() {
             if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) { setPartsBatchStatus('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu theo dòng xe.', true); return; }
             document.getElementById('partsBatchOcrFile')?.click();
@@ -4555,63 +4613,10 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             const deadline = setTimeout(() => { timedOut = true; controller.abort(); }, 90000);
             try {
                 await loadQuoteApiSettingsForCurrentUser();
-                // Dùng chung cách đọc với quét đăng kiểm (admin chọn ở Quản lý người dùng → Key AI): 'fast' = OCR.Space lấy chữ + Groq bóc tách, Gemini dự phòng.
-                const reader = getVehicleRegReader();
-                const creds = QUOTE_USER_API_SETTINGS.credentials || {};
-                const canFast = reader === 'fast' && !!creds.ocrspace && !!(creds.groq1 || creds.groq2 || creds.groq3);
-                if (!creds.gemini && !canFast) throw new Error('Đọc báo giá cần key Gemini (hoặc cả key OCR.Space và Groq ở chế độ nhanh). '+AI_KEY_MISSING_HINT);
-                stage = canFast ? 'OCR.Space đang đọc chữ' : 'Gemini đang đọc báo giá';
-                renderPartsBatchOcrPreview(files, stage + '...');
-                paint();
-                const rawItems = [];
-                let pending = files.slice(), engineLabel = '';
-                // Chế độ nhanh: mỗi tệp ≤ ~1MB (giới hạn OCR.Space gói miễn phí) đi OCR.Space -> Groq; tệp lớn hoặc đọc lỗi chuyển Gemini.
-                if (canFast) {
-                    const fastSignal = AbortSignal.any([controller.signal, AbortSignal.timeout(40000)]);
-                    const small = files.filter(file => !isPdfFile(file) || file.size <= 1000 * 1000); // ảnh được thu nhỏ bên dưới rồi mới kiểm tra 1MB
-                    const texts = new Map();
-                    await Promise.all(small.map(async file => {
-                        try {
-                            const media = isPdfFile(file) ? { mime: 'application/pdf', blob: file } : await prepareVehicleRegImage(file, 2000).then(m => ({ mime: m.mime, blob: base64ToBlob(m.data, m.mime) }));
-                            if (media.blob.size > 1000 * 1000) return;
-                            const ocr = await secureAi.ocr(media.blob, getQuoteOcrSpaceLanguage(), getQuoteOcrSpaceEngine(), { signal: fastSignal });
-                            if (ocr?.text) texts.set(file, ocr.text);
-                        } catch (_) { /* tệp này chuyển Gemini */ }
-                    }));
-                    if (controller.signal.aborted) throw new DOMException('Đã hủy.', 'AbortError');
-                    if (texts.size) {
-                        try {
-                            stage = 'Groq đang bóc tách hạng mục';
-                            renderPartsBatchOcrPreview(files, stage + '...');
-                            paint();
-                            const answer = await secureAi.generate([{ text: buildQuotePartsTextPrompt(joinQuoteOcrTexts([...texts.values()])) }],
-                                { responseMimeType: 'application/json', maxOutputTokens: 4096, temperature: 0 }, { provider: 'groq', signal: fastSignal });
-                            const parsed = extractJsonObjectFromGeminiText(answer.output);
-                            const list = Array.isArray(parsed?.items) ? parsed.items : Array.isArray(parsed) ? parsed : [];
-                            if (list.length) { rawItems.push(...list); pending = pending.filter(file => !texts.has(file)); engineLabel = 'OCR.Space + Groq'; }
-                        } catch (fastError) {
-                            if (controller.signal.aborted) throw fastError;
-                        }
-                    }
-                }
-                if (pending.length) {
-                    if (!creds.gemini) throw new Error(canFast ? 'Chế độ nhanh chưa đọc được báo giá này và chưa có key Gemini để dự phòng. Hãy chụp rõ hơn hoặc nhập tay.' : 'Đọc báo giá cần key Gemini. '+AI_KEY_MISSING_HINT);
-                    stage = canFast ? 'Chế độ nhanh chưa đọc đủ, Gemini đang đọc thay' : 'Gemini đang đọc báo giá';
-                    renderPartsBatchOcrPreview(files, stage + '...');
-                    paint();
-                    const parts = [{ text: buildQuotePartsAiPrompt() }];
-                    for (const file of pending) {
-                        const media = isPdfFile(file) ? { mime: 'application/pdf', data: await fileToBase64(file) } : await prepareVehicleRegImage(file, 2400);
-                        parts.push({ inline_data: { mime_type: media.mime, data: media.data } });
-                    }
-                    if (controller.signal.aborted) throw new DOMException('Đã hủy.', 'AbortError');
-                    // thinking:'minimal': chỉ chép danh sách dòng, không cần suy luận sâu (mặc định Gemini 3 chậm nhiều giây, hay quá hạn khi nhiều ảnh).
-                    const answer = await callGeminiGenerateContentWithRetry(parts, { responseMimeType: 'application/json', maxOutputTokens: 4096, temperature: 0, thinking: 'minimal' },
-                        { signal: controller.signal, maxRetriesPerModel: 1 });
-                    const parsed = extractJsonObjectFromGeminiText(answer.output);
-                    rawItems.push(...(Array.isArray(parsed?.items) ? parsed.items : Array.isArray(parsed) ? parsed : []));
-                    engineLabel = engineLabel ? engineLabel + ' + Gemini' : (canFast ? 'Gemini (dự phòng)' : 'Gemini');
-                }
+                const { rawItems, engineLabel } = await readQuoteFilesWithAi(files, {
+                    controller, buildImagePrompt: buildQuotePartsAiPrompt, buildTextPrompt: buildQuotePartsTextPrompt,
+                    setStage: message => { stage = message; renderPartsBatchOcrPreview(files, message + '...'); paint(); }
+                });
                 clearInterval(ticker); clearTimeout(deadline);
                 if (controller !== QUOTE_OCR_CONTROLLER) return;
                 const tookLabel = engineLabel + ' · ' + ((Date.now() - startedAt) / 1000).toFixed(1) + 's';
@@ -4640,6 +4645,71 @@ Năm SX: ${nextMeta.nam_sx_all?.length || 0}`, 'success');
             } finally { clearInterval(ticker); clearTimeout(deadline); if (controller === QUOTE_OCR_CONTROLLER) { setPartsBatchOcrBusy(false); QUOTE_OCR_CONTROLLER = null; } }
         };
         // PARTS_BATCH_QUOTE_OCR_END
+        // GARAGE_QUOTE_OCR_BEGIN
+        // Giá sơn sửa gara ngoài: đọc hạng mục SƠN từ ảnh/PDF báo giá, khớp với bảng giá và lọc bảng theo nhóm xe đang chọn.
+        // Phần hiển thị nằm ở outsideGarageController.js (window.pgQuote); ở đây chỉ gọi AI.
+        let GARAGE_QUOTE_CONTROLLER = null;
+        window.pgQuoteCancel = () => { GARAGE_QUOTE_CONTROLLER?.abort(); GARAGE_QUOTE_CONTROLLER = null; setGarageQuoteBusy(false); };
+        window.pgOpenQuoteThumb = (url, isPdf) => { if (isPdf) window.open(url, '_blank', 'noopener'); else openVehicleRegLightbox(url); };
+        function setGarageQuoteBusy(busy) {
+            const button = document.getElementById('pgQuoteOcrBtn');
+            if (!button) return;
+            button.disabled = busy;
+            button.setAttribute('aria-busy', String(busy));
+        }
+        window.openGarageQuotePicker = function() {
+            if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) { customAlert('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu.', 'error'); return; }
+            document.getElementById('pgQuoteFile')?.click();
+        };
+        window.runGarageQuoteOcr = async function(fileList) {
+            const picker = document.getElementById('pgQuoteFile');
+            const files = Array.from(fileList || []);
+            if (picker) picker.value = '';
+            if (!files.length || !window.pgQuote) return;
+            const fail = message => customAlert(message, 'error');
+            if (files.length > QUOTE_OCR_MAX_FILES) { fail('Mỗi lần đọc tối đa ' + QUOTE_OCR_MAX_FILES + ' tệp báo giá.'); return; }
+            if (files.some(file => !isQuotePdfFile(file) && !String(file.type || '').startsWith('image/'))) { fail('Chỉ nhận ảnh (JPG, PNG...) hoặc PDF báo giá.'); return; }
+            if (files.some(file => file.size > VQ_REG_MAX_BYTES)) { fail('Có tệp quá lớn (tối đa 8MB mỗi tệp). Hãy chụp/nén nhỏ hơn.'); return; }
+            if (!auth.currentUser?.uid || !canCurrentUserAccessPage('parts', 'view')) { fail('Vui lòng đăng nhập bằng tài khoản được cấp quyền tra cứu.'); return; }
+            GARAGE_QUOTE_CONTROLLER?.abort();
+            const controller = GARAGE_QUOTE_CONTROLLER = new AbortController();
+            const thumbs = files.map(file => { let url = ''; try { url = URL.createObjectURL(file); } catch (_) {} return { url, isPdf: isQuotePdfFile(file), name: String(file.name || '').slice(0, 80) }; });
+            window.pgQuote.begin(thumbs, 'Đang đọc báo giá...');
+            setGarageQuoteBusy(true);
+            const startedAt = Date.now();
+            let timedOut = false, stage = 'Đang đọc báo giá';
+            const paint = () => { if (controller === GARAGE_QUOTE_CONTROLLER && !timedOut) window.pgQuote.status(stage + '... ' + Math.round((Date.now() - startedAt) / 1000) + 's'); };
+            const ticker = setInterval(paint, 1000);
+            const deadline = setTimeout(() => { timedOut = true; controller.abort(); }, 90000);
+            try {
+                await loadQuoteApiSettingsForCurrentUser();
+                const catalog = window.pgQuote.catalog();
+                const { rawItems, engineLabel } = await readQuoteFilesWithAi(files, {
+                    controller, buildImagePrompt: () => buildGarageQuoteImagePrompt(catalog), buildTextPrompt: text => buildGarageQuoteTextPrompt(text, catalog),
+                    setStage: message => { stage = message; paint(); }
+                });
+                clearInterval(ticker); clearTimeout(deadline);
+                if (controller !== GARAGE_QUOTE_CONTROLLER) return;
+                const result = matchGarageQuoteItems(rawItems, catalog);
+                const tookLabel = engineLabel + ' · ' + ((Date.now() - startedAt) / 1000).toFixed(1) + 's';
+                if (!result.matched.length && !result.unmatched.length) { window.pgQuote.fail('Không tìm thấy hạng mục sơn trong báo giá này. Hãy chụp rõ hơn hoặc nhập tay tên hạng mục.'); return; }
+                const lines = result.matched.reduce((sum, item) => sum + item.count, 0) + result.unmatched.length;
+                const message = !result.matched.length
+                    ? 'Đọc được ' + lines + ' dòng sơn nhưng chưa có dòng nào khớp bảng giá. Hãy nhập tay tên hạng mục. (' + tookLabel + ')'
+                    : 'Đọc được ' + lines + ' dòng sơn · khớp ' + result.matched.length + ' hạng mục bảng giá' + (result.unmatched.length ? ' · ' + result.unmatched.length + ' dòng chưa khớp' : '') + '. Đối chiếu với ảnh; bảng bên dưới chỉ hiện các hạng mục này. (' + tookLabel + ')';
+                window.pgQuote.apply(result, message);
+            } catch (error) {
+                if (controller !== GARAGE_QUOTE_CONTROLLER) return;
+                if (timedOut) { window.pgQuote.fail('AI phản hồi quá lâu (90 giây). Hãy thử lại với ít tệp/ảnh nhỏ hơn.'); return; }
+                if (error?.name === 'AbortError') return;
+                window.pgQuote.fail(typeof handleGeminiApiError === 'function' && !/Gemini API key/.test(error?.message || '') ? handleGeminiApiError(error) : (error?.message || 'Không đọc được báo giá bằng AI.'));
+            } finally {
+                clearInterval(ticker); clearTimeout(deadline);
+                if (controller === GARAGE_QUOTE_CONTROLLER) { setGarageQuoteBusy(false); GARAGE_QUOTE_CONTROLLER = null; }
+            }
+        };
+        // GARAGE_QUOTE_OCR_END
+
 
         // THỰC THI TRA CỨU PHỤ TÙNG DATA
         let PARTS_DATA_SEARCH_REVISION = 0;

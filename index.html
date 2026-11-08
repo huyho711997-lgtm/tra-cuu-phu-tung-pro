@@ -17,7 +17,7 @@
 
 
 
-<link rel="stylesheet" href="assets/css/app.css?v=20261108-pg-pagination"/>
+<link rel="stylesheet" href="assets/css/app.css?v=20261108-pg-quote"/>
 
 <link rel="stylesheet" href="assets/css/parts-knowledge-page.css?v=20261108-review-prompt"/>
 <link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261108-batch-scan"/>
@@ -471,7 +471,7 @@
       <p>Tra cứu đơn giá đồng sơn theo dòng xe và mức độ hư hỏng.</p>
     </div>
     <div class="pg-overview-actions" role="group" aria-label="Bộ lọc tra cứu giá sơn sửa">
-      <div class="pg-field pg-item-search-field"><label for="pgItemSearch" class="pg-sr-only">Tên hạng mục</label><div class="pg-search-wrap"><svg class="pg-input-icon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input class="pg-input" id="pgItemSearch" type="search" placeholder="VD: cản trước, cửa, gương" autocomplete="off" aria-describedby="pgItemSearchHelp"><button id="pgClearSearch" type="button" data-premium-delete-bypass="1" aria-label="Xóa tên hạng mục" hidden><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg></button></div><span class="pg-search-help" id="pgItemSearchHelp">Nhiều hạng mục: cách nhau bằng , hoặc ;</span></div>
+      <div class="pg-field pg-item-search-field"><label for="pgItemSearch" class="pg-sr-only">Tên hạng mục</label><div class="pg-search-wrap"><svg class="pg-input-icon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input class="pg-input" id="pgItemSearch" type="search" placeholder="VD: cản trước, cửa, gương" autocomplete="off" aria-describedby="pgItemSearchHelp"><button id="pgClearSearch" type="button" data-premium-delete-bypass="1" aria-label="Xóa tên hạng mục" hidden><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg></button><button id="pgQuoteOcrBtn" type="button" class="pg-scan-btn" onclick="openGarageQuotePicker()" aria-label="Đọc hạng mục sơn từ báo giá" title="Đọc hạng mục sơn từ ảnh hoặc PDF báo giá"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M4 12h16"/><path d="M8 9h8M8 15h5"/></svg></button><input type="file" id="pgQuoteFile" accept="image/*,application/pdf" multiple hidden onchange="runGarageQuoteOcr(this.files)"></div><span class="pg-search-help" id="pgItemSearchHelp">Nhiều hạng mục: cách nhau bằng , hoặc ;</span></div>
       <div class="pg-field pg-vehicle-field">
         <label id="pgVehicleLabel" class="pg-sr-only">Dòng xe / nhóm xe</label>
         <button id="pgVehicleTrigger" class="pg-input pg-vehicle-trigger" type="button" aria-labelledby="pgVehicleLabel pgVehicleValue" aria-describedby="pgGroupContext pgModelContext" aria-haspopup="listbox" aria-expanded="false" aria-controls="pgVehicleOptions">
@@ -514,6 +514,7 @@
         <span class="pg-unit">Đơn vị: VNĐ</span>
       </div>
     </div>
+    <div class="pg-quote-panel" id="pgQuotePanel" hidden></div>
     <div class="pg-results-tools"><div class="pg-tabs" role="group" aria-label="Trạng thái đơn giá"><button type="button" data-pg-status="all" class="active" aria-pressed="true">Tất cả <span id="pgAllCount">33</span></button><button type="button" data-pg-status="priced" aria-pressed="false">Có đơn giá <span id="pgAvailableCount">27</span></button><button type="button" data-pg-status="missing" aria-pressed="false">Chưa có giá <span id="pgUnavailableCount">6</span></button></div></div>
     <div class="pg-pagination-bar">
       <span class="pg-page-summary" id="pgPageSummary" aria-live="polite"></span>
@@ -1767,7 +1768,7 @@
 </div>
 <script src="assets/js/document-libraries.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js" defer></script>
-<script type="module" src="assets/js/app-core.mjs?v=20261108-review-prompt"></script>
+<script type="module" src="assets/js/app-core.mjs?v=20261108-garage-quote"></script>
 <script src="assets/js/app-training.js"></script>
 
 <script id="kgptUnifiedPremiumDropdowns" src="assets/js/kgptUnifiedPremiumDropdowns.js"></script>

@@ -2421,3 +2421,45 @@ html.dark #outsideGarageSection .pg-page-size-menu{border-color:#334155;backgrou
 html.dark #outsideGarageSection .pg-page-size-option{color:#cbd5e1}
 html.dark #outsideGarageSection .pg-page-size-option:hover,html.dark #outsideGarageSection .pg-page-size-option[aria-selected=true]{background:#24364f;color:#fff}
 @media(max-width:640px){#outsideGarageSection .pg-pagination-bar{align-items:flex-start;flex-direction:column}#outsideGarageSection .pg-pagination-tools{width:100%;justify-content:space-between;flex-wrap:wrap}}
+
+/* pgQuoteOcr: đọc hạng mục sơn từ báo giá trên trang Giá sơn sửa gara ngoài */
+#outsideGarageSection .pg-item-search-field .pg-input{padding-right:74px}
+#outsideGarageSection .pg-search-wrap>#pgClearSearch{right:42px}
+#outsideGarageSection .pg-search-wrap>.pg-scan-btn{position:absolute;right:8px;top:7px;width:30px;height:30px;padding:5px;display:grid;place-items:center;background:#edf2f9;border:0;border-radius:9px;color:#4f70ce;cursor:pointer;transition:background .16s ease,color .16s ease}
+#outsideGarageSection .pg-search-wrap>.pg-scan-btn svg{width:18px;height:18px}
+#outsideGarageSection .pg-search-wrap>.pg-scan-btn:hover:not(:disabled){background:#dfe9fb;color:#2563eb}
+#outsideGarageSection .pg-search-wrap>.pg-scan-btn:disabled{opacity:.55;cursor:progress}
+#outsideGarageSection .pg-search-wrap>.pg-scan-btn:focus-visible{outline:3px solid #93bbff;outline-offset:2px}
+#outsideGarageSection .pg-quote-panel{display:flex;gap:14px;align-items:flex-start;padding:14px 20px;border-top:1px solid #e7edf5;background:linear-gradient(180deg,#f7faff,#fff)}
+#outsideGarageSection .pg-quote-panel[hidden]{display:none}
+#outsideGarageSection .pg-quote-thumbs{display:flex;flex-wrap:wrap;gap:8px;flex:0 0 auto;max-width:232px}
+#outsideGarageSection .pg-quote-thumb{position:relative;width:70px;height:70px;padding:0;border:1px solid #c3d6f6;border-radius:10px;overflow:hidden;background:#f1f5fb;cursor:zoom-in}
+#outsideGarageSection .pg-quote-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+#outsideGarageSection .pg-quote-thumb.is-pdf{display:flex;align-items:center;justify-content:center;color:#b91c1c;background:#fef2f2;border-color:#fecaca;cursor:pointer}
+#outsideGarageSection .pg-quote-thumb.is-pdf strong{font-size:16px;font-weight:900}
+#outsideGarageSection .pg-quote-info{flex:1 1 auto;min-width:0}
+#outsideGarageSection .pg-quote-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#outsideGarageSection .pg-quote-head strong{color:#0f2a55;font-size:13px;font-weight:800}
+#outsideGarageSection .pg-quote-actions{display:flex;gap:8px}
+#outsideGarageSection .pg-quote-btn{height:28px;padding:0 12px;border:1px solid #d5e1f5;border-radius:999px;background:#fff;color:#4f70ce;font:inherit;font-size:11px;font-weight:700;cursor:pointer}
+#outsideGarageSection .pg-quote-btn:hover{background:#f1f6ff}
+#outsideGarageSection .pg-quote-note{margin:8px 0 0;color:#5a6f93;font-size:12px;line-height:1.55}
+#outsideGarageSection .pg-quote-note[data-tone=error]{color:#b45309}
+#outsideGarageSection .pg-quote-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+#outsideGarageSection .pg-quote-row{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:5px 10px;border:1px solid #d7e4fa;border-radius:999px;background:#fff;font-size:11.5px;color:#334155}
+#outsideGarageSection .pg-quote-paper{color:#7a8ba4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+#outsideGarageSection .pg-quote-arrow{color:#9aa7ba}
+#outsideGarageSection .pg-quote-row strong{color:#1d4ed8;font-weight:800;white-space:nowrap}
+#outsideGarageSection .pg-quote-level{padding:1px 7px;border-radius:999px;font-size:10px;font-weight:800}
+#outsideGarageSection .pg-quote-level-a{background:#eaf2ff;color:#2563eb}
+#outsideGarageSection .pg-quote-level-b{background:#fff1e0;color:#c2610c}
+#outsideGarageSection .pg-quote-count{color:#7a8ba4;font-weight:800}
+#outsideGarageSection .pg-quote-group{margin:10px 0 0;color:#5a6f93;font-size:11.5px;font-weight:700}
+#outsideGarageSection .pg-quote-unmatched{margin:8px 0 0;color:#b45309;font-size:11.5px;line-height:1.55}
+html.dark #outsideGarageSection .pg-quote-panel{border-color:#2b3b53;background:#142238}
+html.dark #outsideGarageSection .pg-quote-head strong{color:#e2e8f0}
+html.dark #outsideGarageSection .pg-quote-btn,html.dark #outsideGarageSection .pg-quote-row{border-color:#334155;background:#1e293b;color:#cbd5e1}
+html.dark #outsideGarageSection .pg-quote-row strong{color:#93bbff}
+html.dark #outsideGarageSection .pg-quote-note,html.dark #outsideGarageSection .pg-quote-group,html.dark #outsideGarageSection .pg-quote-paper{color:#94a3b8}
+html.dark #outsideGarageSection .pg-search-wrap>.pg-scan-btn{background:#1e293b;color:#93bbff}
+@media(max-width:640px){#outsideGarageSection .pg-quote-panel{flex-direction:column}#outsideGarageSection .pg-quote-thumbs{max-width:none}}
