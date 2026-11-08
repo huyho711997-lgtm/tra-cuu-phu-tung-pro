@@ -166,12 +166,11 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         if(!view.rows.length)view.content.append(node('div',view.mode==='pending'?'Chưa có gợi ý chờ duyệt trong bộ lọc. Gợi ý được tạo khi người dùng mở kết quả tra cứu có hãng và dòng xe.':view.mode==='approved'?'Chưa có kiến thức đã duyệt trong bộ lọc. Mở Gợi ý chờ duyệt để kiểm tra và duyệt tên đúng.':'Không có dữ liệu phù hợp với bộ lọc.','pk-empty'));
         view.loading=false;view.content.classList.remove('is-loading');view.content.removeAttribute('inert');view.content.style.minHeight='';renderPagination(view);
         view.export.disabled=!view.rows.length;
-        view.status.textContent=(automated.reviewed?'Đã tự duyệt '+formatNumber(automated.reviewed)+' mục đủ điều kiện. ':'')+(automated.error?'Chưa nhận được kết quả tự động; bấm Làm mới để kiểm tra trạng thái. ':'')+(overview.error?'Chưa tải được chỉ số tổng hợp. ':'')+'Cập nhật lúc '+new Date().toLocaleTimeString('vi-VN')+'. Chỉ số tổng hợp dựa trên phiên tạo trong khoảng ngày đã chọn.';
+        view.status.textContent=(automated.reviewed?'Đã tự duyệt '+formatNumber(automated.reviewed)+' mục đủ điều kiện. ':'')+(automated.error?'Chưa nhận được kết quả tự động; bấm Làm mới để kiểm tra trạng thái. ':'')+(overview.error?'Chưa tải được chỉ số tổng hợp. ':'')+'Cập nhật lúc '+new Date().toLocaleTimeString('vi-VN')+'. Chỉ số tổng hợp dựa trên phiên tạo trong khoảng ngày đã chọn.'+(view.mode==='overview'?' Bảng tổng quan dùng tối đa 500 phiên mới nhất.':'');
         if(automated.reviewed)refreshMetrics(view,view.status.textContent);
         return ticket;
     }
     function renderOverview(view,rows){
-        view.content.append(node('p','Dùng bảng này để phát hiện từ khóa cần bổ sung kiến thức, ưu tiên các lượt chưa có kết quả hoặc gặp lỗi. Tổng hợp tối đa 500 phiên mới nhất trong bộ lọc.','pk-note'));
         view.overviewTerms=aggregateOverview(rows);const page=overviewPage(view.overviewTerms,view.page,view.overviewPageSize);view.page=page.page;
         const count=(value,tone)=>{const cell=node('span',formatNumber(value),'pk-overview-count');cell.dataset.tone=value?tone:'zero';return cell;};
         const overviewTable=table(['Nội dung tìm kiếm','Số phiên','Chưa có kết quả / gặp lỗi','Phiên có lựa chọn'],page.items.map(item=>[node('strong',item.query,'pk-overview-query'),count(item.total,'blue'),count(item.missing,'rose'),count(item.selected,'green')]));
