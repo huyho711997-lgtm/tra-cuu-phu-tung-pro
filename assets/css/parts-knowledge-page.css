@@ -110,7 +110,7 @@
 .pk-badge[data-tone=blue] { background:#eaf2ff; color:#2563eb; }
 .pk-badge[data-tone=green] { background:#e9f8f0; color:#15976a; }
 .pk-badge[data-tone=rose] { background:#fff0f2; color:#c74063; }
-.pk-page .pk-pagination { display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:16px 20px; border-top:1px solid #edf1f5; font-size:11.5px; color:#8290a3; }
+.pk-page .pk-pagination { position:relative; z-index:50; display:flex; justify-content:space-between; align-items:center; gap:14px; min-height:58px; padding:10px 18px; border-top:1px solid #e7edf5; border-bottom:1px solid #e7edf5; background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.94)); font-size:11px; font-weight:800; color:#334155; }
 .pk-page .pk-pagination:empty { display:none; }
 .pk-page .pk-pagination>span { margin-right:auto; }
 .pk-page .pk-pagination .pk-button { min-height:36px; font-size:11px; }
@@ -287,19 +287,35 @@
 .pk-capture-status:empty { display:none; }
 
 /* Overview pagination follows the compact controls used by the lookup table. */
-.pk-page .pk-page-summary{font-weight:700;color:#71839d}
+.pk-page .pk-page-summary{font-weight:800;color:#334155;white-space:nowrap}
 .pk-page .pk-page-tools,.pk-page .pk-page-numbers{display:flex;align-items:center;gap:6px}
 .pk-page .pk-page-tools{flex-wrap:wrap;justify-content:flex-end;gap:10px}
 .pk-page .pk-pagination .pk-page-numbers .pk-button{width:34px;height:34px;min-height:34px;padding:0;border:1px solid #dbe5f1;border-radius:9px;background:linear-gradient(180deg,#fff,#f9fbfe);color:#6f809a;font-size:11px;font-weight:800;box-shadow:0 5px 13px -12px rgba(15,23,42,.65)}
 .pk-page .pk-pagination .pk-page-numbers .pk-button:not(:disabled):hover{border-color:#93b4f8;background:#eff6ff;color:#2563eb}
 .pk-page .pk-pagination .pk-page-numbers .pk-page-number[aria-current=page]{border-color:#3269db;background:linear-gradient(145deg,#4f83ec,#315fcf);color:#fff;box-shadow:0 10px 18px -12px rgba(37,99,235,.9)}
 .pk-page .pk-page-ellipsis{padding:0 2px;color:#97a6bb}
-.pk-page .pk-page-size{display:flex;align-items:center;gap:7px;height:34px;padding:0 8px 0 10px;border:1px solid #dbe5f1;border-radius:9px;background:#fff;color:#718096;font-size:10px;font-weight:700;white-space:nowrap}
-.pk-page .pk-page-size select{height:26px;padding:0 20px 0 7px;border:1px solid #e3ebf6;border-radius:6px;background:#f8faff;color:#405a80;font:inherit;cursor:pointer}
-.pk-page .pk-page-size select:focus-visible{outline:3px solid #93bbff;outline-offset:2px}
+.pk-page .pk-pagination .pk-page-numbers .pk-button:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}
+.pk-page .pk-page-size{position:relative;display:flex;align-items:center;gap:7px;height:34px;margin-left:4px;padding:0 8px 0 10px;border:1px solid #dbe5f1;border-radius:9px;background:#fff;color:#718096;font-size:10px;font-weight:650;white-space:nowrap;box-shadow:0 5px 13px -12px rgba(15,23,42,.6)}
+.pk-page .pk-page-size-dropdown{position:relative}
+.pk-page .pk-page-size-trigger{position:relative;height:26px;min-width:54px;padding:0 24px 0 9px;border:1px solid #d7e2f1;border-radius:7px;background:linear-gradient(180deg,#fff,#f8fbff);color:#263b5e;display:flex;align-items:center;cursor:pointer;font:inherit;font-size:10.5px;font-weight:800;transition:border-color .16s ease,box-shadow .16s ease}
+.pk-page .pk-page-size-trigger:hover,.pk-page .pk-page-size-dropdown.open .pk-page-size-trigger{border-color:#88acf0;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+.pk-page .pk-page-size-trigger:focus-visible{outline:3px solid #93bbff;outline-offset:2px}
+.pk-page .pk-page-size-trigger svg{position:absolute;right:7px;top:50%;width:13px;height:13px;transform:translateY(-50%);stroke:#7185a5;stroke-width:2}
+.pk-page .pk-page-size-dropdown.open .pk-page-size-trigger svg{transform:translateY(-50%) rotate(180deg);stroke:#2563eb}
+.pk-page .pk-page-size-menu{position:absolute;z-index:170;right:0;top:calc(100% + 7px);width:86px;padding:5px;border:1px solid #d8e3f0;border-radius:11px;background:rgba(255,255,255,.99);box-shadow:0 20px 42px -23px rgba(15,23,42,.52);opacity:0;visibility:hidden;transform:translateY(-5px) scale(.98);transform-origin:top right;transition:opacity .16s ease,visibility .16s ease,transform .16s ease}
+.pk-page .pk-page-size-dropdown.open .pk-page-size-menu{opacity:1;visibility:visible;transform:translateY(0) scale(1)}
+.pk-page .pk-page-size-option{width:100%;height:32px;padding:0 9px;border:0;border-radius:7px;background:transparent;color:#526176;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font:inherit;font-size:10.5px;font-weight:750;transition:background .15s ease,color .15s ease}
+.pk-page .pk-page-size-option:hover,.pk-page .pk-page-size-option:focus-visible{outline:none;background:#f0f6ff;color:#1d4ed8}
+.pk-page .pk-page-size-option[aria-selected=true]{background:#eaf2ff;color:#1d4ed8;font-weight:850}
+.pk-page .pk-page-size-option[aria-selected=true]:after{content:'✓';font-size:10px}
+.dark .pk-page .pk-pagination{background:#172033;border-color:#2b3b53;color:#cbd5e1}
+.dark .pk-page .pk-page-summary{color:#cbd5e1}
+.dark .pk-page .pk-page-size-trigger{border-color:#3b4a61;background:#0f172a;color:#e2e8f0}
+.dark .pk-page .pk-page-size-menu{border-color:#334155;background:#172033;box-shadow:0 20px 42px -23px rgba(0,0,0,.9)}
+.dark .pk-page .pk-page-size-option{color:#cbd5e1}
+.dark .pk-page .pk-page-size-option:hover,.dark .pk-page .pk-page-size-option[aria-selected=true]{background:#24364f;color:#fff}
 .dark .pk-page .pk-pagination .pk-page-numbers .pk-button,.dark .pk-page .pk-page-size{border-color:#3b4e69;background:#1c2d46;color:#c5d6ef}
 .dark .pk-page .pk-pagination .pk-page-numbers .pk-page-number[aria-current=page]{border-color:#3b82f6;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff}
-.dark .pk-page .pk-page-size select{border-color:#40536f;background:#17263c;color:#d6e4f7}
 @media(max-width:650px){.pk-page .pk-page-tools{width:100%;justify-content:space-between}.pk-page .pk-page-numbers{flex-wrap:wrap}}
 .pk-auto-reason{display:block;max-width:280px;margin-top:7px;color:#526879;font-size:11px;line-height:1.6}
 html.dark .pk-auto-reason{color:#a9c7ba}

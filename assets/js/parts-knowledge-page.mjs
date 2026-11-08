@@ -5,7 +5,7 @@ const eventLabels={search_started:'Bắt đầu tra cứu',results_ready:'Nhận
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const icons={search:'m21 21-4.4-4.4M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0',file:'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5',open:'M15 3h6v6 M10 14 21 3 M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6',empty:'M9 9l6 6 M15 9l-6 6 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',clock:'M12 8v4l3 2 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',check:'m8 12 3 3 5-6 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',refresh:'M20 7v5h-5 M4 17v-5h5 M6 7a7 7 0 0 1 12-2l2 3 M4 16l2 3a7 7 0 0 0 12-2',download:'M12 3v12 m-5-5 5 5 5-5 M4 16v4h16v-4',filter:'M4 7h16 M7 12h10 M10 17h4',shield:'M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z m-4 9 3 3 5-6'};
 Object.assign(icons,{edit:'m16 3 5 5 M4 16 16 4a3 3 0 0 1 4 4L8 20l-5 1z',close:'m6 6 12 12 M18 6 6 18',arrow:'M4 12h16 m-6-6 6 6-6 6'});
-Object.assign(icons,{chevronLeft:'m15 18-6-6 6-6',chevronRight:'m9 18 6-6-6-6'});
+Object.assign(icons,{chevronLeft:'m15 18-6-6 6-6',chevronRight:'m9 18 6-6-6-6',chevronDown:'m7 10 5 5 5-5'});
 function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),path=document.createElementNS(svg.namespaceURI,'path');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.8');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');path.setAttribute('d',icons[name] || icons.file);svg.append(path);return svg;}
 function setButtonLabel(button,text){const label=button.querySelector('.pk-button-label');if(label)label.textContent=text;else button.textContent=text;}
 const btn=(text,action,primary=false,glyph)=>{const n=node('button',undefined,'pl-button pk-button'+(primary?' pk-button-primary':''));n.type='button';if(glyph)n.append(icon(glyph));n.append(node('span',text,'pk-button-label'));n.addEventListener('click',action);return n;};
@@ -64,6 +64,23 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         view.nextCopy.textContent=pending>0?'Đúng tên và phạm vi xe thì bấm Duyệt ngay trên dòng; chọn nhiều dòng để duyệt cùng lúc. Cần điều chỉnh thì mở Chỉnh sửa.':'Hệ thống tạo gợi ý khi người dùng mở kết quả tra cứu có hãng và dòng xe. Bạn có thể đổi bộ lọc để xem các gợi ý khác.';
         setButtonLabel(view.nextButton,'Mở gợi ý chờ duyệt'+(pending>0?' ('+formatNumber(pending)+')':''));
     }
+    // Ô chọn số dòng giống trang tra cứu chính (nút + danh sách tùy chỉnh), không dùng <select> gốc của trình duyệt.
+    function pageSizeControl(view){
+        const wrap=node('div',undefined,'pk-page-size'),drop=node('div',undefined,'pk-page-size-dropdown'),trigger=node('button',undefined,'pk-page-size-trigger'),menu=node('div',undefined,'pk-page-size-menu');
+        trigger.type='button';trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-label','Số nội dung trên mỗi trang');
+        trigger.append(node('span',String(view.overviewPageSize)),icon('chevronDown'));
+        menu.setAttribute('role','listbox');menu.setAttribute('aria-label','Số dòng hiển thị');
+        const onOutside=event=>{if(!drop.contains(event.target))close();};
+        const onKey=event=>{if(event.key==='Escape'){close();trigger.focus({preventScroll:true});}};
+        function close(){drop.classList.remove('open');trigger.setAttribute('aria-expanded','false');document.removeEventListener('click',onOutside);document.removeEventListener('keydown',onKey);}
+        trigger.addEventListener('click',()=>{if(drop.classList.contains('open')){close();return;}drop.classList.add('open');trigger.setAttribute('aria-expanded','true');document.addEventListener('click',onOutside);document.addEventListener('keydown',onKey);});
+        for(const value of [10,20,50]){
+            const option=node('button',String(value),'pk-page-size-option');option.type='button';option.setAttribute('role','option');option.setAttribute('aria-selected',String(value===view.overviewPageSize));
+            option.addEventListener('click',()=>{close();if(value===view.overviewPageSize)return;view.overviewPageSize=value;view.page=0;view.content.replaceChildren();renderOverview(view,view.rows);renderPagination(view);view.pagination.querySelector('.pk-page-size-trigger')?.focus({preventScroll:true});});
+            menu.append(option);
+        }
+        drop.append(trigger,menu);wrap.append(node('span','Hiển thị'),drop,node('span','dòng'));return wrap;
+    }
     function renderPagination(view){
         view.pagination.replaceChildren();
         if(view.mode==='overview'){
@@ -76,7 +93,8 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
             const indexes=[...new Set([0,page.page-1,page.page,page.page+1,page.pages-1].filter(i=>i>=0&&i<page.pages))].sort((a,b)=>a-b);
             let previous=-1;for(const index of indexes){if(index>previous+1)pages.append(node('span','…','pk-page-ellipsis'));const button=btn(String(index+1),()=>go(index));button.classList.add('pk-page-number');button.setAttribute('aria-label','Trang '+(index+1));if(index===page.page)button.setAttribute('aria-current','page');pages.append(button);previous=index;}
             pages.append(arrow('Trang sau','chevronRight',page.page+1,page.page===page.pages-1));
-            const sizeLabel=node('label',undefined,'pk-page-size'),select=node('select');select.setAttribute('aria-label','Số nội dung trên mỗi trang');for(const value of [10,20,50]){const option=node('option',String(value));option.value=String(value);select.append(option);}select.value=String(view.overviewPageSize);select.addEventListener('change',()=>{view.overviewPageSize=Number(select.value);view.page=0;view.content.replaceChildren();renderOverview(view,view.rows);renderPagination(view);view.pagination.querySelector('select')?.focus({preventScroll:true});});sizeLabel.append(node('span','Hiển thị'),select,node('span','dòng'));tools.append(pages,sizeLabel);view.pagination.append(summary,tools);return;
+            tools.append(pages,pageSizeControl(view));
+            view.pagination.append(summary,tools);return;
         }
         const knowledge=isKnowledge(view),remaining=knowledge?view.rows.filter(row=>row.status===view.mode).length:view.rows.length,processed=view.rows.length-remaining;
         view.pagination.append(node('span',formatNumber(view.count)+' bản ghi'+(knowledge?(processed?' · '+formatNumber(processed)+' dòng đã xử lý trên trang':''):' · Trang '+(view.page+1))));
@@ -352,7 +370,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         const notification=node('aside',undefined,'pk-toast'),toastIcon=node('span',undefined,'pk-toast-icon'),toastText=node('span',undefined,'pk-toast-text'),toastClose=iconButton('Đóng thông báo',()=>{notification.hidden=true;},'close');notification.hidden=true;notification.setAttribute('aria-live','polite');notification.setAttribute('aria-atomic','true');notification.append(toastIcon,toastText,toastClose);
         state={mode:'overview',page:0,offset:0,overviewPageSize:10,overviewTerms:[],loading:false,metricsRevision:0,appliedFilters:null,applyKnowledgeChange:null,setKnowledgeBusy:null,setKnowledgeError:null,busyRows:new Map(),toast:notification,toastIcon,toastText,toastTimer:null,fields,metrics,content,pagination,status,total,nextTitle,nextCopy,nextButton,rows:[],count:0,export:exportButton};
         for(const [key,title,glyph] of groups){const tab=btn(title,()=>selectMode(remembered[key]),false,glyph);tab.dataset.group=key;tab.setAttribute('aria-pressed',String(key==='overview'));tabs.append(tab);}
-        hero.append(header,metrics,nextStep);workspace.append(panelHead,navigation,filtersBox,status,content,pagination);host.append(hero,workspace,notification);
+        hero.append(header,metrics,nextStep);workspace.append(panelHead,navigation,filtersBox,status,pagination,content);host.append(hero,workspace,notification);
         const actor=owner;
         const {data}=await supabase.from('user_profiles').select('id,full_name,email').order('full_name',{ascending:true}).limit(1000).abortSignal(AbortSignal.timeout(12000));
         if(!allowed()||owner!==actor)return;
