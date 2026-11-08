@@ -35,7 +35,10 @@ export function validateGenerate(body) {
   const temperature = Number(config.temperature ?? 0.1);
   if (!Number.isFinite(output) || output < 1 || output > 8192 || !Number.isFinite(temperature) || temperature < 0 || temperature > 2) throw invalid();
   if (config.responseMimeType !== undefined && !['application/json','text/plain'].includes(config.responseMimeType)) throw invalid();
-  return { maxOutputTokens: Math.floor(output), temperature, ...(config.responseMimeType ? { responseMimeType: config.responseMimeType } : {}) };
+  // thinking: mức "suy nghĩ" của Gemini 3.x. Mặc định của Google là cao nên tác vụ trích xuất đơn giản (đọc giấy đăng kiểm) chậm vô ích.
+  if (config.thinking !== undefined && !['minimal','low'].includes(config.thinking)) throw invalid();
+  return { maxOutputTokens: Math.floor(output), temperature, ...(config.responseMimeType ? { responseMimeType: config.responseMimeType } : {}),
+    ...(config.thinking ? { thinking: config.thinking } : {}) };
 }
 
 function validateSave(body) {
@@ -167,6 +170,8 @@ function readRateLimit(response, data, nowMs) {
   return { daily, seconds };
 }
 
+const geminiConfig = ({ thinking, ...rest }) => rest;
+
 async function generate(fetchImpl, body, credentials, signal, ctx) {
   const { cooldowns, random, now } = ctx;
   const config = validateGenerate(body), attempts = [];
@@ -207,12 +212,20 @@ async function generate(fetchImpl, body, credentials, signal, ctx) {
           { role:'user',content:body.parts.map(p => p.text).join('\n\n') },
         ], reasoning_effort:'low', temperature:config.temperature, max_completion_tokens:config.maxOutputTokens,
         ...(config.responseMimeType === 'application/json' ? { response_format:{type:'json_object'} } : {}),
-      } : { contents:[{role:'user',parts:body.parts}], generationConfig:{...config,temperature:1} };
-      const response = await upstream(fetchImpl,url,{
+      } : { contents:[{role:'user',parts:body.parts}], generationConfig:{...geminiConfig(config),temperature:1,
+        ...(config.thinking ? { thinkingConfig:{ thinkingLevel:config.thinking } } : {})} };
+      const send = () => upstream(fetchImpl,url,{
         method:'POST',headers:{'Content-Type':'application/json',...(groq ? {Authorization:`Bearer ${credential.key}`} : {'x-goog-api-key':credential.key})},
         body:JSON.stringify(payload),
       },signal);
-      const data = await response.json().catch(() => ({}));
+      let response = await send();
+      let data = await response.json().catch(() => ({}));
+      // Model không nhận thinkingConfig (400 nhắc tới "thinking"): bỏ trường này và gọi lại đúng một lần, không làm hỏng tính năng.
+      if (!groq && config.thinking && response.status === 400 && /thinking/i.test(JSON.stringify(data?.error ?? {}).slice(0, 2000))) {
+        delete payload.generationConfig.thinkingConfig;
+        response = await send();
+        data = await response.json().catch(() => ({}));
+      }
       const headers = Object.fromEntries(RATE_HEADERS.map(h => [h,response.headers.get(h)])
         .filter(([,v]) => v !== null && v.length <= 64 && /^[0-9.msdh]+$/.test(v)));
       const usage = groq ? data.usage : undefined;

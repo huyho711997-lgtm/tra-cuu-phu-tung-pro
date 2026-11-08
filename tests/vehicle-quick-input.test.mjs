@@ -259,3 +259,13 @@ test('dòng gần đúng: chữ lạ trong tên phụ tùng không sinh gợi ý
     const plan = parse('toyota xyz cản trước', VF);
     assert.deepEqual(plan.similarOptions, []);
 });
+
+import {buildRegistrationTextPrompt} from '../assets/js/vehicle-quick-input.mjs';
+test('prompt cho văn bản OCR chứa văn bản, lược đồ JSON và giới hạn độ dài', () => {
+    const prompt = buildRegistrationTextPrompt('BIỂN SỐ: 47A-123.45\nNhãn hiệu: TOYOTA');
+    assert.match(prompt, /văn bản do OCR/);
+    assert.match(prompt, /"bien_so"/);
+    assert.match(prompt, /47A-123\.45/);
+    assert.ok(buildRegistrationTextPrompt('x'.repeat(50000)).length < 9000);
+    assert.equal(normalizeRegistrationFields({nhan_hieu: 'toyota', ten_thuong_mai: 'Vios', bien_so: '47a-12345', nam_san_xuat: '2019'}).found, true);
+});

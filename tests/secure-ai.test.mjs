@@ -199,3 +199,44 @@ test('failed legacy upload keeps server metadata usable and reports incomplete m
     assert.ok(vm.runInContext('QUOTE_API_MIGRATION_NOTICE',context));
     assert.equal(storage.getItem('tascoGroqKey__'+USER),SECRET);
 });
+
+// ---- Tốc độ quét giấy đăng kiểm: thinking của Gemini ----
+const geminiOk=()=>json({candidates:[{content:{parts:[{text:'{"nhan_hieu":"TOYOTA"}'}]},finishReason:'STOP'}]});
+const geminiAsk={action:'generate',provider:'gemini',model:'gemini-3.8-flash',parts:[{text:'đọc giấy'}],config:{responseMimeType:'application/json',maxOutputTokens:512,temperature:0,thinking:'minimal'}};
+const geminiCreds={gemini:{id:'rev-g',key:'AIza-test-key-123456'}};
+
+test('thinking minimal đi vào thinkingConfig của Gemini và không lọt ra ngoài generationConfig',async()=>{
+    const app=server({credentials:geminiCreds,fetchImpl:()=>geminiOk()});
+    const res=await app.request(geminiAsk);
+    assert.equal(res.status,200);
+    const sent=JSON.parse(app.upstream[0][1].body).generationConfig;
+    assert.deepEqual(sent.thinkingConfig,{thinkingLevel:'minimal'});
+    assert.equal(sent.thinking,undefined);
+    assert.equal(sent.maxOutputTokens,512);
+});
+test('không gửi thinking thì payload Gemini giữ nguyên như cũ',async()=>{
+    const app=server({credentials:geminiCreds,fetchImpl:()=>geminiOk()});
+    const {thinking,...config}=geminiAsk.config;
+    await app.request({...geminiAsk,config});
+    assert.equal(JSON.parse(app.upstream[0][1].body).generationConfig.thinkingConfig,undefined);
+});
+test('mức thinking không hợp lệ bị từ chối trước khi gọi nhà cung cấp',async()=>{
+    for(const thinking of ['high','xyz',5,{}]) {
+        const app=server({credentials:geminiCreds,fetchImpl:()=>geminiOk()});
+        const res=await app.request({...geminiAsk,config:{...geminiAsk.config,thinking}});
+        assert.equal(res.status,400);assert.equal(app.upstream.length,0);
+    }
+});
+test('model không nhận thinkingConfig (400) được gọi lại đúng một lần không có trường này',async()=>{
+    let n=0;
+    const app=server({credentials:geminiCreds,fetchImpl:()=>++n===1?json({error:{message:'Unknown name "thinkingLevel": Cannot find field.'}},400):geminiOk()});
+    const res=await app.request(geminiAsk);
+    assert.equal(res.status,200);assert.equal(app.upstream.length,2);
+    assert.ok(JSON.parse(app.upstream[0][1].body).generationConfig.thinkingConfig);
+    assert.equal(JSON.parse(app.upstream[1][1].body).generationConfig.thinkingConfig,undefined);
+});
+test('lỗi 400 không liên quan thinking không bị gọi lại',async()=>{
+    const app=server({credentials:geminiCreds,fetchImpl:()=>json({error:{message:'API key not valid'}},400)});
+    const res=await app.request(geminiAsk);
+    assert.notEqual(res.status,200);assert.equal(app.upstream.length,1);
+});

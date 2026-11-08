@@ -353,6 +353,16 @@ export function buildRegistrationAiPrompt() {
     ].join('\n');
 }
 
+// Bản dành cho văn bản OCR (không có ảnh): dùng với OCR.Space + Groq. OCR hay lệch dòng/nhầm ký tự nên dặn rõ không đoán.
+export function buildRegistrationTextPrompt(ocrText) {
+    return [
+        buildRegistrationAiPrompt().replace('Bạn đọc ảnh/PDF giấy', 'Bạn nhận văn bản do OCR đọc từ giấy'),
+        'Văn bản OCR có thể lệch dòng hoặc sai vài ký tự; nhãn và giá trị có thể nằm ở hai dòng liền nhau. Chỉ lấy giá trị thật sự có trong văn bản.',
+        '--- VĂN BẢN OCR ---',
+        String(ocrText || '').slice(0, 8000)
+    ].join('\n');
+}
+
 const cleanText = (value, max) => (typeof value === 'string' || typeof value === 'number' ? String(value) : '')
     .replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 
