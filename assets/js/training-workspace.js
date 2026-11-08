@@ -541,7 +541,7 @@
             syncFilter();
         }
 
-        const panelHead = doc.querySelector('.panel .panel-head');
+        const panelHead = doc.querySelector('#usersPanel .panel-head') || doc.querySelector('.panel .panel-head');
         const userRows = doc.getElementById('userRows');
         const emptyState = doc.getElementById('empty');
         const userStatusSelect = doc.getElementById('status');
