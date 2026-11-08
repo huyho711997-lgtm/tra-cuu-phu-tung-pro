@@ -18,21 +18,39 @@ function tiInitSidebarHover(){
     if(!app||!sidebar||sidebar.dataset.hoverReady)return;
     sidebar.dataset.hoverReady='1';
     app.classList.add('ti-sidebar-auto');
+    var pinButton=document.getElementById('tiSidebarPin');var pinned=false;
+    try{pinned=localStorage.getItem('tiSidebarPinned')==='true'}catch(error){}
     var edge=document.createElement('span');edge.className='ti-sidebar-edge';edge.setAttribute('aria-hidden','true');sidebar.appendChild(edge);
     var closeTimer=0;var pointerInside=false;var keyboardInside=false;
     function cancelClose(){clearTimeout(closeTimer);closeTimer=0}
     function open(){cancelClose();if(tiUsesHoverSidebar())tiSetSidebarCollapsed(false)}
     function scheduleClose(){
         cancelClose();
-        if(tiUsesHoverSidebar()&&!pointerInside&&!keyboardInside){
-            closeTimer=setTimeout(function(){if(!pointerInside&&!keyboardInside)tiSetSidebarCollapsed(true)},140);
+        if(tiUsesHoverSidebar()&&!pinned&&!pointerInside&&!keyboardInside){
+            closeTimer=setTimeout(function(){if(!pinned&&!pointerInside&&!keyboardInside)tiSetSidebarCollapsed(true)},140);
+        }
+    }
+    function syncPin(){
+        app.classList.toggle('ti-sidebar-pinned',pinned&&tiUsesHoverSidebar());
+        if(pinButton){
+            pinButton.setAttribute('aria-pressed',pinned?'true':'false');
+            pinButton.setAttribute('aria-label',pinned?'Bỏ ghim thanh bên':'Ghim thanh bên');
+            pinButton.title=pinned?'Bỏ ghim thanh bên':'Ghim thanh bên';
+            pinButton.querySelector('span').textContent=pinned?'Bỏ ghim thanh bên':'Ghim thanh bên';
         }
     }
     function syncMode(){
         cancelClose();pointerInside=sidebar.matches(':hover');keyboardInside=false;
         tiCloseSidebar();
-        tiSetSidebarCollapsed(tiUsesHoverSidebar()&&!pointerInside,false);
+        syncPin();
+        tiSetSidebarCollapsed(tiUsesHoverSidebar()&&!pinned&&!pointerInside,false);
     }
+    if(pinButton)pinButton.addEventListener('click',function(){
+        pinned=!pinned;
+        try{localStorage.setItem('tiSidebarPinned',String(pinned))}catch(error){}
+        syncPin();
+        if(pinned)open();else scheduleClose();
+    });
     sidebar.addEventListener('pointerenter',function(event){
         if(!tiUsesHoverSidebar()||event.pointerType==='touch')return;
         pointerInside=true;open();

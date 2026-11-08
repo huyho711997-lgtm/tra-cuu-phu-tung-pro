@@ -1989,6 +1989,20 @@ html.dark #loginOverlay .login-title{color:#f8fafc}
     #mainApp.ti-sidebar-auto .ti-sidebar-edge{transition:none!important}
 }
 
+/* The pinned navigation occupies its own space on desktop. */
+#mainApp .ti-sidebar-pin{display:none}
+@media(min-width:1024px) and (hover:hover) and (pointer:fine){
+    #mainApp.ti-sidebar-auto.ti-sidebar-pinned.main-container{margin-left:var(--ti-sidebar-width)!important;width:auto!important}
+    #mainApp.ti-sidebar-auto.ti-sidebar-pinned>.app-topbar{left:var(--ti-sidebar-width)!important}
+    #mainApp .ti-sidebar-pin{display:flex;align-items:center;gap:11px;width:100%;height:42px;margin:0 0 18px;padding:0 9px;border:1px solid rgba(96,165,250,.12);border-radius:12px;background:rgba(255,255,255,.035);color:#a9bad2;font-size:11px;font-weight:800;text-align:left;white-space:nowrap;cursor:pointer}
+    #mainApp .ti-sidebar-pin svg{width:34px;height:34px;flex:0 0 34px;padding:8px;border-radius:9px;color:#93b5e6}
+    #mainApp .ti-sidebar-pin:hover,#mainApp .ti-sidebar-pin[aria-pressed="true"]{border-color:rgba(96,165,250,.3);background:rgba(37,99,235,.16);color:#e6f0ff}
+    #mainApp .ti-sidebar-pin[aria-pressed="true"] svg{color:#75b5ff}
+    #mainApp .ti-sidebar-pin:focus-visible{outline:3px solid rgba(96,165,250,.55);outline-offset:2px}
+    #mainApp.ti-sidebar-collapsed .ti-sidebar-pin{width:54px;overflow:hidden}
+    #mainApp.ti-sidebar-collapsed .ti-sidebar-pin span{opacity:0}
+}
+
 
 /* Compact AI candidate editor: names first, results after applying. */
 #partsAiStatus:empty{display:none}
