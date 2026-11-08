@@ -13,7 +13,7 @@
 .vq-quick .vq-row{display:flex;align-items:stretch;gap:12px}
 .vq-quick .vq-field{position:relative;flex:1 1 auto;min-width:0}
 .vq-quick .vq-field-icon{position:absolute;left:16px;top:50%;width:18px;height:18px;transform:translateY(-50%);color:#6f8fbe;pointer-events:none}
-.vq-quick .vq-field input{width:100%;height:52px;padding:0 92px 0 46px;border:1px solid #c3d6f6;border-radius:13px;background:#fff;color:var(--vq-ink);
+.vq-quick .vq-field input{width:100%;height:52px;padding:0 122px 0 46px;border:1px solid #c3d6f6;border-radius:13px;background:#fff;color:var(--vq-ink);
     font:700 14px 'Plus Jakarta Sans',sans-serif;box-shadow:0 8px 20px -16px rgba(37,99,235,.6);transition:border-color .16s,box-shadow .16s}
 .vq-quick .vq-field input::placeholder{color:#8ba3c7;font-weight:600}
 .vq-quick .vq-field input:hover{border-color:#9dbcf0}
@@ -33,15 +33,15 @@
 @keyframes vqPulse{50%{opacity:.35;transform:scale(.86)}}
 
 /* Nút quét giấy đăng kiểm */
-.vq-quick .vq-reg{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 11px;border:1px solid #b9d0f5;border-radius:999px;background:#fff;color:#1d4ed8;
-    font:800 11.5px 'Plus Jakarta Sans',sans-serif;cursor:pointer;box-shadow:0 6px 14px -11px rgba(37,99,235,.7);transition:border-color .16s,background .16s,transform .16s}
-.vq-quick .vq-reg svg{width:14px;height:14px;flex:0 0 auto}
-.vq-quick .vq-reg:hover:not(:disabled){border-color:#3b82f6;background:#eff6ff;transform:translateY(-1px)}
-.vq-quick .vq-reg:focus-visible{outline:3px solid rgba(37,99,235,.3);outline-offset:1px}
+.vq-quick .vq-reg{position:absolute;right:69px;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:38px;height:38px;padding:0;border:0;border-radius:9px;background:transparent;color:#6f8fbe;cursor:pointer;transition:color .16s,background .16s}
+.vq-quick .vq-reg svg{width:19px;height:19px}
+.vq-quick .vq-reg:hover:not(:disabled){background:#eff6ff;color:#2563eb}
+.vq-quick .vq-reg:focus-visible{outline:3px solid rgba(37,99,235,.3);outline-offset:-2px}
 .vq-quick .vq-reg:disabled{opacity:.75;cursor:progress}
 .vq-quick .vq-reg[aria-busy="true"] svg{animation:vqPulse 1s ease-in-out infinite}
-html.dark .vq-quick .vq-reg,.dark .vq-quick .vq-reg{border-color:#3a5c8f;background:rgba(30,41,59,.8);color:#bfdbfe}
-@media (max-width:720px){.vq-quick .vq-reg{width:100%;justify-content:center;height:36px}}
+html.dark .vq-quick .vq-reg,.dark .vq-quick .vq-reg{background:transparent;color:#93a8c6}
+html.dark .vq-quick .vq-reg:hover:not(:disabled),.dark .vq-quick .vq-reg:hover:not(:disabled){background:#293b57;color:#bfdbfe}
+.vq-quick .vq-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 /* Dòng gợi ý + ví dụ bấm nhanh (lấy từ dữ liệu thật của kho) */
 .vq-quick .vq-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-top:12px}
@@ -123,7 +123,8 @@ html.dark .vq-quick .vq-note,.dark .vq-quick .vq-note{background:#2a2112;color:#
     .vq-quick .vq-row{flex-direction:column}
     .vq-quick .vq-btn{width:100%}
     .vq-quick .vq-kbd{display:none}
-    .vq-quick .vq-field input{padding-right:14px}
+    .vq-quick .vq-reg{right:7px}
+    .vq-quick .vq-field input{padding-right:52px}
 }
 @media (prefers-reduced-motion:reduce){
     .vq-quick *{transition:none!important;animation:none!important}
