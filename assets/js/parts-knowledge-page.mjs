@@ -60,6 +60,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
             card.querySelector('strong').textContent=formatNumber(data?.[key]);
         }
         const pending=Number(data?.pending || 0);
+        view.nextStep.hidden=pending<=0;
         view.nextTitle.textContent=pending>0?'Bước tiếp theo: kiểm tra '+formatNumber(pending)+' gợi ý trong bộ lọc':'Chưa có gợi ý chờ duyệt trong bộ lọc';
         view.nextCopy.textContent=pending>0?'Đúng tên và phạm vi xe thì bấm Duyệt ngay trên dòng; chọn nhiều dòng để duyệt cùng lúc. Cần điều chỉnh thì mở Chỉnh sửa.':'Hệ thống tạo gợi ý khi người dùng mở kết quả tra cứu có hãng và dòng xe. Bạn có thể đổi bộ lọc để xem các gợi ý khác.';
         setButtonLabel(view.nextButton,'Mở gợi ý chờ duyệt'+(pending>0?' ('+formatNumber(pending)+')':''));
@@ -108,7 +109,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         Promise.resolve(supabase.rpc('kgpt_parts_search_overview',{p_from:f.from,p_to:f.to,p_query:f.q,p_user:f.user || null,p_source:f.source || null}).abortSignal(AbortSignal.timeout(12000))).then(result=>{
             if(!allowed()||owner!==actor||state!==view||ticket!==version||revision!==view.metricsRevision)return;
             if(result.error){if(view.status.textContent===message)view.status.textContent+=' Chưa cập nhật được thống kê.';return;}
-            const position=window.scrollY,hero=view.metrics.closest('.pk-hero');if(hero)hero.style.minHeight=hero.getBoundingClientRect().height+'px';renderMetrics(view,result.data);window.scrollTo({top:position,behavior:'instant'});
+            const position=window.scrollY,hero=view.metrics.closest('.pk-hero'),height=hero?.getBoundingClientRect().height,wasHidden=view.nextStep.hidden;renderMetrics(view,result.data);if(hero)hero.style.minHeight=wasHidden===view.nextStep.hidden?height+'px':'';window.scrollTo({top:position,behavior:'instant'});
         }).catch(()=>{});
     }
     async function load(){
@@ -142,6 +143,7 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
         if(!overview.error){
             renderMetrics(view,overview.data);
         }else{
+            view.nextStep.hidden=false;
             view.nextTitle.textContent='Kiểm tra gợi ý để bổ sung kiến thức';
             view.nextCopy.textContent='Chưa tải được số lượng gợi ý. Bạn vẫn có thể mở danh sách chờ duyệt để kiểm tra.';
             setButtonLabel(view.nextButton,'Mở gợi ý chờ duyệt');
@@ -365,9 +367,9 @@ export function createPartsKnowledgePage({supabase,getOwner,isAdmin}){
             modeSelect.replaceChildren();for(const [value,text] of modes.filter(([mode])=>group[3].includes(mode))){const option=node('option',value==='pending'?'Chờ duyệt':text);option.value=value;modeSelect.append(option);}modeSelect.value=key;
             load();
         }
-        const nextStep=node('div',undefined,'pk-next-step'),nextText=node('div'),nextTitle=node('strong','Kiểm tra gợi ý để bổ sung kiến thức','pk-next-title'),nextCopy=node('p','Chỉ tên đã duyệt mới được dùng lại khi trùng từ khóa, phạm vi xe và vẫn còn trong kho.','pk-next-copy'),nextButton=btn('Mở gợi ý chờ duyệt',()=>{selectMode('pending');workspace.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});tabs.querySelector('[data-group="knowledge"]')?.focus({preventScroll:true});},true,'check');nextText.append(nextTitle,nextCopy);nextStep.append(nextText,nextButton);
+        const nextStep=node('div',undefined,'pk-next-step'),nextText=node('div'),nextTitle=node('strong','Kiểm tra gợi ý để bổ sung kiến thức','pk-next-title'),nextCopy=node('p','Chỉ tên đã duyệt mới được dùng lại khi trùng từ khóa, phạm vi xe và vẫn còn trong kho.','pk-next-copy'),nextButton=btn('Mở gợi ý chờ duyệt',()=>{selectMode('pending');workspace.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});tabs.querySelector('[data-group="knowledge"]')?.focus({preventScroll:true});},true,'check');nextStep.hidden=true;nextText.append(nextTitle,nextCopy);nextStep.append(nextText,nextButton);
         const notification=node('aside',undefined,'pk-toast'),toastIcon=node('span',undefined,'pk-toast-icon'),toastText=node('span',undefined,'pk-toast-text'),toastClose=iconButton('Đóng thông báo',()=>{notification.hidden=true;},'close');notification.hidden=true;notification.setAttribute('aria-live','polite');notification.setAttribute('aria-atomic','true');notification.append(toastIcon,toastText,toastClose);
-        state={mode:'overview',page:0,offset:0,overviewPageSize:10,overviewTerms:[],loading:false,metricsRevision:0,appliedFilters:null,applyKnowledgeChange:null,setKnowledgeBusy:null,setKnowledgeError:null,busyRows:new Map(),toast:notification,toastIcon,toastText,toastTimer:null,fields,metrics,content,pagination,status,total,nextTitle,nextCopy,nextButton,rows:[],count:0,export:exportButton};
+        state={mode:'overview',page:0,offset:0,overviewPageSize:10,overviewTerms:[],loading:false,metricsRevision:0,appliedFilters:null,applyKnowledgeChange:null,setKnowledgeBusy:null,setKnowledgeError:null,busyRows:new Map(),toast:notification,toastIcon,toastText,toastTimer:null,fields,metrics,content,pagination,status,total,nextStep,nextTitle,nextCopy,nextButton,rows:[],count:0,export:exportButton};
         for(const [key,title,glyph] of groups){const tab=btn(title,()=>selectMode(remembered[key]),false,glyph);tab.dataset.group=key;tab.setAttribute('aria-pressed',String(key==='overview'));tabs.append(tab);}
         hero.append(header,metrics,nextStep);workspace.append(panelHead,navigation,filtersBox,status,pagination,content);host.append(hero,workspace,notification);
         const actor=owner;
