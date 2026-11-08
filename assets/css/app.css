@@ -2385,3 +2385,39 @@ html.dark .parts-related-choice:hover{background:#243c58}html.dark .parts-relate
 #quoteGeminiSettingsModal .quote-groq-group>.quote-settings-field{margin-bottom:12px}
 
 .secure-ai-key-clear{display:block;margin:6px 0 12px auto;padding:4px 8px;border:0;background:transparent;color:#b42318;font:inherit;font-size:11px;cursor:pointer}.secure-ai-key-clear[hidden]{display:none}.secure-ai-key-clear:disabled{opacity:.45;cursor:default}
+
+/* pgPaginationBar: phân trang bảng giá gara ngoài đồng bộ với trang tra cứu chính */
+#outsideGarageSection .pg-pagination-bar{position:relative;z-index:50;min-height:58px;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid #e7edf5;border-bottom:1px solid #e7edf5;background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.94))}
+#outsideGarageSection .pg-page-summary{display:inline-flex;align-items:center;color:#334155;font-size:11px;font-weight:800;white-space:nowrap}
+#outsideGarageSection .pg-pagination-tools{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0}
+#outsideGarageSection .pg-page-controls{display:flex;align-items:center;gap:6px}
+#outsideGarageSection .pg-page-numbers{display:flex;align-items:center;gap:6px}
+#outsideGarageSection .pg-page-controls button{width:34px;height:34px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid #dbe5f1;border-radius:9px;background:linear-gradient(180deg,#fff,#f9fbfe);color:#6f809a;font:inherit;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 5px 13px -12px rgba(15,23,42,.65);transition:transform .16s ease,border-color .16s ease,background .16s ease,color .16s ease,box-shadow .16s ease}
+#outsideGarageSection .pg-page-controls button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+#outsideGarageSection .pg-page-controls button:not(:disabled):hover{transform:translateY(-1px);border-color:#93b4f8;background:#eff6ff;color:#2563eb;box-shadow:0 9px 18px -13px rgba(37,99,235,.65)}
+#outsideGarageSection .pg-page-controls .pg-page-number[aria-current=page]{border-color:#3269db;background:linear-gradient(145deg,#4f83ec,#315fcf);color:#fff;box-shadow:0 10px 18px -12px rgba(37,99,235,.9);cursor:default;transform:none}
+#outsideGarageSection .pg-page-controls button:disabled{opacity:.42;cursor:not-allowed;transform:none;box-shadow:none}
+#outsideGarageSection .pg-page-controls button:focus-visible,#outsideGarageSection .pg-page-size-trigger:focus-visible{outline:3px solid #93bbff;outline-offset:2px}
+#outsideGarageSection .pg-page-ellipsis{width:20px;text-align:center;color:#9aa7ba;font-size:11px;font-weight:800}
+#outsideGarageSection .pg-page-size{position:relative;height:34px;margin-left:4px;padding:0 8px 0 10px;border:1px solid #dbe5f1;border-radius:9px;background:#fff;display:flex;align-items:center;gap:7px;color:#718096;font-size:10px;font-weight:650;white-space:nowrap;box-shadow:0 5px 13px -12px rgba(15,23,42,.6)}
+#outsideGarageSection .pg-page-size-dropdown{position:relative}
+#outsideGarageSection .pg-page-size-trigger{position:relative;height:26px;min-width:54px;padding:0 24px 0 9px;border:1px solid #d7e2f1;border-radius:7px;background:linear-gradient(180deg,#fff,#f8fbff);color:#263b5e;display:flex;align-items:center;cursor:pointer;font:inherit;font-size:10.5px;font-weight:800;transition:border-color .16s ease,box-shadow .16s ease}
+#outsideGarageSection .pg-page-size-trigger:hover,#outsideGarageSection .pg-page-size-dropdown.open .pg-page-size-trigger{border-color:#88acf0;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+#outsideGarageSection .pg-page-size-trigger svg{position:absolute;right:7px;top:50%;width:13px;height:13px;transform:translateY(-50%);fill:none;stroke:#7185a5;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#outsideGarageSection .pg-page-size-dropdown.open .pg-page-size-trigger svg{transform:translateY(-50%) rotate(180deg);stroke:#2563eb}
+#outsideGarageSection .pg-page-size-menu{position:absolute;z-index:170;right:0;top:calc(100% + 7px);width:86px;padding:5px;border:1px solid #d8e3f0;border-radius:11px;background:rgba(255,255,255,.99);box-shadow:0 20px 42px -23px rgba(15,23,42,.52);opacity:0;visibility:hidden;transform:translateY(-5px) scale(.98);transform-origin:top right;transition:opacity .16s ease,visibility .16s ease,transform .16s ease}
+#outsideGarageSection .pg-page-size-dropdown.open .pg-page-size-menu{opacity:1;visibility:visible;transform:translateY(0) scale(1)}
+#outsideGarageSection .pg-page-size-option{width:100%;height:32px;padding:0 9px;border:0;border-radius:7px;background:transparent;color:#526176;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font:inherit;font-size:10.5px;font-weight:750}
+#outsideGarageSection .pg-page-size-option:hover,#outsideGarageSection .pg-page-size-option:focus-visible{outline:none;background:#f0f6ff;color:#1d4ed8}
+#outsideGarageSection .pg-page-size-option[aria-selected=true]{background:#eaf2ff;color:#1d4ed8;font-weight:850}
+#outsideGarageSection .pg-page-size-option[aria-selected=true]:after{content:'✓';font-size:10px}
+#outsideGarageSection .pg-pagination{justify-content:flex-end}
+html.dark #outsideGarageSection .pg-pagination-bar{background:#172033;border-color:#2b3b53}
+html.dark #outsideGarageSection .pg-page-summary{color:#cbd5e1}
+html.dark #outsideGarageSection .pg-page-controls button,html.dark #outsideGarageSection .pg-page-size{border-color:#334155;background:#172033;color:#a8b5c8}
+html.dark #outsideGarageSection .pg-page-controls .pg-page-number[aria-current=page]{border-color:#3b82f6;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff}
+html.dark #outsideGarageSection .pg-page-size-trigger{border-color:#3b4a61;background:#0f172a;color:#e2e8f0}
+html.dark #outsideGarageSection .pg-page-size-menu{border-color:#334155;background:#172033;box-shadow:0 20px 42px -23px rgba(0,0,0,.9)}
+html.dark #outsideGarageSection .pg-page-size-option{color:#cbd5e1}
+html.dark #outsideGarageSection .pg-page-size-option:hover,html.dark #outsideGarageSection .pg-page-size-option[aria-selected=true]{background:#24364f;color:#fff}
+@media(max-width:640px){#outsideGarageSection .pg-pagination-bar{align-items:flex-start;flex-direction:column}#outsideGarageSection .pg-pagination-tools{width:100%;justify-content:space-between;flex-wrap:wrap}}

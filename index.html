@@ -17,7 +17,7 @@
 
 
 
-<link rel="stylesheet" href="assets/css/app.css?v=20261108-hero-seamless"/>
+<link rel="stylesheet" href="assets/css/app.css?v=20261108-pg-pagination"/>
 
 <link rel="stylesheet" href="assets/css/parts-knowledge-page.css?v=20261108-knowledge-table"/>
 <link rel="stylesheet" href="assets/css/vehicle-quick-input.css?v=20261108-batch-scan"/>
@@ -514,9 +514,25 @@
         <span class="pg-unit">Đơn vị: VNĐ</span>
       </div>
     </div>
-    <div class="pg-results-tools"><div class="pg-tabs" role="group" aria-label="Trạng thái đơn giá"><button type="button" data-pg-status="all" class="active" aria-pressed="true">Tất cả <span id="pgAllCount">33</span></button><button type="button" data-pg-status="priced" aria-pressed="false">Có đơn giá <span id="pgAvailableCount">27</span></button><button type="button" data-pg-status="missing" aria-pressed="false">Chưa có giá <span id="pgUnavailableCount">6</span></button></div><div class="pg-page-controls" role="group" aria-label="Phân trang bảng giá"><button id="pgPrev" type="button" aria-label="Trang trước"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg></button><span id="pgPageNumber">1 / 4</span><button id="pgNext" type="button" aria-label="Trang sau"><svg viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"/></svg></button><label class="pg-size-label" for="pgPageSize">Hiển thị <select id="pgPageSize" aria-label="Số hạng mục trên mỗi trang"><option value="10">10</option><option value="20">20</option><option value="50">Tất cả</option></select></label></div></div>
+    <div class="pg-results-tools"><div class="pg-tabs" role="group" aria-label="Trạng thái đơn giá"><button type="button" data-pg-status="all" class="active" aria-pressed="true">Tất cả <span id="pgAllCount">33</span></button><button type="button" data-pg-status="priced" aria-pressed="false">Có đơn giá <span id="pgAvailableCount">27</span></button><button type="button" data-pg-status="missing" aria-pressed="false">Chưa có giá <span id="pgUnavailableCount">6</span></button></div></div>
+    <div class="pg-pagination-bar">
+      <span class="pg-page-summary" id="pgPageSummary" aria-live="polite"></span>
+      <div class="pg-pagination-tools">
+        <div class="pg-page-controls" role="group" aria-label="Phân trang bảng giá">
+          <button id="pgPrev" type="button" aria-label="Trang trước"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg></button>
+          <div class="pg-page-numbers" id="pgPageNumbers"></div>
+          <button id="pgNext" type="button" aria-label="Trang sau"><svg viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"/></svg></button>
+        </div>
+        <div class="pg-page-size"><span>Hiển thị</span>
+          <div class="pg-page-size-dropdown" id="pgPageSizeDropdown">
+            <button class="pg-page-size-trigger" id="pgPageSizeTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Số hạng mục trên mỗi trang"><span id="pgPageSizeValue">10</span><svg viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+            <div class="pg-page-size-menu" role="listbox" aria-label="Số dòng hiển thị"><button class="pg-page-size-option" type="button" role="option" data-size="10" aria-selected="true">10</button><button class="pg-page-size-option" type="button" role="option" data-size="20" aria-selected="false">20</button><button class="pg-page-size-option" type="button" role="option" data-size="50" aria-selected="false">50</button></div>
+          </div>
+          <span>dòng</span></div>
+      </div>
+    </div>
     <div class="pg-table-wrap"><table class="pg-table"><caption class="pg-sr-only">Bảng giá sơn sửa gara ngoài theo dòng xe, năm 2024; đơn vị VNĐ, chưa gồm VAT 10%</caption><thead id="pgTableHead"></thead><tbody id="pgTableBody"></tbody></table></div>
-    <div class="pg-pagination"><span id="pgPageSummary" aria-live="polite"></span><div class="pg-table-note"><i></i> Giá tối đa có thể duyệt</div></div>
+    <div class="pg-pagination"><div class="pg-table-note"><i></i> Giá tối đa có thể duyệt</div></div>
     <div class="pg-data-note"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><span>Ô ghi <strong>0</strong> được giữ nguyên theo bảng gốc; ô trống hiển thị <strong>Chưa có giá</strong>. Hạng mục không phân mức A/B sử dụng một đơn giá chung.</span></div>
   </div>
 

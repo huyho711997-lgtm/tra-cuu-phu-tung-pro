@@ -17,8 +17,28 @@
   let vehicleChoices=[],focusIndex=-1;
   let visibleItems=[];
   function styleLookupSelectMenus(){
-    ['pgDamage','pgPageSize'].forEach(id=>el(id).__kgptPremiumWrapper?.__kgptMenu?.classList.add('pg-owned-select-menu'));
+    ['pgDamage'].forEach(id=>el(id).__kgptPremiumWrapper?.__kgptMenu?.classList.add('pg-owned-select-menu'));
   }
+  // Phân trang cùng kiểu trang tra cứu chính: mũi tên, số trang có dấu …, ô chọn số dòng tùy chỉnh.
+  function goPage(target){state.page=target;render();el('pgPageNumbers').querySelector('[aria-current="page"]')?.focus({preventScroll:true});}
+  function renderPager(pages){
+    const box=el('pgPageNumbers');box.replaceChildren();
+    const indexes=[...new Set([1,state.page-1,state.page,state.page+1,pages].filter(n=>n>=1&&n<=pages))].sort((a,b)=>a-b);
+    let previous=0;
+    for(const n of indexes){
+      if(n>previous+1){const gap=document.createElement('span');gap.className='pg-page-ellipsis';gap.textContent='…';box.append(gap);}
+      const button=document.createElement('button');button.type='button';button.className='pg-page-number';button.textContent=String(n);button.setAttribute('aria-label','Trang '+n);
+      if(n===state.page)button.setAttribute('aria-current','page');else button.addEventListener('click',()=>goPage(n));
+      box.append(button);previous=n;
+    }
+    el('pgPrev').disabled=state.page<=1;
+    el('pgNext').disabled=state.page>=pages;
+  }
+  function syncPageSize(){
+    el('pgPageSizeValue').textContent=String(state.size);
+    root.querySelectorAll('.pg-page-size-option').forEach(option=>option.setAttribute('aria-selected',String(Number(option.dataset.size)===state.size)));
+  }
+  function closePageSize(){const drop=el('pgPageSizeDropdown');drop.classList.remove('open');el('pgPageSizeTrigger').setAttribute('aria-expanded','false');}
   function groupIndex(){return groups.findIndex(g=>g.id===state.group);}
   function currentGroup(){return groups[groupIndex()];}
   function rates(item){const index=groupIndex();return item.rates.common?{common:item.rates.common[index]}:{A:item.rates.A?.[index]??null,B:item.rates.B?.[index]??null};}
@@ -70,9 +90,7 @@
       return '<tr data-pg-item="'+item.id+'"'+(item.no===32?' class="pg-overhaul-row"':'')+'><td class="pg-row-no">'+item.no+'</td><td class="pg-name-cell"><span class="pg-item-name">'+escape(item.name)+(item.no===32?'<span class="pg-item-full">TOÀN XE</span>':'')+'</span><span class="pg-item-meta">'+(item.id==='24-phay'?'Hạng mục thuộc danh mục 24':Object.hasOwn(rate,'common')?'Đơn giá theo hạng mục':'Phân mức theo hư hỏng A / B')+'</span></td>'+cells+'<td class="pg-source-cell"><a href="'+catalog.source+'#page='+item.page+'" target="_blank" rel="noopener" aria-label="Đối chiếu '+escape(item.name)+' tại trang '+item.page+' của PDF">'+item.page+'<svg viewBox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10"/></svg></a></td></tr>';
     }).join(''):'<tr><td class="pg-empty-state" colspan="'+(state.level==='all'?5:4)+'"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><strong>Không tìm thấy hạng mục phù hợp</strong><p>Thử từ khóa khác hoặc chuyển trạng thái đơn giá.</p><button type="button" data-pg-clear-items data-premium-delete-bypass="1">Xóa bộ lọc hạng mục</button></td></tr>';
     el('pgPageSummary').textContent=visibleItems.length?'Hiển thị '+(start+1)+'–'+(start+shown.length)+' / '+visibleItems.length+' hạng mục':'0 hạng mục phù hợp';
-    el('pgPageNumber').textContent=state.page+' / '+pages;
-    el('pgPrev').disabled=state.page<=1;
-    el('pgNext').disabled=state.page>=pages;
+    renderPager(pages);
     el('pgClearSearch').hidden=!state.query;
   }
   function choicesForQuery(query){
@@ -168,13 +186,23 @@
   el('pgTableBody').addEventListener('click',event=>{if(event.target.closest('[data-pg-clear-items]'))clearItems();});
   el('pgPrev').addEventListener('click',()=>{state.page--;render();});
   el('pgNext').addEventListener('click',()=>{state.page++;render();});
-  el('pgPageSize').addEventListener('change',event=>{state.size=Number(event.target.value);state.page=1;render();});
+  el('pgPageSizeTrigger').addEventListener('click',event=>{
+    event.stopPropagation();
+    const open=el('pgPageSizeDropdown').classList.toggle('open');
+    el('pgPageSizeTrigger').setAttribute('aria-expanded',String(open));
+  });
+  root.querySelectorAll('.pg-page-size-option').forEach(option=>option.addEventListener('click',()=>{
+    const size=Number(option.dataset.size);closePageSize();
+    if(size!==state.size){state.size=size;state.page=1;syncPageSize();render();}
+    el('pgPageSizeTrigger').focus({preventScroll:true});
+  }));
+  document.addEventListener('click',event=>{if(!el('pgPageSizeDropdown').contains(event.target))closePageSize();});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&el('pgPageSizeDropdown').classList.contains('open')){closePageSize();el('pgPageSizeTrigger').focus({preventScroll:true});}});
   el('pgReset').addEventListener('click',()=>{
     Object.assign(state,{group:'sedan',model:'',query:'',level:'all',status:'all',page:1,size:10});
-    el('pgItemSearch').value='';el('pgDamage').value='all';el('pgPageSize').value='10';
+    el('pgItemSearch').value='';el('pgDamage').value='all';syncPageSize();
     // Keep the existing shared select UI in sync without assigning it a second owner.
     el('pgDamage').dispatchEvent(new Event('change',{bubbles:true}));
-    el('pgPageSize').dispatchEvent(new Event('change',{bubbles:true}));
     closePicker();render();
   });
   window.paintGarageRefresh=render;
