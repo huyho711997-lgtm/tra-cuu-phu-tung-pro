@@ -70,6 +70,40 @@ function validateGrant(body) {
   return [...new Set(targets)];
 }
 
+const FP = /^[0-9a-f]{8}$/;
+function validateSharedTarget(body, required) {
+  if (body.name === undefined && body.fp === undefined && !required) return {};
+  if (!KEY_NAMES.includes(body.name) || (body.fp !== undefined && !FP.test(body.fp)) || (required && body.fp === undefined)) throw invalid();
+  return { name: body.name, ...(body.fp !== undefined ? { fp: body.fp } : {}) };
+}
+
+// Kiểm tra tình trạng một key dùng chung bằng lệnh liệt kê model (không tốn lượt tạo nội dung). Không bao giờ trả key hay nội dung lỗi của nhà cung cấp.
+async function checkSharedKey(fetchImpl, item, signal, ctx) {
+  const { cooldowns, now } = ctx;
+  const base = { name: item.name, no: item.no, fp: item.fp, checkedAt: new Date(now()).toISOString() };
+  if (item.name === 'ocrspace') return { ...base, status: 'unsupported', message: 'OCR.Space không có cách kiểm tra miễn phí; key được thử khi dùng thật.' };
+  const groq = item.name.startsWith('groq');
+  try {
+    const response = await upstream(fetchImpl, groq ? 'https://api.groq.com/openai/v1/models' : 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1',
+      { method: 'GET', headers: groq ? { Authorization: `Bearer ${item.key}` } : { 'x-goog-api-key': item.key } }, signal);
+    await response.arrayBuffer().catch(() => null);
+    const fp = await fingerprint(item.key);
+    const waits = {};
+    if (!groq) for (const model of GEMINI_MODELS) {
+      const left = Math.ceil((Math.max(cooldowns.get(fp + '|' + model) || 0, cooldowns.get(fp + '|*') || 0) - now()) / 1000);
+      if (left > 0) waits[model] = left;
+    }
+    if (response.ok) return Object.keys(waits).length
+      ? { ...base, status: 'limited', cooldowns: waits, message: 'Key hợp lệ nhưng đang tạm nghỉ vì hết lượt ở ít nhất một model.' }
+      : { ...base, status: 'ok', message: 'Key hợp lệ.' };
+    if ([400, 401, 403].includes(response.status)) return { ...base, status: 'invalid', message: 'Key không hợp lệ, đã bị thu hồi hoặc bị hạn chế.' };
+    if (response.status === 429) return { ...base, status: 'limited', cooldowns: waits, message: 'Key đang bị giới hạn lượt dùng. Hãy thử lại sau.' };
+    return { ...base, status: 'error', message: 'Nhà cung cấp tạm thời chưa phản hồi đúng. Hãy kiểm tra lại sau.' };
+  } catch (_) {
+    return { ...base, status: 'error', message: 'Không kết nối được nhà cung cấp. Hãy kiểm tra lại sau.' };
+  }
+}
+
 async function readBounded(req) {
   if (Number(req.headers.get('content-length') || 0) > MAX_BODY) throw new HttpError(413, 'BODY_TOO_LARGE', 'Dữ liệu quá lớn. Hãy chia nhỏ file.');
   if (!req.body) throw invalid();
@@ -238,6 +272,7 @@ export function createHandler({createClient,env,fetchImpl=globalThis.fetch,rando
         if (error) {
           if (error.code === '42501') throw new HttpError(403,'ACCESS_DENIED','Bạn không có quyền thay đổi cấu hình này.');
           if (/AI_TOO_MANY_KEYS/.test(error.message || '')) throw new HttpError(400,'TOO_MANY_KEYS','Tối đa ' + MAX_GEMINI_KEYS + ' key Gemini. Hãy xóa bớt key cũ trước khi thêm.');
+          if (/AI_KEY_NOT_FOUND/.test(error.message || '')) throw new HttpError(409,'KEY_NOT_FOUND','Key này không còn trong kho. Hãy tải lại danh sách.');
           if (/AI_INVALID/.test(error.message || '')) throw invalid();
           throw new HttpError(503,'STORAGE_UNAVAILABLE','Không truy cập được kho key. Hãy thử lại sau.');
         }
@@ -252,16 +287,28 @@ export function createHandler({createClient,env,fetchImpl=globalThis.fetch,rando
       } else if (type.startsWith('application/json')) {
         try { body = JSON.parse(new TextDecoder().decode(bytes)); } catch (_) { throw invalid(); }
       } else throw invalid();
-      if (!object(body) || !['settings','save','list','generate','ocr','shared','sharedSave','grant'].includes(body.action)) throw invalid();
+      if (!object(body) || !['settings','save','list','generate','ocr','shared','sharedSave','grant','sharedCheck','sharedRemove'].includes(body.action)) throw invalid();
       const ai = ['generate','ocr'].includes(body.action);
       if (body.action === 'list' && profile.role !== 'admin') throw new HttpError(403,'ACCESS_DENIED','Chỉ quản trị viên được xem danh sách cấu hình.');
-      if (['shared','sharedSave','grant'].includes(body.action) && profile.role !== 'admin') throw new HttpError(403,'ACCESS_DENIED','Chỉ quản trị viên được quản lý key dùng chung.');
+      if (['shared','sharedSave','grant','sharedCheck','sharedRemove'].includes(body.action) && profile.role !== 'admin') throw new HttpError(403,'ACCESS_DENIED','Chỉ quản trị viên được quản lý key dùng chung.');
       if (!await rpc('kgpt_ai_consume_rate',{p_user_id:actor,p_category:ai?'ai':'settings'})) throw new HttpError(429,'APP_RATE_LIMIT','Bạn thao tác quá nhanh hoặc đã hết hạn mức ngày của ứng dụng. Hãy thử lại sau.');
       if (body.action === 'shared') return reply(await rpc('kgpt_ai_shared_read',{p_actor:actor}));
       if (body.action === 'sharedSave') {
         validateSharedSave(body);
         // Việc gộp key (append) và giới hạn 10 key làm ngay trong CSDL: key cũ không rời khỏi Vault.
         return reply(await rpc('kgpt_ai_shared_save',{p_actor:actor,p_keys:body.keys || {},p_clear:body.clear || [],p_append:body.appendKeys || []}));
+      }
+      if (body.action === 'sharedRemove') {
+        const target = validateSharedTarget(body, true);
+        if (target.name !== 'gemini') throw invalid();
+        return reply(await rpc('kgpt_ai_shared_remove_key',{p_actor:actor,p_name:target.name,p_fp:target.fp}));
+      }
+      if (body.action === 'sharedCheck') {
+        const target = validateSharedTarget(body, false);
+        const items = (await rpc('kgpt_ai_shared_secrets',{p_actor:actor}) || []).filter(item => (!target.name || item.name === target.name) && (!target.fp || item.fp === target.fp)).slice(0,15);
+        if (target.fp && !items.length) throw new HttpError(409,'KEY_NOT_FOUND','Key này không còn trong kho. Hãy tải lại danh sách.');
+        const signal = AbortSignal.any([req.signal,AbortSignal.timeout(60000)]);
+        return reply({results: await Promise.all(items.map(item => checkSharedKey(fetchImpl,item,signal,{cooldowns,now})))});
       }
       if (body.action === 'grant') return reply(await rpc('kgpt_ai_shared_grant',{p_actor:actor,p_targets:validateGrant(body),p_allow:body.allow}));
       if (body.action === 'settings' || body.action === 'list') {

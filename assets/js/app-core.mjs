@@ -1,6 +1,6 @@
 // 1. KẾT NỐI SUPABASE — thay Firebase Auth/Firestore bằng Supabase Auth + PostgreSQL
         import { createPartsSearchLearning } from "./parts-search-learning.mjs?v=20261019-knowledge-contrast-v1";
-        import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs?v=20261108-shared-keys";
+        import { createSecureAiClient, migrateLegacyKeys } from "./secure-ai.mjs?v=20261108-key-manage";
         import { parseVehicleQuickInput, buildVehicleQuickAiPrompt, sanitizeVehicleAiHints, buildVehicleQuickExamples, buildRegistrationAiPrompt, normalizeRegistrationFields } from "./vehicle-quick-input.mjs?v=20261107-quick-v11";
         import { buildQuotePartsAiPrompt, mergeQuotePartItems } from "./quote-parts-ocr.mjs?v=20261108-quote-ocr";
         import { getPartsCandidateFamily as classifyPartsCandidateFamily, getPartsCandidateRelevance as evaluatePartsCandidateRelevance, canRoutePartsCandidate } from "./parts-relevance.mjs";
@@ -800,6 +800,12 @@
                     const clear = Array.isArray(p.clear) ? p.clear.filter(name => typeof name === 'string') : [];
                     const state = await secureAi.sharedSave(keys, clear, { appendKeys: p.append === true && keys.gemini ? ['gemini'] : [] });
                     post({ type: 'kgpt:ai-shared-state', ok: true, saved: true, message: Object.keys(keys).length ? 'Đã lưu key dùng chung.' : 'Đã xóa key dùng chung.', ...state });
+                } else if (message.type === 'kgpt:ai-shared-remove') {
+                    const state = await secureAi.sharedRemoveKey(String(p.name || ''), String(p.fp || ''));
+                    post({ type: 'kgpt:ai-shared-state', ok: true, saved: false, message: 'Đã xóa key khỏi kho.', ...state });
+                } else if (message.type === 'kgpt:ai-shared-check') {
+                    const { results } = await secureAi.sharedCheck(p.name ? String(p.name) : '', p.fp ? String(p.fp) : '');
+                    post({ type: 'kgpt:ai-shared-check-result', ok: true, results: Array.isArray(results) ? results : [] });
                 } else if (message.type === 'kgpt:ai-grant') {
                     const result = await secureAi.grant(uids, allow);
                     ADMIN_USER_CACHE = ADMIN_USER_CACHE.map(user => uids.includes(user.uid) ? { ...user, apiSettings: { ...(user.apiSettings || {}), useSharedKeys: allow, sharedAllowed: allow } } : user);
@@ -809,7 +815,9 @@
                 }
             } catch (error) {
                 const failure = { ok: false, message: error?.message || 'Không thực hiện được. Hãy thử lại.' };
-                post(message.type === 'kgpt:ai-grant' ? { type: 'kgpt:ai-grant-result', ...failure, uids, allow } : { type: 'kgpt:ai-shared-state', ...failure });
+                post(message.type === 'kgpt:ai-grant' ? { type: 'kgpt:ai-grant-result', ...failure, uids, allow }
+                    : message.type === 'kgpt:ai-shared-check' ? { type: 'kgpt:ai-shared-check-result', ...failure }
+                    : { type: 'kgpt:ai-shared-state', ...failure });
             }
         }
         window.addEventListener('message', async function(event) {

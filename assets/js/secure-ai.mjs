@@ -27,6 +27,8 @@ export function createSecureAiClient({supabase,getOwner}) {
         sharedRead: () => request({action:'shared'}),
         sharedSave: (keys={},clear=[],options={}) => request({action:'sharedSave',keys,clear,
             ...(options.appendKeys?.length ? {appendKeys:options.appendKeys} : {})}),
+        sharedCheck: (name,fp) => request({action:'sharedCheck',...(name ? {name} : {}),...(fp ? {fp} : {})}),
+        sharedRemoveKey: (name,fp) => request({action:'sharedRemove',name,fp}),
         grant: (targetUserIds,allow) => request({action:'grant',targetUserIds,allow:allow === true}),
         save: (targetUserId,settings,keys={},clear=[],options={}) => request({action:'save',targetUserId,settings,keys,clear,onlyIfMissing:options.onlyIfMissing === true,
             ...(options.appendKeys?.length ? {appendKeys:options.appendKeys} : {})}),
