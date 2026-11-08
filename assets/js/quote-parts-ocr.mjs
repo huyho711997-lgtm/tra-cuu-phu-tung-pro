@@ -16,6 +16,20 @@ export function buildQuotePartsAiPrompt() {
     ].join('\n');
 }
 
+// Bản dành cho văn bản OCR (không có ảnh): dùng với OCR.Space + Groq, giống cách quét giấy đăng kiểm.
+// OCR bảng hay lệch dòng/dính cột nên dặn rõ không đoán và chỉ lấy cột tên hạng mục.
+export const QUOTE_OCR_TEXT_MAX = 14000;
+export function buildQuotePartsTextPrompt(ocrText) {
+    return [
+        buildQuotePartsAiPrompt().replace('Bạn đọc ảnh/PDF báo giá', 'Bạn nhận văn bản do OCR đọc từ báo giá'),
+        'Văn bản OCR có thể lệch dòng, dính cột hoặc sai vài ký tự; tên hạng mục và số lượng/đơn giá có thể nằm ở các dòng liền nhau. Chỉ lấy cột tên hạng mục, không lấy số tiền.',
+        '--- VĂN BẢN OCR ---',
+        String(ocrText || '').slice(0, QUOTE_OCR_TEXT_MAX)
+    ].join('\n');
+}
+// Gộp chữ OCR của nhiều tệp (mỗi tệp một khối) trước khi gửi Groq.
+export const joinQuoteOcrTexts = texts => (Array.isArray(texts) ? texts : []).map(text => String(text ?? '').trim()).filter(Boolean).join('\n\n=== TỆP TIẾP THEO ===\n\n');
+
 const cleanName = raw => String(raw ?? '').replace(/[\u0000-\u001f]+/g, ' ')
     .replace(/^\s*(?:[-•*]|\(?\d{1,3}[.)]|\d{1,3}\s*[-–:])\s*/, '')      // số thứ tự
     .replace(/\s*[\(\[]\s*(?:x\s*)?\d+\s*(?:cái|chiếc|bộ|pcs|cai|chiec|bo)?\s*[\)\]]\s*$/i, '') // (2) cuối dòng

@@ -97,4 +97,5 @@ Migration `20261108090000_ai_global_settings.sql` thêm bảng `kgpt_private.ai_
 
 - `gemini` (mặc định): Gemini đọc trực tiếp ảnh/PDF (`thinking:'minimal'` để nhanh hơn).
 - `fast`: OCR.Space lấy chữ, Groq bóc tách JSON; thiếu biển số/số khung, file lớn hơn 1MB hoặc lỗi thì tự chuyển sang Gemini. Cần key OCR.Space và Groq.
+- Cài đặt này cũng áp dụng cho nút *Đọc hạng mục từ báo giá* (Tìm nhiều phụ tùng): `fast` = OCR.Space (mỗi tệp ≤ 1MB) → Groq trả danh sách hạng mục; tệp lớn/đọc lỗi/không ra hạng mục thì Gemini đọc thay (`thinking:'minimal'`).
 - Admin đổi tại *Quản lý người dùng → Key AI dùng chung → Cách đọc giấy đăng kiểm*. Mọi tài khoản đọc giá trị này qua `settings` (trường `global.regReader`) và áp dụng sau khi tải lại trang.
